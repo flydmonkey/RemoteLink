@@ -20,7 +20,7 @@ install -D -m 0755 "${build_dir}/remote-gateway" "${package_root}/bin/remote-gat
 install -D -m 0755 "${build_dir}/libremote_gateway_core.so" "${package_root}/lib/libremote_gateway_core.so"
 install -D -m 0755 "${build_dir}/libremote_gateway_streaming.so" "${package_root}/lib/libremote_gateway_streaming.so"
 shopt -s nullglob
-datachannel_libraries=("${build_dir}/third_party/libdatachannel/"libdatachannel.so*)
+mapfile -t datachannel_libraries < <(find "${build_dir}" -name 'libdatachannel.so*' -print)
 (( ${#datachannel_libraries[@]} > 0 )) || { echo "libdatachannel was not built" >&2; exit 1; }
 cp -a "${datachannel_libraries[@]}" "${package_root}/lib/"
 shopt -u nullglob

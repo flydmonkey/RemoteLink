@@ -75,7 +75,7 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y build-essential cmake ninja-build pkg-config git python3 curl openssl \
-  ca-certificates libopenh264-dev libopus-dev libyuv-dev libssl-dev
+  ca-certificates libopenh264-dev libopus-dev libyuv-dev libssl-dev nlohmann-json3-dev
 
 if apt-cache show freerdp3-dev >/dev/null 2>&1 && apt-cache show libwinpr3-dev >/dev/null 2>&1; then
   apt-get install -y freerdp3-dev libwinpr3-dev
@@ -115,9 +115,8 @@ install -d -o remote-gateway -g remote-gateway -m 0750 "${state_root}"
 install -m 0755 "${project_root}/build/remote-gateway" "${install_root}/bin/remote-gateway"
 install -m 0644 "${project_root}/build/libremote_gateway_core.so" "${install_root}/lib/"
 install -m 0644 "${project_root}/build/libremote_gateway_streaming.so" "${install_root}/lib/"
-datachannel_dir="${project_root}/build/third_party/libdatachannel"
 shopt -s nullglob
-datachannel_libraries=("${datachannel_dir}"/libdatachannel.so*)
+mapfile -t datachannel_libraries < <(find "${project_root}/build" -name 'libdatachannel.so*' -print)
 (( ${#datachannel_libraries[@]} > 0 )) || { echo "libdatachannel was not built" >&2; exit 1; }
 cp -a "${datachannel_libraries[@]}" "${install_root}/lib/"
 shopt -u nullglob
