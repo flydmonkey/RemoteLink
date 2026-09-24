@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RemoteLink · 设置</title>
+  <link rel="icon" type="image/png" href="/remotelink-icon.png">
+  <style>
+    :root{color-scheme:dark;--bg:#202020;--panel:#2b2b2b;--control:#222;--hover:#363636;--stroke:#ffffff22;--text:#f5f5f5;--muted:#ffffff92;--accent:#6cc5f3;--accent-text:#10232d;--success:#6ccb5f;font:14px/1.45 "Segoe UI Variable","Segoe UI","Microsoft YaHei UI",sans-serif}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:start center;padding:28px 16px;color:var(--text);background:var(--bg)}.app{width:min(620px,100%);border:1px solid var(--stroke);border-radius:8px;background:var(--panel);box-shadow:0 18px 50px #0006;overflow:hidden}.titlebar{height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 12px 0 8px}.titlebar-start{display:flex;align-items:center;gap:4px}.titlebar h1{margin:0 0 0 4px;font-size:14px;font-weight:600}.icon-button{display:grid;place-items:center;width:34px;height:34px;border-radius:4px;color:var(--text);text-decoration:none}.icon-button:hover{background:#ffffff0d}.icon-button:active{background:#ffffff08}.icon-button svg{width:18px;height:18px}.back-button svg{width:20px;height:20px}.nav{display:flex;gap:2px}.nav .icon-button{color:var(--muted)}.content{padding:6px 20px 20px}.hero{margin-bottom:18px}.hero h2{margin:0 0 3px;font-size:22px;font-weight:600}.hero p,.description{margin:0;color:var(--muted);font-size:12px}.section{margin-top:10px;padding:16px;border:1px solid #ffffff14;border-radius:7px;background:#272727}.section h3{margin:0 0 14px;font-size:15px}.row{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:14px;margin:12px 0}.field label{display:block;font-weight:600}.field .description{margin-top:2px}select,button{font:inherit}select{width:100%;min-height:34px;padding:6px 10px;border:1px solid var(--stroke);border-bottom-color:#ffffff48;border-radius:4px;color:var(--text);background:var(--control);outline:0}select:focus{border-color:var(--accent);border-bottom-width:2px}.switch{position:relative;justify-self:end;width:40px;height:22px}.switch input{position:absolute;opacity:0}.switch span{position:absolute;inset:0;border:1px solid #ffffff45;border-radius:999px;background:#555;cursor:pointer}.switch span:after{content:"";position:absolute;left:3px;top:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:.16s}.switch input:checked+span{border-color:var(--accent);background:var(--accent)}.switch input:checked+span:after{transform:translateX(18px);background:var(--accent-text)}.switch input:disabled+span{opacity:.4;cursor:not-allowed}.notice{margin:12px 0 0;padding:10px 12px;border-radius:5px;color:var(--muted);background:#ffffff08;font-size:12px}.actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;padding-top:18px}.saved{margin-right:auto;color:var(--success);opacity:0;transition:opacity .2s}.saved.show{opacity:1}button{min-width:96px;min-height:34px;padding:6px 14px;border:0;border-radius:4px;color:var(--accent-text);background:var(--accent);font-weight:600;cursor:pointer}button:hover{filter:brightness(1.08)}:focus-visible{outline:2px solid var(--accent);outline-offset:2px}@media(max-width:520px){body{padding:0}.app{min-height:100vh;border:0;border-radius:0}.row{grid-template-columns:1fr}.switch{justify-self:start}}
+  </style>
+</head>
+<body><div class="app">
+  <header class="titlebar"><div class="titlebar-start"><a class="icon-button back-button" href="/" title="返回" aria-label="返回连接页面"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a><h1>设置</h1></div><nav class="nav" aria-label="应用导航"><a class="icon-button" href="/admin" title="状态" aria-label="状态"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg></a></nav></header>
+  <main class="content"><div class="hero"><h2>连接设置</h2><p>这些选项会应用到下一次新建的远程会话。</p></div>
+    <form id="settings-form">
+      <section class="section"><h3>语言</h3><div class="row"><div class="field"><label for="language">界面语言</label><p class="description">默认跟随当前系统语言</p></div><select id="language"><option value="system">跟随系统</option><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option><option value="en">English</option><option value="ja">日本語</option><option value="ko">한국어</option></select></div></section>
+      <section class="section"><h3>显示与画面</h3>
+        <div class="row"><div class="field"><label for="resolution">显示分辨率</label><p class="description">远程 Windows 桌面的实际尺寸</p></div><select id="resolution"><option value="auto">自动 · 当前设备</option><option value="1280x720">1280 × 720</option><option value="1600x900">1600 × 900</option><option value="1920x1080">1920 × 1080</option><option value="2560x1440">2560 × 1440</option><option value="3840x2160">3840 × 2160</option></select></div>
+        <div class="row"><div class="field"><label for="quality">画面质量</label><p class="description">调整 H.264 视频码率</p></div><select id="quality"><option value="2000000">流畅 · 2 Mbps</option><option value="4000000">均衡 · 4 Mbps</option><option value="8000000">高质量 · 8 Mbps</option><option value="12000000">超高 · 12 Mbps</option></select></div>
+        <div class="row"><div class="field"><label for="encoder">视频编码器</label><p class="description">硬件不可用时会自动回退到软件编码</p></div><select id="encoder"><option value="auto">自动选择</option><option value="software">软件 · OpenH264</option><option value="hardware">硬件加速（实验）</option></select></div>
+      </section>
+      <section class="section"><h3>本地资源</h3>
+        <div class="row"><div class="field"><label for="sound">播放远程声音</label><p class="description">通过 WebRTC 在本机播放 Windows 会话声音</p></div><label class="switch"><input id="sound" type="checkbox"><span></span></label></div>
+        <div class="row"><div class="field"><label for="printer">打印机重定向</label><p class="description">将网关打印队列提供给远程 Windows</p></div><label class="switch"><input id="printer" type="checkbox"><span></span></label></div>
+        <p class="notice">浏览器首次播放声音时可能需要点击一次远程画面。打印任务将由网关的 PDF 打印队列接收。</p>
+      </section>
+      <div class="actions"><span id="saved" class="saved" role="status">设置已保存</span><button type="submit">保存设置</button></div>
+    </form>
+  </main>
+</div>
+<script src="/i18n.js"></script>
+<script>
+const defaults={width:1920,height:1080,bitrate:4000000,sound:true,printer:true,encoder:'auto'};
+document.querySelector('.nav a[href="/admin"]')?.remove();
+let settings={...defaults};try{settings={...settings,...JSON.parse(localStorage.getItem('remote-gateway-settings')||'{}')}}catch{}
+const language=document.querySelector('#language');const resolution=document.querySelector('#resolution');const quality=document.querySelector('#quality');const encoder=document.querySelector('#encoder');const sound=document.querySelector('#sound');const printer=document.querySelector('#printer');const saved=document.querySelector('#saved');
+language.value=window.RemoteLinkI18n.preference;resolution.value=settings.width&&settings.height?`${settings.width}x${settings.height}`:'auto';if(!resolution.value)resolution.value='auto';
+quality.value=String(settings.bitrate);if(!quality.value)quality.value='4000000';encoder.value=settings.encoder||'auto';sound.checked=settings.sound!==false;printer.checked=settings.printer!==false;
+document.querySelector('#settings-form').addEventListener('submit',event=>{event.preventDefault();if(language.value!==window.RemoteLinkI18n.preference){window.RemoteLinkI18n.setLanguage(language.value);return}const [width,height]=resolution.value==='auto'?[0,0]:resolution.value.split('x').map(Number);localStorage.setItem('remote-gateway-settings',JSON.stringify({width,height,bitrate:Number(quality.value),encoder:encoder.value,sound:sound.checked,printer:printer.checked}));saved.classList.add('show');setTimeout(()=>saved.classList.remove('show'),1800)});
+</script></body></html>

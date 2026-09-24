@@ -1,0 +1,16 @@
+{
+  "targets": [
+    {
+      "id": "server-55",
+      "name": "Windows Server 10.17.12.55",
+      "host": "10.17.12.55",
+      "port": 3389,
+      "username": "administrator",
+      "passwordEnv": "RG_TARGET_SERVER_55_PASSWORD",
+      "domain": "",
+      "width": 1280,
+      "height": 720,
+      "ignoreCertificate": true
+    }
+  ]
+}

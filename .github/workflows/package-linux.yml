@@ -1,0 +1,74 @@
+name: Package RemoteLink for Linux
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version (optional)
+        required: false
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  package-linux-x86_64:
+    name: Linux x86_64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build pkg-config \
+            freerdp3-dev libwinpr3-dev libopenh264-dev \
+            libopus-dev libyuv-dev libssl-dev
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DREMOTE_GATEWAY_ENABLE_STREAMING=ON
+          -DREMOTE_GATEWAY_BUILD_TESTS=ON
+
+      - name: Build and test
+        run: |
+          cmake --build build --parallel
+          ctest --test-dir build --output-on-failure
+
+      - name: Resolve package version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ -n "${INPUT_VERSION}" ]]; then
+            version="${INPUT_VERSION}"
+          elif [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME}"
+          else
+            version="0.1.0-${GITHUB_SHA::7}"
+          fi
+          echo "value=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Create package
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.value }}
+        run: ./scripts/package-linux.sh
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: RemoteLink-linux-x86_64-${{ steps.version.outputs.value }}
+          path: |
+            dist/RemoteLink-linux-x86_64-*.tar.gz
+            dist/RemoteLink-linux-x86_64-*.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 30

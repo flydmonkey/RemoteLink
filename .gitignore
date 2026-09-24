@@ -1,0 +1,13 @@
+/build/
+/build-*/
+/dist/
+/.cursor/
+/.deps/
+/third_party/
+/.cache/
+/config/*.local
+/config/*.local.json
+compile_commands.json
+*.user
+__pycache__/
+*.py[cod]

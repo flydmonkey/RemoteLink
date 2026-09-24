@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RemoteLink · 远程会话</title>
+  <link rel="icon" type="image/png" href="/remotelink-icon.png">
+  <style>
+    :root{color-scheme:dark;font-family:"Segoe UI Variable","Segoe UI","Microsoft YaHei UI",sans-serif;--mica:#202020;--layer:#2b2b2b;--layer-alt:#252525;--stroke:#ffffff14;--stroke-strong:#ffffff2a;--text:#fff;--muted:#ffffff9a;--accent:#60cdff;--accent-text:#003447;--danger:#ff99a4}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--text);background:radial-gradient(circle at 78% -20%,#16445c55,transparent 42%),linear-gradient(135deg,#202020,#1c2023);font:14px/1.45 "Segoe UI Variable","Segoe UI","Microsoft YaHei UI",sans-serif}body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.22;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.08'/%3E%3C/svg%3E")}
+    .app-shell{position:relative;min-height:100vh;display:grid;grid-template-rows:auto 1fr}.titlebar{height:56px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--stroke);background:#202020b8;backdrop-filter:blur(24px)}.brand{display:flex;align-items:center;gap:12px}.app-icon{display:grid;place-items:center;width:28px;height:28px;border-radius:6px;background:linear-gradient(145deg,#74d7ff,#168fc5);color:#062637;font-weight:700}.brand h1{margin:0;font-size:14px;font-weight:600}.connection{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.nav-link{color:var(--text);text-decoration:none;padding:7px 12px;border-radius:4px}.nav-link:hover{background:#ffffff0f}#status{display:flex;align-items:center;gap:7px;color:var(--muted);padding-right:8px}#status:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px #60cdffaa}
+    main{width:min(1440px,calc(100% - 48px));margin:0 auto;padding:24px 0 32px}.workspace{position:relative;min-height:calc(100vh - 150px);padding:12px;border:1px solid var(--stroke);border-radius:8px;background:var(--layer-alt);box-shadow:0 16px 48px #0005;overflow:hidden}.command-info{display:flex;justify-content:space-between;gap:20px;padding:12px 4px 0;color:var(--muted)}.command-info p{margin:0}.command-info #metrics{text-align:right;font-variant-numeric:tabular-nums}
+    video{display:block;width:100%;aspect-ratio:16/9;max-height:calc(100vh - 190px);object-fit:contain;background:#090909;border:1px solid #000;border-radius:4px;touch-action:none;box-shadow:inset 0 0 0 1px #ffffff0a}.remote-cursor{position:fixed;z-index:1100;display:none;pointer-events:none;max-width:none;max-height:none;transform:translate(var(--cursor-hotspot-x,0),var(--cursor-hotspot-y,0));image-rendering:auto}button,input,textarea{font:inherit}button{min-height:32px;padding:5px 12px;border:1px solid var(--stroke-strong);border-bottom-color:#ffffff42;border-radius:4px;color:var(--text);background:#ffffff0f;cursor:pointer}button:hover{background:#ffffff18}button:active{background:#ffffff0a;border-bottom-color:var(--stroke-strong)}button:disabled{opacity:.45;cursor:not-allowed}.primary,form button[type=submit]{color:var(--accent-text);background:var(--accent);border-color:transparent;font-weight:600}.primary:hover,form button[type=submit]:hover{background:#77d5fa}.tool{background:#ffffff0f}
+    #chooser{padding:20px}.section-heading{margin:0 0 4px;font-size:20px;font-weight:600}.section-copy{margin:0 0 18px;color:var(--muted)}#hosts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px}.host{min-height:68px;padding:12px 16px;text-align:left;background:var(--layer);border-color:var(--stroke)}.host:hover{background:#323232;border-color:var(--stroke-strong)}
+    dialog{width:min(420px,calc(100% - 32px));padding:0;border:1px solid #ffffff26;border-radius:8px;color:var(--text);background:#2c2c2ce8;backdrop-filter:blur(28px) saturate(1.25);box-shadow:0 24px 70px #0009}dialog::backdrop{background:#00000070}form{display:grid;gap:12px;padding:24px}form strong{font-size:20px;font-weight:600}label{color:var(--muted)}input,textarea{width:100%;padding:8px 10px;border:1px solid var(--stroke-strong);border-bottom-color:#ffffff55;border-radius:4px;color:var(--text);background:#1f1f1f;outline:0}input:focus,textarea:focus{border-color:var(--accent);border-bottom-width:2px}#auth-error{color:var(--danger);min-height:20px}.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}[hidden]{display:none!important}@media(max-width:760px){.titlebar{height:auto;min-height:56px;padding:10px 16px;align-items:flex-start}.connection{justify-content:flex-end}main{width:calc(100% - 24px);padding-top:12px}.command-info{display:block}.command-info #metrics{text-align:left}.workspace{padding:8px}}
+  </style>
+  <style>
+    :root{color-scheme:light;--mica:#f3f3f3;--layer:#fff;--layer-alt:#f9f9f9;--stroke:#0000000f;--stroke-strong:#00000029;--text:#1a1a1a;--muted:#0000009e;--accent:#005fb8;--accent-hover:#196fc2;--accent-text:#fff;--danger:#c42b1c;--page-glow:#d7effb;--control:#ffffffb3;--control-hover:#fff;--canvas:#090909}
+    @media(prefers-color-scheme:dark){:root{color-scheme:dark;--mica:#202020;--layer:#2b2b2b;--layer-alt:#252525;--stroke:#ffffff14;--stroke-strong:#ffffff2a;--text:#fff;--muted:#ffffff9a;--accent:#60cdff;--accent-hover:#77d5fa;--accent-text:#003447;--danger:#ff99a4;--page-glow:#16445c;--control:#ffffff0f;--control-hover:#ffffff18;--canvas:#090909}}
+    :root[data-theme="light"]{color-scheme:light;--mica:#f3f3f3;--layer:#fff;--layer-alt:#f9f9f9;--stroke:#0000000f;--stroke-strong:#00000029;--text:#1a1a1a;--muted:#0000009e;--accent:#005fb8;--accent-hover:#196fc2;--accent-text:#fff;--danger:#c42b1c;--page-glow:#d7effb;--control:#ffffffb3;--control-hover:#fff;--canvas:#090909}
+    :root[data-theme="dark"]{color-scheme:dark;--mica:#202020;--layer:#2b2b2b;--layer-alt:#252525;--stroke:#ffffff14;--stroke-strong:#ffffff2a;--text:#fff;--muted:#ffffff9a;--accent:#60cdff;--accent-hover:#77d5fa;--accent-text:#003447;--danger:#ff99a4;--page-glow:#16445c;--control:#ffffff0f;--control-hover:#ffffff18;--canvas:#090909}
+    body{background:radial-gradient(circle at 78% -20%,var(--page-glow),transparent 42%),var(--mica)}.titlebar{background:color-mix(in srgb,var(--mica) 84%,transparent)}.workspace{background:var(--layer-alt)}video{background:var(--canvas)}button,.tool{color:var(--text);background:var(--control);border-color:var(--stroke-strong)}button:hover:hover,.tool:hover{background:var(--control-hover)}.primary,form button[type=submit]{color:var(--accent-text);background:var(--accent)}.primary:hover,form button[type=submit]:hover{background:var(--accent-hover)}.host{background:var(--layer);border-color:var(--stroke)}.host:hover{background:var(--control-hover)}dialog{color:var(--text);background:color-mix(in srgb,var(--layer) 88%,transparent);border-color:var(--stroke-strong)}input,textarea{color:var(--text);background:var(--layer);border-color:var(--stroke-strong)}#auth-error{color:var(--danger)}:where(button,a,input,textarea,video):focus-visible{outline:2px solid var(--accent);outline-offset:2px}.theme-toggle{white-space:nowrap}
+    .remote-toolbar{position:absolute;z-index:5;left:12px;top:50%;display:flex;flex-direction:column;align-items:center;gap:2px;width:48px;padding:6px;border:1px solid var(--stroke-strong);border-radius:8px;background:color-mix(in srgb,var(--layer) 82%,transparent);box-shadow:0 8px 28px #0005;backdrop-filter:blur(24px) saturate(1.2);transform:translateY(-50%);transition:transform .18s ease}.remote-toolbar.collapsed{transform:translate(calc(-100% - 12px),-50%)}.remote-toolbar button{position:relative;display:grid;place-items:center;width:34px;height:34px;min-height:34px;padding:0;border-color:transparent;background:transparent}.remote-toolbar button:hover{background:var(--control-hover)}.remote-toolbar button.print-ready{color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent)}.remote-toolbar svg{width:20px;height:20px;pointer-events:none}.toolbar-divider{width:24px;height:1px;margin:4px 0;background:var(--stroke-strong)}.toolbar-tooltip{position:absolute;z-index:2;left:calc(100% + 12px);top:50%;padding:5px 9px;border:1px solid var(--stroke-strong);border-radius:4px;color:var(--text);background:var(--layer);box-shadow:0 4px 16px #0004;font-size:12px;line-height:18px;white-space:nowrap;opacity:0;pointer-events:none;transform:translateY(-50%);transition:opacity .12s}.remote-toolbar button:hover .toolbar-tooltip,.remote-toolbar button:focus-visible .toolbar-tooltip{opacity:1}.toolbar-toggle{margin-top:1px}.remote-toolbar.collapsed .toolbar-toggle{position:absolute;left:calc(100% + 12px);top:50%;border:1px solid var(--stroke-strong);border-left:0;border-radius:0 8px 8px 0;background:color-mix(in srgb,var(--layer) 88%,transparent);transform:translateY(-50%)}.remote-toolbar.collapsed .toolbar-toggle svg{transform:rotate(180deg)}.remote-toolbar.collapsed .toolbar-toggle .toolbar-tooltip{left:calc(100% + 8px)}.app-shell.immersive{position:fixed;z-index:1000;inset:0;display:block;background:#000}.app-shell.immersive .titlebar,.app-shell.immersive .command-info{display:none}.app-shell.immersive main{width:100%;height:100%;padding:0}.app-shell.immersive .workspace{width:100%;height:100%;min-height:100%;padding:0;border:0;border-radius:0;background:#000}.app-shell.immersive video{width:100%;height:100%;max-height:none;border:0;border-radius:0}.app-shell.immersive .remote-toolbar{position:fixed;left:12px}
+    .stats-overlay{position:fixed;z-index:1200;inset:0;display:grid;place-items:center;padding:24px;background:#0008;backdrop-filter:blur(8px)}.stats-panel{width:min(660px,100%);max-height:min(760px,calc(100vh - 48px));overflow:auto;border:1px solid var(--stroke-strong);border-radius:12px;background:color-mix(in srgb,var(--layer) 94%,transparent);box-shadow:0 28px 90px #0009}.stats-header{display:flex;align-items:center;justify-content:space-between;padding:20px 22px 16px;border-bottom:1px solid var(--stroke)}.stats-title{margin:0;font-size:19px;font-weight:600}.stats-subtitle{margin:3px 0 0;color:var(--muted);font-size:12px}.stats-close{width:32px;min-height:32px;padding:0;font-size:20px;line-height:1}.stats-hero{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--stroke);border-bottom:1px solid var(--stroke)}.stats-primary{padding:18px 22px;background:var(--layer)}.stats-value{display:block;font-size:28px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.04em}.stats-label{display:block;margin-top:2px;color:var(--muted);font-size:12px}.stats-groups{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--stroke)}.stats-group{padding:18px 22px;background:var(--layer)}.stats-group h3{margin:0 0 12px;font-size:13px;font-weight:600}.stats-row{display:flex;justify-content:space-between;gap:18px;padding:5px 0;color:var(--muted)}.stats-row output{color:var(--text);text-align:right;font-variant-numeric:tabular-nums}.stats-live{display:inline-flex;align-items:center;gap:6px}.stats-live:before{content:"";width:7px;height:7px;border-radius:50%;background:#6ccb5f;box-shadow:0 0 8px #6ccb5f88}.stats-note{padding:12px 22px;border-top:1px solid var(--stroke);color:var(--muted);font-size:12px}
+    .print-center{width:min(620px,calc(100% - 32px))}.print-center header{display:flex;align-items:flex-start;justify-content:space-between;padding:22px;border-bottom:1px solid var(--stroke)}.print-center h2{margin:0;font-size:19px}.print-center p{margin:3px 0 0;color:var(--muted);font-size:12px}.print-list{display:grid;gap:1px;max-height:460px;overflow:auto;background:var(--stroke)}.print-job{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;padding:14px 20px;background:var(--layer)}.print-job-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}.print-job-meta{margin-top:3px;color:var(--muted);font-size:12px}.print-job-actions{display:flex;gap:7px}.print-empty{padding:36px;text-align:center;color:var(--muted);background:var(--layer)}.toast{position:fixed;z-index:1400;right:24px;bottom:24px;max-width:380px;padding:13px 16px;border:1px solid var(--stroke-strong);border-radius:8px;background:var(--layer);box-shadow:0 12px 42px #0007}.toast strong{display:block;margin-bottom:2px}.toast span{color:var(--muted);font-size:12px}
+    @media(max-width:640px){.remote-toolbar{left:8px}.toolbar-tooltip{display:none}.stats-overlay{padding:12px}.stats-hero{grid-template-columns:1fr}.stats-groups{grid-template-columns:1fr}.stats-value{font-size:24px}}
+    @media(forced-colors:active){body,.titlebar,.workspace,.host,dialog,input,textarea,.remote-toolbar,.toolbar-tooltip{background:Canvas;color:CanvasText;border-color:ButtonBorder}button,.tool{background:ButtonFace;color:ButtonText;border-color:ButtonBorder}#status:before{background:Highlight;box-shadow:none}:where(button,a,input,textarea,video):focus-visible{outline-color:Highlight}.toolbar-divider{background:ButtonBorder}}
+  </style>
+  <style>#file-center{width:min(760px,calc(100% - 32px))}#file-center .print-job{grid-template-columns:auto 1fr auto}</style>
+</head>
+<body><div class="app-shell">
+<header class="titlebar"><div class="brand"><span class="app-icon">RG</span><h1>Remote Gateway</h1></div><div class="connection"><a class="nav-link" href="/admin">状态</a><a class="nav-link" href="/settings">设置</a><button id="theme-toggle" class="tool theme-toggle" type="button">主题：系统</button><span id="status">正在连接…</span></div></header>
+<main><div class="workspace">
+  <section id="chooser" hidden><h2 class="section-heading">选择远程主机</h2><p class="section-copy">选择一台可用的 Windows 主机开始远程会话。</p><div id="hosts"></div></section>
+  <aside id="remote-toolbar" class="remote-toolbar" aria-label="远程会话工具栏" hidden>
+    <button id="paste-text" type="button" aria-label="粘贴文本" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M16 5h2a2 2 0 0 1 2 2v13H4V7a2 2 0 0 1 2-2h2M8 12h8M8 16h5"/></svg><span class="toolbar-tooltip">粘贴文本</span></button>
+    <button id="fullscreen" type="button" aria-label="进入全屏"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M3 16v3a2 2 0 0 0 2 2h3M21 16v3a2 2 0 0 1-2 2h-3"/></svg><span class="toolbar-tooltip">全屏</span></button>
+    <button id="show-stats" type="button" aria-label="状态信息"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></svg><span class="toolbar-tooltip">状态信息</span></button>
+    <button id="toggle-audio" type="button" aria-label="静音"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4zM15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12"/></svg><span class="toolbar-tooltip">静音 · 滚轮调节音量</span></button>
+    <button id="show-files" type="button" aria-label="文件管理"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h7l2 2h9v11H3z"/><path d="M3 6V4h7l2 2"/></svg><span class="toolbar-tooltip">文件管理</span></button>
+    <button id="download-print" type="button" aria-label="下载打印文件" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg><span class="toolbar-tooltip">下载打印文件</span></button>
+    <div class="toolbar-divider" role="separator"></div>
+    <button id="secure-attention" type="button" aria-label="打开远程安全界面" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M7 15h10"/></svg><span class="toolbar-tooltip">远程 Ctrl+Alt+Delete</span></button>
+    <button id="logout" type="button" aria-label="注销并返回连接页面"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M14 8l4 4-4 4M9 12h9"/></svg><span class="toolbar-tooltip">注销</span></button>
+    <div class="toolbar-divider" role="separator"></div>
+    <button id="toolbar-toggle" class="toolbar-toggle" type="button" aria-label="收起工具栏"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span class="toolbar-tooltip">收起</span></button>
+  </aside>
+  <video id="desktop" autoplay muted playsinline disablepictureinpicture controlslist="nodownload noplaybackrate noremoteplayback" tabindex="0" hidden></video>
+  <audio id="remote-audio" autoplay></audio>
+  <img id="remote-cursor" class="remote-cursor" alt="" aria-hidden="true">
+</div><div class="command-info"><p id="stream-info">远程桌面：H.264 / WebRTC。点击画面后可使用键盘、鼠标和滚轮。</p><p id="metrics">等待视频轨道…</p></div></main></div>
+<div id="stats-overlay" class="stats-overlay" role="dialog" aria-modal="true" aria-labelledby="stats-title" hidden>
+  <section class="stats-panel">
+    <header class="stats-header"><div><h2 id="stats-title" class="stats-title">连接状态</h2><p class="stats-subtitle">浏览器接收端与网关实时指标</p></div><button id="stats-close" class="stats-close" type="button" aria-label="关闭状态信息">×</button></header>
+    <div class="stats-hero">
+      <div class="stats-primary"><output id="stat-fps" class="stats-value">—</output><span class="stats-label">解码帧率</span></div>
+      <div class="stats-primary"><output id="stat-bitrate" class="stats-value">—</output><span class="stats-label">接收码率</span></div>
+      <div class="stats-primary"><output id="stat-latency" class="stats-value">—</output><span class="stats-label">网络往返</span></div>
+    </div>
+    <div class="stats-groups">
+      <section class="stats-group"><h3>视频</h3><div class="stats-row"><span>状态</span><output id="stat-video-state">等待轨道</output></div><div class="stats-row"><span>分辨率</span><output id="stat-resolution">—</output></div><div class="stats-row"><span>编解码器</span><output id="stat-codec">H.264</output></div><div class="stats-row"><span>已解码帧</span><output id="stat-frames">0</output></div><div class="stats-row"><span>浏览器丢帧</span><output id="stat-video-drops">0</output></div></section>
+      <section class="stats-group"><h3>网络</h3><div class="stats-row"><span>WebRTC</span><output id="stat-connection">等待连接</output></div><div class="stats-row"><span>接收包</span><output id="stat-packets">0</output></div><div class="stats-row"><span>丢包</span><output id="stat-packet-loss">0</output></div><div class="stats-row"><span>抖动</span><output id="stat-jitter">—</output></div><div class="stats-row"><span>传输协议</span><output id="stat-transport">—</output></div></section>
+      <section class="stats-group"><h3>声音</h3><div class="stats-row"><span>音频轨道</span><output id="stat-audio">未提供</output></div><div class="stats-row"><span>播放状态</span><output id="stat-audio-state">无声音</output></div><div class="stats-row"><span>接收码率</span><output id="stat-audio-bitrate">0 bps</output></div></section>
+      <section class="stats-group"><h3>网关</h3><div class="stats-row"><span>服务</span><output id="stat-service" class="stats-live">在线</output></div><div class="stats-row"><span>打印机</span><output id="stat-printer">等待会话</output></div><div class="stats-row"><span>捕获帧</span><output id="stat-captured">0</output></div><div class="stats-row"><span>编码帧</span><output id="stat-encoded">0</output></div><div class="stats-row"><span>管线丢帧</span><output id="stat-pipeline-drops">0</output></div><div class="stats-row"><span>累计发送</span><output id="stat-sent">0 B</output></div></section>
+    </div>
+    <footer class="stats-note">RDPGFX Progressive · H.264 视频 · Opus 音频 · RDPDR 打印机</footer>
+  </section>
+</div>
+<dialog id="print-center" class="print-center">
+  <header><div><h2>打印任务</h2><p>文件保留 24 小时，最多保留 100 个</p></div><div class="print-job-actions"><button id="print-delete-all" type="button">全部删除</button><button id="print-close" type="button" aria-label="关闭打印任务">×</button></div></header>
+  <div id="print-list" class="print-list"><div class="print-empty">暂无打印文件</div></div>
+</dialog>
+<dialog id="file-center" class="print-center">
+  <header><div><h2>文件管理</h2><p id="file-path">Gateway Files /</p></div><div class="print-job-actions"><button id="file-delete-selected" type="button" disabled>删除所选</button><button id="file-up" type="button">上级</button><button id="file-mkdir" type="button">新建文件夹</button><button id="file-upload" type="button">上传文件</button><button id="file-close" type="button" aria-label="关闭文件管理">×</button></div></header>
+  <input id="file-picker" type="file" hidden>
+  <div id="file-list" class="print-list"><div class="print-empty">暂无文件</div></div>
+</dialog>
+<div id="print-toast" class="toast" role="status" hidden><strong>打印完成</strong><span>PDF 已生成，可在打印任务中下载。</span></div>
+<dialog id="login">
+  <form id="login-form">
+    <strong>连接 Remote Gateway</strong>
+    <label for="login-username">用户名</label>
+    <input id="login-username" autocomplete="username" required autofocus>
+    <label for="login-password">密码</label>
+    <input id="login-password" type="password" autocomplete="current-password" required>
+    <span id="auth-error"></span>
+    <button type="submit">连接</button>
+  </form>
+</dialog>
+<dialog id="paste-dialog">
+  <form id="paste-form">
+    <strong>粘贴到远程 Windows</strong>
+    <label for="paste-value">文本（最多 4096 个字符）</label>
+    <textarea id="paste-value" maxlength="4096" rows="7" autofocus></textarea>
+    <div class="dialog-actions"><button type="button" id="paste-cancel" class="tool">取消</button><button type="submit">发送</button></div>
+  </form>
+</dialog>
+<script src="/i18n.js"></script>
+<script>
+const status = document.querySelector('#status');
+document.querySelector('.brand h1').textContent='RemoteLink';document.querySelector('.app-icon').textContent='RL';document.querySelector('#login-form strong').textContent='登录 RemoteLink';
+const video = document.querySelector('#desktop');
+const remoteAudio = document.querySelector('#remote-audio');
+const remoteCursor = document.querySelector('#remote-cursor');
+let pc = null;
+let input = null;
+let videoTransceiver = null;
+let videoReceiver = null;
+let audioReceiver = null;
+let audioPlaybackBlocked = false;
+let pointerX = 0;
+let pointerY = 0;
+let accessToken = '';
+let selectedTarget = '';
+let selectedHost = '';
+let sessionUsername = '';
+let sessionPassword = '';
+let sessionOptions = { width: 1920, height: 1080, bitrate: 4000000, sound: true, printer: true, encoder: 'auto' };
+let printSessionStartedMs = 0;
+let rdpState = '';
+const chooser = document.querySelector('#chooser');
+const hosts = document.querySelector('#hosts');
+const login = document.querySelector('#login');
+const loginForm = document.querySelector('#login-form');
+const loginUsername = document.querySelector('#login-username');
+const loginPassword = document.querySelector('#login-password');
+const authError = document.querySelector('#auth-error');
+const logout = document.querySelector('#logout');
+const fullscreen = document.querySelector('#fullscreen');
+const secureAttention = document.querySelector('#secure-attention');
+const pasteText = document.querySelector('#paste-text');
+const remoteToolbar = document.querySelector('#remote-toolbar');
+const toolbarToggle = document.querySelector('#toolbar-toggle');
+const showStats = document.querySelector('#show-stats');
+const downloadPrint = document.querySelector('#download-print');
+const toggleAudio = document.querySelector('#toggle-audio');
+const showFiles = document.querySelector('#show-files');
+const fileCenter = document.querySelector('#file-center');
+const fileList = document.querySelector('#file-list');
+const fileUpload = document.querySelector('#file-upload');
+const fileUp = document.querySelector('#file-up');
+const fileMkdir = document.querySelector('#file-mkdir');
+const filePathLabel = document.querySelector('#file-path');
+const fileDeleteSelected = document.querySelector('#file-delete-selected');
+const filePicker = document.querySelector('#file-picker');
+const fileClose = document.querySelector('#file-close');
+const printCenter = document.querySelector('#print-center');
+const printList = document.querySelector('#print-list');
+const printClose = document.querySelector('#print-close');
+const printDeleteAll = document.querySelector('#print-delete-all');
+const printToast = document.querySelector('#print-toast');
+const statsOverlay = document.querySelector('#stats-overlay');
+const statsClose = document.querySelector('#stats-close');
+const workspace = document.querySelector('.workspace');
+const appShell = document.querySelector('.app-shell');
+const pasteDialog = document.querySelector('#paste-dialog');
+const pasteForm = document.querySelector('#paste-form');
+const pasteValue = document.querySelector('#paste-value');
+const streamInfo = document.querySelector('#stream-info');
+const pressedKeys = new Map();
+const pressedButtons = new Set();
+let lastVideoSample = null;
+let lastAudioSample = null;
+const h264Codecs = RTCRtpReceiver.getCapabilities('video').codecs
+  .filter(codec => codec.mimeType.toLowerCase() === 'video/h264');
+const themeToggle = document.querySelector('#theme-toggle');
+const themeNames = { system: '系统', light: '浅色', dark: '深色' };
+const themeOrder = ['system', 'light', 'dark'];
+let selectedTheme = localStorage.getItem('remote-gateway-theme') || 'system';
+function applyTheme() {
+  document.documentElement.dataset.theme = selectedTheme === 'system' ? '' : selectedTheme;
+  themeToggle.textContent = `主题：${themeNames[selectedTheme]}`;
+  themeToggle.setAttribute('aria-label', `当前${themeNames[selectedTheme]}主题，点击切换`);
+}
+themeToggle.addEventListener('click', () => {
+  selectedTheme = themeOrder[(themeOrder.indexOf(selectedTheme) + 1) % themeOrder.length];
+  localStorage.setItem('remote-gateway-theme', selectedTheme);
+  applyTheme();
+});
+applyTheme();
+
+const stat = id => document.querySelector(`#${id}`);
+const number = value => new Intl.NumberFormat('zh-CN').format(Number(value) || 0);
+function formatRate(bits) {
+  if (!Number.isFinite(bits) || bits <= 0) return '0 bps';
+  if (bits >= 1000000) return `${(bits / 1000000).toFixed(2)} Mbps`;
+  if (bits >= 1000) return `${Math.round(bits / 1000)} Kbps`;
+  return `${Math.round(bits)} bps`;
+}
+function formatBytes(bytes) {
+  if (!Number.isFinite(Number(bytes)) || Number(bytes) <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = Number(bytes), unit = 0;
+  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
+  return `${value.toFixed(unit ? 1 : 0)} ${units[unit]}`;
+}
+function closeStats() { statsOverlay.hidden = true; showStats.focus(); }
+showStats.addEventListener('click', () => { statsOverlay.hidden = false; statsClose.focus(); updateStatistics(); });
+statsClose.addEventListener('click', closeStats);
+statsOverlay.addEventListener('click', event => { if (event.target === statsOverlay) closeStats(); });
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && !statsOverlay.hidden) closeStats(); });
+
+let ws;
+let reconnectTimer = null;
+function createPeerConnection() {
+  if (pc) pc.close();
+  pc = new RTCPeerConnection({ iceServers: [] });
+  window.remoteGatewayPeerConnection = pc;
+  input = null;
+  videoReceiver = null;
+  audioReceiver = null;
+  videoTransceiver = null;
+  lastVideoSample = null;
+  lastAudioSample = null;
+  video.srcObject = null;
+  remoteAudio.srcObject = null;
+  pc.ondatachannel = event => {
+    input = event.channel;
+    input.onopen = () => { secureAttention.disabled = false; pasteText.disabled = false; };
+    input.onmessage = event => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message.type === 'cursor-system') {
+          remoteCursor.hidden = true;
+          remoteCursor.style.display = 'none';
+          video.style.cursor = message.hidden ? 'none' : 'default';
+          return;
+        }
+        if (message.type !== 'cursor' || !message.pixels) return;
+        const width = Number(message.width);
+        const height = Number(message.height);
+        if (!width || !height || width > 256 || height > 256) return;
+        const binary = atob(message.pixels);
+        const pixels = new Uint8ClampedArray(binary.length);
+        for (let index = 0; index < binary.length; index++) pixels[index] = binary.charCodeAt(index);
+        const source = document.createElement('canvas');
+        source.width = width; source.height = height;
+        source.getContext('2d').putImageData(new ImageData(pixels, width, height), 0, 0);
+        const scale = Math.min(1, 128 / width, 128 / height);
+        const output = document.createElement('canvas');
+        output.width = Math.max(1, Math.round(width * scale));
+        output.height = Math.max(1, Math.round(height * scale));
+        const outputContext = output.getContext('2d');
+        outputContext.drawImage(source, 0, 0, output.width, output.height);
+        const cursorImage = outputContext.getImageData(0, 0, output.width, output.height);
+        let opaque = 0, bright = 0;
+        for (let index = 0; index < cursorImage.data.length; index += 4) {
+          if (cursorImage.data[index + 3] < 64) continue;
+          opaque++;
+          if (cursorImage.data[index] + cursorImage.data[index + 1] + cursorImage.data[index + 2] > 480) bright++;
+        }
+        if (opaque && bright < opaque / 8) {
+          const outlined = new Uint8ClampedArray(cursorImage.data);
+          for (let y = 0; y < output.height; y++) for (let x = 0; x < output.width; x++) {
+            const index = (y * output.width + x) * 4;
+            if (cursorImage.data[index + 3] >= 64) continue;
+            let neighbor = false;
+            for (let dy = -1; dy <= 1 && !neighbor; dy++) for (let dx = -1; dx <= 1; dx++) {
+              const nx = x + dx, ny = y + dy;
+              if (nx >= 0 && nx < output.width && ny >= 0 && ny < output.height &&
+                  cursorImage.data[(ny * output.width + nx) * 4 + 3] >= 64) { neighbor = true; break; }
+            }
+            if (neighbor) { outlined[index] = 255; outlined[index + 1] = 255; outlined[index + 2] = 255; outlined[index + 3] = 255; }
+          }
+          outputContext.putImageData(new ImageData(outlined, output.width, output.height), 0, 0);
+        }
+        const hotspotX = Math.max(0, Math.min(output.width - 1, Math.round(Number(message.hotspotX || 0) * scale)));
+        const hotspotY = Math.max(0, Math.min(output.height - 1, Math.round(Number(message.hotspotY || 0) * scale)));
+        remoteCursor.src = output.toDataURL('image/png');
+        remoteCursor.width = output.width;
+        remoteCursor.height = output.height;
+        remoteCursor.style.setProperty('--cursor-hotspot-x', `${-hotspotX}px`);
+        remoteCursor.style.setProperty('--cursor-hotspot-y', `${-hotspotY}px`);
+        remoteCursor.hidden = false;
+        video.style.cursor = 'none';
+      } catch (error) {
+        console.warn('Unable to apply remote cursor', error);
+      }
+    };
+    input.onclose = () => { secureAttention.disabled = true; pasteText.disabled = true; video.style.cursor = 'default'; remoteCursor.style.display = 'none'; };
+  };
+  pc.ontrack = event => {
+    if (event.track.kind === 'audio') {
+      audioReceiver = event.receiver;
+      remoteAudio.srcObject = event.streams[0] || new MediaStream([event.track]);
+      updateAudioControl();
+      remoteAudio.play().then(() => { audioPlaybackBlocked = false; }).catch(() => {
+        audioPlaybackBlocked = true;
+        status.textContent = '声音已连接，点击远程画面启用播放';
+      });
+    } else {
+      videoReceiver = event.receiver;
+      video.srcObject = event.streams[0] || new MediaStream([event.track]);
+      video.muted = true;
+      video.play().catch(error => {
+        status.textContent = `视频播放被浏览器阻止：${error.message}（请点击画面）`;
+      });
+    }
+  };
+  pc.onconnectionstatechange = () => {
+    status.textContent = pc.connectionState === 'connected' && rdpState
+      ? `远程会话：${rdpState}` : `WebRTC: ${pc.connectionState}`;
+    if (pc.connectionState === 'failed' && ws?.readyState < WebSocket.CLOSING) ws.close();
+  };
+  pc.onicecandidate = event => {
+    if (event.candidate && ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'candidate', candidate: event.candidate.candidate,
+        mid: event.candidate.sdpMid
+      }));
+    }
+  };
+}
+
+function showTargets(targets) {
+  hosts.replaceChildren();
+  chooser.hidden = false;
+  video.hidden = true;
+  remoteToolbar.hidden = true;
+  workspace.classList.remove('has-session');
+  fullscreen.hidden = true;
+  secureAttention.hidden = true;
+  pasteText.hidden = true;
+  if (!targets.length) {
+    hosts.innerHTML = '<p class="section-copy">没有可用的目标主机。请在服务端配置目标后重试。</p>';
+    return;
+  }
+  for (const target of targets) {
+    const button = document.createElement('button');
+    button.className = 'host';
+    button.textContent = `${target.name} · ${target.width}×${target.height}`;
+    button.addEventListener('click', () => startTarget(target));
+    hosts.append(button);
+  }
+}
+
+function startTarget(target) {
+  const width = sessionOptions.width || target.width || 1920;
+  const height = sessionOptions.height || target.height || 1080;
+  selectedTarget = target.id;
+  rdpState = '正在连接 Windows…';
+  chooser.hidden = true;
+  video.hidden = false;
+  remoteToolbar.hidden = false;
+  workspace.classList.add('has-session');
+  setImmersive(true);
+  fullscreen.hidden = false;
+  secureAttention.hidden = false;
+  pasteText.hidden = false;
+  secureAttention.disabled = true;
+  pasteText.disabled = true;
+  video.style.aspectRatio = `${width} / ${height}`;
+  streamInfo.textContent = `远程桌面：H.264 / WebRTC / ${width}×${height} / 30 FPS。点击画面后可使用键盘、鼠标和滚轮。`;
+  status.textContent = `正在连接 ${target.name}…`;
+  createPeerConnection();
+  ws.send(JSON.stringify({
+    type: 'start', target: target.id || '', host: target.host || selectedHost,
+    username: sessionUsername, password: sessionPassword,
+    width, height, bitrate: sessionOptions.bitrate, sound: sessionOptions.sound,
+    printer: sessionOptions.printer, encoder: sessionOptions.encoder
+  }));
+}
+
+logout.addEventListener('click', () => {
+  if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'stop' }));
+  sessionStorage.removeItem('remote-gateway-session');
+  location.replace('/');
+});
+
+function connectSignaling() {
+if (reconnectTimer) clearTimeout(reconnectTimer);
+const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+const socket = new WebSocket(`${scheme}://${location.host}/ws`);
+ws = socket;
+socket.onopen = () => socket.send(JSON.stringify({ type: 'authenticate', token: accessToken }));
+socket.onmessage = async event => {
+  const message = JSON.parse(event.data);
+  if (message.type === 'authenticated') {
+    if (login.open) login.close();
+    status.textContent = '请选择远程主机';
+    const targets = message.targets || [];
+    window.remoteGatewayTargets = targets;
+    const remembered = targets.find(target => target.id === selectedTarget) ||
+      (selectedHost ? targets.find(target => target.host.toLowerCase() === selectedHost.toLowerCase()) : null);
+    if (remembered) startTarget(remembered);
+    else if (selectedHost) startTarget({ id: '', name: selectedHost, host: selectedHost, width: 1920, height: 1080 });
+    else location.replace('/');
+    return;
+  }
+  if (message.type === 'error') {
+    const errors = { 'target-user-busy': '该主机和 Windows 用户已有活动会话' };
+    const text = errors[message.message] || (message.message === 'host-not-allowed'
+      ? '该地址不在服务端允许连接的主机列表中' : message.message);
+    status.textContent = `连接失败：${text}`;
+    if (location.pathname.startsWith('/session')) {
+      sessionStorage.setItem('remote-gateway-error', text);
+      sessionStorage.removeItem('remote-gateway-session');
+      location.replace('/');
+    }
+    return;
+  }
+  if (message.type === 'session-status') {
+    const labels = {
+      connecting: '正在连接 Windows…', connected: 'Windows 已连接',
+      retrying: 'Windows 连接失败，正在重试…', stopped: '会话已停止'
+    };
+    rdpState = labels[message.state] || message.state;
+    status.textContent = `远程会话：${rdpState}`;
+    return;
+  }
+  if (message.type === 'stopped') {
+    if (pc) { pc.close(); pc = null; }
+    input = null;
+    secureAttention.disabled = true;
+    pasteText.disabled = true;
+    rdpState = '';
+    videoReceiver = null;
+    audioReceiver = null;
+    videoTransceiver = null;
+    video.srcObject = null;
+    remoteAudio.srcObject = null;
+    if (location.pathname.startsWith('/session')) {
+      sessionStorage.removeItem('remote-gateway-session');
+      location.replace('/');
+      return;
+    }
+    status.textContent = '请选择远程主机';
+    showTargets(message.targets || window.remoteGatewayTargets || []);
+    return;
+  }
+  if (message.type === 'auth-error') {
+    accessToken = '';
+    sessionStorage.removeItem('remote-gateway-access-token');
+    authError.textContent = '登录状态已失效，请重新登录';
+    loginPassword.value = '';
+    login.showModal();
+    return;
+  }
+  if (message.type === 'offer') {
+    await pc.setRemoteDescription(message);
+    videoTransceiver = pc.getTransceivers().find(item => item.receiver.track.kind === 'video');
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    socket.send(JSON.stringify({ type: 'answer', sdp: answer.sdp }));
+  }
+  if (message.type === 'candidate') {
+    await pc.addIceCandidate({ candidate: message.candidate, sdpMid: message.mid });
+  }
+};
+socket.onerror = () => status.textContent = '信令连接失败';
+socket.onclose = () => {
+  if (ws !== socket) return;
+  if (accessToken) {
+    status.textContent = '信令断开，正在恢复…';
+    reconnectTimer = setTimeout(connectSignaling, 1000);
+  }
+};
+}
+
+loginForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  authError.textContent = '';
+  const response=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:loginUsername.value,password:loginPassword.value})});
+  if(!response.ok){authError.textContent='用户名或密码不正确';loginPassword.value='';return}
+  accessToken=(await response.json()).token;
+  sessionStorage.setItem('remote-gateway-access-token', accessToken);
+  loginPassword.value='';
+  status.textContent = '正在认证…';
+  if (ws && ws.readyState < WebSocket.CLOSING) {
+    ws.onclose = null;
+    ws.close();
+  }
+  connectSignaling();
+});
+const pendingSession = (() => {
+  try { return JSON.parse(sessionStorage.getItem('remote-gateway-session') || 'null'); }
+  catch { return null; }
+})();
+const sharedAccessToken = sessionStorage.getItem('remote-gateway-access-token') || '';
+if ((pendingSession?.target || pendingSession?.host) && pendingSession?.accessToken) {
+  if (!localStorage.getItem('remote-gateway-audio-fix-v2')) {
+    pendingSession.sound = true;
+    pendingSession.printer = true;
+    sessionStorage.setItem('remote-gateway-session', JSON.stringify(pendingSession));
+    try {
+      const migrated = JSON.parse(localStorage.getItem('remote-gateway-settings') || '{}');
+      localStorage.setItem('remote-gateway-settings', JSON.stringify({...migrated, sound: true, printer: true}));
+    } catch {}
+    localStorage.setItem('remote-gateway-audio-fix-v2', 'enabled');
+  }
+  accessToken = pendingSession.accessToken;
+  selectedTarget = pendingSession.target;
+  selectedHost = pendingSession.host || '';
+  sessionUsername = pendingSession.username || '';
+  sessionPassword = pendingSession.password || '';
+  sessionOptions = {
+    width: Number(pendingSession.width) || 1920,
+    height: Number(pendingSession.height) || 1080,
+    bitrate: Number(pendingSession.bitrate) || 4000000,
+    sound: pendingSession.sound !== false,
+    printer: pendingSession.printer !== false,
+    encoder: ['auto', 'software', 'hardware'].includes(pendingSession.encoder) ? pendingSession.encoder : 'auto'
+  };
+  printSessionStartedMs = Number(pendingSession.startedAt) || 0;
+  status.textContent = '正在连接…';
+  connectSignaling();
+}
+const fragment = new URLSearchParams(location.hash.slice(1));
+const localhostBootstrap = fragment.get('token');
+if ((pendingSession?.target || pendingSession?.host) && pendingSession?.accessToken) {
+  // 独立会话页已使用连接管理页传入的短期会话数据。
+} else if (sharedAccessToken) {
+  location.replace('/');
+} else if (localhostBootstrap && (location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+  accessToken = localhostBootstrap;
+  history.replaceState(null, '', `${location.pathname}${location.search}`);
+  status.textContent = '正在认证…';
+  connectSignaling();
+} else {
+  location.replace('/');
+}
+
+function send(payload) {
+  if (input?.readyState === 'open') input.send(JSON.stringify(payload));
+}
+document.addEventListener('pointerdown', () => {
+  if (remoteAudio.srcObject && (remoteAudio.paused || audioPlaybackBlocked)) {
+    remoteAudio.play().then(() => { audioPlaybackBlocked = false; }).catch(() => {});
+  }
+}, { capture: true });
+let remoteVolume = Math.max(0, Math.min(1, Number(localStorage.getItem('remote-gateway-volume') ?? 1)));
+remoteAudio.volume = remoteVolume;
+function updateAudioControl() {
+  const silent = remoteAudio.muted || remoteVolume === 0;
+  toggleAudio.setAttribute('aria-label', silent ? '取消静音' : '静音');
+  toggleAudio.querySelector('.toolbar-tooltip').textContent = silent
+    ? '取消静音 · 滚轮调节音量' : `音量 ${Math.round(remoteVolume * 100)}% · 点击静音`;
+  toggleAudio.classList.toggle('print-ready', !silent && remoteAudio.srcObject !== null);
+}
+toggleAudio.addEventListener('click', () => {
+  remoteAudio.muted = !remoteAudio.muted;
+  updateAudioControl();
+  status.textContent = remoteAudio.muted ? '远程声音已静音' : `远程声音音量 ${Math.round(remoteVolume * 100)}%`;
+});
+toggleAudio.addEventListener('wheel', event => {
+  event.preventDefault();
+  remoteVolume = Math.max(0, Math.min(1, remoteVolume + (event.deltaY < 0 ? .05 : -.05)));
+  remoteAudio.volume = remoteVolume;
+  remoteAudio.muted = false;
+  localStorage.setItem('remote-gateway-volume', String(remoteVolume));
+  updateAudioControl();
+  status.textContent = `远程声音音量 ${Math.round(remoteVolume * 100)}%`;
+}, { passive: false });
+updateAudioControl();
+
+let currentFilePath = '';
+const selectedFiles = new Set();
+let currentFileItems = [];
+const joinFilePath = name => currentFilePath ? `${currentFilePath}/${name}` : name;
+async function fileRequest(path, name, body, destination='') {
+  return fetch(path, { method: body === undefined ? 'GET' : 'POST', cache: 'no-store',
+    headers: { Authorization: `Bearer ${accessToken}`, ...(name ? {'X-File-Name': encodeURIComponent(name)} : {}), ...(destination ? {'X-Destination':encodeURIComponent(destination)}:{}) }, body });
+}
+async function refreshFiles() {
+  const response = await fileRequest('/api/admin/files', currentFilePath);
+  if (!response.ok) return;
+  const {items=[],usage=0,quota=0} = await response.json();
+  currentFileItems = items;
+  selectedFiles.clear();fileDeleteSelected.disabled=true;
+  items.sort((a,b)=>Number(b.directory)-Number(a.directory)||a.name.localeCompare(b.name)); fileList.replaceChildren();
+  filePathLabel.textContent=`Gateway Files /${currentFilePath} · ${formatPrintSize(usage)} / ${formatPrintSize(quota)}`;fileUp.disabled=!currentFilePath;
+  if (!items.length) { const empty=document.createElement('div');empty.className='print-empty';empty.textContent='暂无文件';fileList.append(empty);return; }
+  for (const item of items) {
+    const row=document.createElement('div');row.className='print-job';
+    const check=document.createElement('input');check.type='checkbox';check.style.width='18px';check.onchange=()=>{const path=joinFilePath(item.name);check.checked?selectedFiles.add(path):selectedFiles.delete(path);fileDeleteSelected.disabled=!selectedFiles.size};
+    const info=document.createElement('div');const name=document.createElement('div');name.className='print-job-name';name.textContent=item.name;
+    const meta=document.createElement('div');meta.className='print-job-meta';meta.textContent=item.directory?'文件夹':`${new Date(item.modifiedMs).toLocaleString()} · ${formatPrintSize(item.size)}`;info.append(name,meta);
+    const actions=document.createElement('div');actions.className='print-job-actions';
+    if(item.directory){const open=document.createElement('button');open.textContent='打开';open.onclick=()=>{currentFilePath=joinFilePath(item.name);refreshFiles()};actions.append(open)}else{const preview=document.createElement('button');preview.textContent='预览';preview.onclick=async()=>{const r=await fileRequest('/api/admin/files/download',joinFilePath(item.name),'');if(!r.ok)return;const raw=await r.blob();const ext=item.name.split('.').pop().toLowerCase();const types={pdf:'application/pdf',txt:'text/plain',json:'application/json',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',mp3:'audio/mpeg',mp4:'video/mp4',webm:'video/webm'};const url=URL.createObjectURL(new Blob([raw],{type:types[ext]||raw.type}));window.open(url,'_blank','noopener');setTimeout(()=>URL.revokeObjectURL(url),60000)};const download=document.createElement('button');download.textContent='下载';download.onclick=async()=>{const r=await fileRequest('/api/admin/files/download',joinFilePath(item.name),'');if(!r.ok)return;const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download=item.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};actions.append(preview,download)}
+    const rename=document.createElement('button');rename.textContent='重命名';rename.onclick=async()=>{const next=prompt('新名称',item.name);if(next&&next!==item.name&&(await fileRequest('/api/admin/files/move',joinFilePath(item.name),'',joinFilePath(next))).ok)refreshFiles()};
+    const remove=document.createElement('button');remove.textContent='删除';remove.onclick=async()=>{if((await fileRequest('/api/admin/files/delete',joinFilePath(item.name),'')).ok)refreshFiles()};
+    actions.append(rename,remove);row.append(check,info,actions);fileList.append(row);
+  }
+}
+showFiles.addEventListener('click',()=>{refreshFiles();fileCenter.showModal()});
+fileClose.addEventListener('click',()=>fileCenter.close());
+fileUpload.addEventListener('click',()=>filePicker.click());
+fileUp.addEventListener('click',()=>{currentFilePath=currentFilePath.split('/').slice(0,-1).join('/');refreshFiles()});
+fileMkdir.addEventListener('click',async()=>{const name=prompt('文件夹名称');if(name&&(await fileRequest('/api/admin/files/mkdir',joinFilePath(name),'')).ok)refreshFiles()});
+async function uploadManagedFile(file){let targetName=file.name;if(currentFileItems.some(item=>item.name===targetName)){const choice=prompt('存在同名文件：输入 overwrite 覆盖、keep 保留两者，或留空取消','keep');if(!choice)return false;if(choice.toLowerCase()!=='overwrite'){const dot=targetName.lastIndexOf('.'),base=dot>0?targetName.slice(0,dot):targetName,ext=dot>0?targetName.slice(dot):'';let index=1;while(currentFileItems.some(item=>item.name===`${base} (${index})${ext}`))index++;targetName=`${base} (${index})${ext}`}}const chunkSize=4*1024*1024,path=joinFilePath(targetName);for(let offset=0;offset<file.size||offset===0;offset+=chunkSize){const chunk=file.slice(offset,Math.min(file.size,offset+chunkSize));status.textContent=`正在上传 ${targetName} · ${Math.round(Math.min(file.size,offset+chunk.size)/Math.max(1,file.size)*100)}%`;const r=await fetch('/api/admin/files/upload',{method:'POST',headers:{Authorization:`Bearer ${accessToken}`,'X-File-Name':encodeURIComponent(path),'X-Upload-Offset':String(offset),'X-Upload-Total':String(file.size)},body:chunk});if(!r.ok){status.textContent=(await r.json().catch(()=>({}))).error||'文件上传失败';return false}}status.textContent='文件上传完成';return true}
+filePicker.addEventListener('change',async()=>{for(const file of filePicker.files||[])await uploadManagedFile(file);filePicker.value='';refreshFiles()});
+fileDeleteSelected.addEventListener('click',async()=>{for(const path of selectedFiles)await fileRequest('/api/admin/files/delete',path,'');refreshFiles()});
+fileCenter.addEventListener('dragover',event=>{event.preventDefault()});
+fileCenter.addEventListener('drop',async event=>{event.preventDefault();for(const file of event.dataTransfer.files)await uploadManagedFile(file);refreshFiles()});
+setInterval(()=>{if(fileCenter.open)refreshFiles()},3000);
+
+let latestPrintName = '';
+let printJobs = [];
+function formatPrintSize(bytes) {
+  return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+function renderPrintJobs() {
+  printList.replaceChildren();
+  if (!printJobs.length) {
+    const empty = document.createElement('div'); empty.className = 'print-empty'; empty.textContent = '暂无打印文件';
+    printList.append(empty); return;
+  }
+  for (const job of printJobs) {
+    const row = document.createElement('div'); row.className = 'print-job';
+    const info = document.createElement('div');
+    const name = document.createElement('div'); name.className = 'print-job-name'; name.textContent = job.name;
+    const meta = document.createElement('div'); meta.className = 'print-job-meta';
+    meta.textContent = `${new Date(job.modifiedMs).toLocaleString()} · ${formatPrintSize(job.size)}`;
+    info.append(name, meta);
+    const actions = document.createElement('div'); actions.className = 'print-job-actions';
+    const preview = document.createElement('button'); preview.type = 'button'; preview.textContent = '预览';
+    preview.addEventListener('click', () => downloadPrintJob(job, true));
+    const download = document.createElement('button'); download.type = 'button'; download.textContent = '下载';
+    download.addEventListener('click', () => downloadPrintJob(job));
+    const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '删除';
+    remove.addEventListener('click', () => deletePrintJob(job));
+    actions.append(preview, download, remove); row.append(info, actions); printList.append(row);
+  }
+}
+async function refreshPrintJobs() {
+  if (!accessToken) return;
+  try {
+    const response = await fetch('/api/admin/prints', {
+      cache: 'no-store', headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (!response.ok) return;
+    const payload = await response.json();
+    printJobs = (payload.items || []).filter(job => !printSessionStartedMs || job.modifiedMs >= printSessionStartedMs - 5000);
+    const newest = payload.items?.[0];
+    renderPrintJobs();
+    if (!newest) { downloadPrint.hidden = true; latestPrintName = ''; return; }
+    const changed = latestPrintName && newest.name !== latestPrintName;
+    latestPrintName = newest.name;
+    downloadPrint.hidden = false;
+    downloadPrint.classList.add('print-ready');
+    downloadPrint.querySelector('.toolbar-tooltip').textContent = `打印任务 · ${printJobs.length} 个文件`;
+    if (changed) {
+      status.textContent = '打印完成，点击工具栏打印机按钮查看';
+      printToast.hidden = false;
+      setTimeout(() => { printToast.hidden = true; }, 5000);
+    }
+  } catch {}
+}
+async function downloadPrintJob(job, preview = false) {
+  try {
+    const response = await fetch('/api/admin/prints/download', {
+      method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: job.name })
+    });
+    if (!response.ok) throw new Error('download failed');
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(await response.blob());
+    if (preview) { window.open(link.href, '_blank', 'noopener'); setTimeout(() => URL.revokeObjectURL(link.href), 60000); return; }
+    link.download = job.name;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    downloadPrint.classList.remove('print-ready');
+    status.textContent = '打印文件已下载';
+  } catch {
+    status.textContent = '打印文件下载失败，请重试';
+  }
+}
+async function deletePrintJob(job) {
+  const response = await fetch('/api/admin/prints/delete', {
+    method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: job.name })
+  });
+  if (response.ok) { status.textContent = '打印文件已删除'; await refreshPrintJobs(); }
+}
+downloadPrint.addEventListener('click', () => { renderPrintJobs(); printCenter.showModal(); });
+printClose.addEventListener('click', () => printCenter.close());
+printDeleteAll.addEventListener('click', async () => {
+  const response = await fetch('/api/admin/prints/delete-all', {
+    method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  if (response.ok) { status.textContent = '当前用户的打印文件已全部删除'; await refreshPrintJobs(); }
+});
+setInterval(refreshPrintJobs, 2000);
+refreshPrintJobs();
+function releaseInputs() {
+  for (const [code, key] of pressedKeys) send({ type: 'key', code, key, down: false });
+  pressedKeys.clear();
+  for (const button of pressedButtons) send({ type: 'pointer-button', button, down: false, x: pointerX, y: pointerY });
+  pressedButtons.clear();
+}
+function setImmersive(immersive) {
+  appShell.classList.toggle('immersive', immersive);
+}
+function updateFullscreenButton() {
+  const active = document.fullscreenElement !== null;
+  fullscreen.setAttribute('aria-label', active ? '退出全屏' : '进入全屏');
+  fullscreen.querySelector('.toolbar-tooltip').textContent = active ? '退出全屏' : '全屏';
+}
+document.addEventListener('fullscreenchange', updateFullscreenButton);
+fullscreen.addEventListener('click', async () => {
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else {
+      setImmersive(true);
+      await appShell.requestFullscreen({ navigationUI: 'hide' });
+    }
+  } catch (error) {
+    setImmersive(true);
+    status.textContent = `浏览器未允许全屏：${error.message}`;
+  }
+  updateFullscreenButton();
+  video.focus();
+});
+updateFullscreenButton();
+toolbarToggle.addEventListener('click', () => {
+  const collapsed = remoteToolbar.classList.toggle('collapsed');
+  toolbarToggle.setAttribute('aria-label', collapsed ? '展开工具栏' : '收起工具栏');
+  toolbarToggle.querySelector('.toolbar-tooltip').textContent = collapsed ? '展开' : '收起';
+});
+secureAttention.addEventListener('click', () => {
+  const keys = [['ControlLeft', 'Control'], ['AltLeft', 'Alt'], ['End', 'End']];
+  for (const [code, key] of keys) send({ type: 'key', code, key, down: true });
+  for (const [code, key] of [...keys].reverse()) send({ type: 'key', code, key, down: false });
+  video.focus();
+});
+pasteText.addEventListener('click', () => { pasteValue.value = ''; pasteDialog.showModal(); });
+document.querySelector('#paste-cancel').addEventListener('click', () => pasteDialog.close());
+pasteForm.addEventListener('submit', event => {
+  event.preventDefault();
+  if (pasteValue.value) send({ type: 'text', text: pasteValue.value });
+  pasteDialog.close();
+  video.focus();
+});
+function updatePointer(event) {
+  const rect = video.getBoundingClientRect();
+  const style = getComputedStyle(video);
+  const borderLeft = parseFloat(style.borderLeftWidth) || 0;
+  const borderTop = parseFloat(style.borderTopWidth) || 0;
+  const borderRight = parseFloat(style.borderRightWidth) || 0;
+  const borderBottom = parseFloat(style.borderBottomWidth) || 0;
+  const paddingLeft = parseFloat(style.paddingLeft) || 0;
+  const paddingTop = parseFloat(style.paddingTop) || 0;
+  const paddingRight = parseFloat(style.paddingRight) || 0;
+  const paddingBottom = parseFloat(style.paddingBottom) || 0;
+  const contentLeft = rect.left + borderLeft + paddingLeft;
+  const contentTop = rect.top + borderTop + paddingTop;
+  const contentWidth = Math.max(1, rect.width - borderLeft - borderRight - paddingLeft - paddingRight);
+  const contentHeight = Math.max(1, rect.height - borderTop - borderBottom - paddingTop - paddingBottom);
+  const sourceWidth = video.videoWidth || sessionOptions.width || 1280;
+  const sourceHeight = video.videoHeight || sessionOptions.height || 720;
+  const scale = Math.min(contentWidth / sourceWidth, contentHeight / sourceHeight);
+  const renderedWidth = sourceWidth * scale;
+  const renderedHeight = sourceHeight * scale;
+  const renderedLeft = contentLeft + (contentWidth - renderedWidth) / 2;
+  const renderedTop = contentTop + (contentHeight - renderedHeight) / 2;
+  const rawX = (event.clientX - renderedLeft) / renderedWidth;
+  const rawY = (event.clientY - renderedTop) / renderedHeight;
+  pointerX = Math.max(0, Math.min(1, rawX));
+  pointerY = Math.max(0, Math.min(1, rawY));
+  return rawX >= 0 && rawX <= 1 && rawY >= 0 && rawY <= 1;
+}
+video.addEventListener('pointermove', event => {
+  if (!remoteCursor.hidden) {
+    remoteCursor.style.left = `${event.clientX}px`;
+    remoteCursor.style.top = `${event.clientY}px`;
+    remoteCursor.style.display = 'block';
+  }
+  updatePointer(event);
+  send({ type: 'pointer', x: pointerX, y: pointerY, buttons: event.buttons });
+});
+video.addEventListener('pointerenter', event => {
+  if (!remoteCursor.hidden) {
+    remoteCursor.style.left = `${event.clientX}px`;
+    remoteCursor.style.top = `${event.clientY}px`;
+    remoteCursor.style.display = 'block';
+  }
+});
+video.addEventListener('pointerleave', () => { remoteCursor.style.display = 'none'; });
+video.addEventListener('pointerdown', event => {
+  if (!updatePointer(event)) return;
+  video.play().catch(() => {});
+  video.focus();
+  video.setPointerCapture(event.pointerId);
+  pressedButtons.add(event.button);
+  send({ type: 'pointer-button', button: event.button, down: true, x: pointerX, y: pointerY });
+  event.preventDefault();
+});
+video.addEventListener('pointerup', event => {
+  updatePointer(event);
+  send({ type: 'pointer-button', button: event.button, down: false, x: pointerX, y: pointerY });
+  pressedButtons.delete(event.button);
+});
+video.addEventListener('pointercancel', releaseInputs);
+video.addEventListener('wheel', event => {
+  send({ type: 'wheel', delta: Math.round(-event.deltaY / 3) });
+  event.preventDefault();
+}, { passive: false });
+video.addEventListener('contextmenu', event => event.preventDefault());
+video.addEventListener('keydown', event => {
+  pressedKeys.set(event.code, event.key);
+  send({ type: 'key', code: event.code, key: event.key, down: true });
+  event.preventDefault();
+});
+video.addEventListener('keyup', event => {
+  send({ type: 'key', code: event.code, key: event.key, down: false });
+  pressedKeys.delete(event.code);
+  event.preventDefault();
+});
+window.addEventListener('blur', releaseInputs);
+document.addEventListener('visibilitychange', () => { if (document.hidden) releaseInputs(); });
+async function updateStatistics() {
+  if (!videoReceiver) {
+    document.querySelector('#metrics').textContent =
+      `视频协商：${videoTransceiver?.currentDirection || '等待'} · H.264能力 ${h264Codecs.length}`;
+    stat('stat-video-state').textContent = '等待轨道';
+    stat('stat-connection').textContent = pc?.connectionState || '等待连接';
+    return;
+  }
+  try {
+    const reports = await pc.getStats();
+    const values = [...reports.values()];
+    const inbound = values.find(report => report.type === 'inbound-rtp' && report.kind === 'video');
+    const audio = values.find(report => report.type === 'inbound-rtp' && report.kind === 'audio');
+    const pair = values.find(report => report.type === 'candidate-pair' && report.state === 'succeeded' && report.nominated) ||
+      values.find(report => report.type === 'candidate-pair' && report.state === 'succeeded');
+    const codec = inbound ? reports.get(inbound.codecId) : null;
+    let fps = 0, bitrate = 0;
+    if (inbound && lastVideoSample) {
+      const seconds = (inbound.timestamp - lastVideoSample.timestamp) / 1000;
+      if (seconds > 0) {
+        fps = ((inbound.framesDecoded || 0) - lastVideoSample.frames) / seconds;
+        bitrate = ((inbound.bytesReceived || 0) - lastVideoSample.bytes) * 8 / seconds;
+      }
+    }
+    if (inbound) lastVideoSample = { timestamp: inbound.timestamp, frames: inbound.framesDecoded || 0, bytes: inbound.bytesReceived || 0 };
+    let audioBitrate = 0;
+    if (audio && lastAudioSample) {
+      const seconds = (audio.timestamp - lastAudioSample.timestamp) / 1000;
+      if (seconds > 0) audioBitrate = ((audio.bytesReceived || 0) - lastAudioSample.bytes) * 8 / seconds;
+    }
+    if (audio) lastAudioSample = { timestamp: audio.timestamp, bytes: audio.bytesReceived || 0 };
+    document.querySelector('#metrics').textContent = inbound
+      ? `${fps ? fps.toFixed(1) : '—'} FPS · ${formatRate(bitrate)} · ${video.videoWidth}×${video.videoHeight}`
+      : '视频轨道已建立，等待媒体包…';
+    stat('stat-fps').textContent = fps ? `${fps.toFixed(1)}` : '—';
+    stat('stat-bitrate').textContent = bitrate ? formatRate(bitrate) : '—';
+    stat('stat-latency').textContent = pair?.currentRoundTripTime != null ? `${Math.round(pair.currentRoundTripTime * 1000)} ms` : '—';
+    stat('stat-video-state').textContent = inbound ? '正在解码' : '等待媒体包';
+    stat('stat-resolution').textContent = video.videoWidth ? `${video.videoWidth} × ${video.videoHeight}` : '—';
+    stat('stat-codec').textContent = codec?.mimeType?.split('/')[1] || 'H.264';
+    stat('stat-frames').textContent = number(inbound?.framesDecoded);
+    stat('stat-video-drops').textContent = number(inbound?.framesDropped);
+    stat('stat-connection').textContent = pc.connectionState === 'connected' ? '已连接' : pc.connectionState;
+    stat('stat-packets').textContent = number(inbound?.packetsReceived);
+    stat('stat-packet-loss').textContent = number(inbound?.packetsLost);
+    stat('stat-jitter').textContent = inbound?.jitter != null ? `${(inbound.jitter * 1000).toFixed(1)} ms` : '—';
+    stat('stat-transport').textContent = pair?.protocol?.toUpperCase() || 'UDP / DTLS / SRTP';
+    stat('stat-codec').textContent = sessionOptions.encoder === 'hardware'
+      ? 'H264 · 软件回退' : 'H264 · OpenH264';
+    stat('stat-audio').textContent = audio ? '已接收' : '未提供';
+    stat('stat-audio-state').textContent = audio
+      ? (remoteAudio.muted || remoteAudio.volume === 0 ? '浏览器已静音' : (audio.audioLevel > 0 ? '正在播放' : '当前无声'))
+      : '无声音';
+    stat('stat-audio-bitrate').textContent = formatRate(audioBitrate);
+    stat('stat-printer').textContent = sessionOptions.printer ? '已重定向' : '未启用';
+    if (!statsOverlay.hidden) {
+      const response = await fetch('/api/admin/state', {
+        cache: 'no-store', headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (response.ok) {
+        const health = await response.json();
+        stat('stat-service').textContent = health.status === 'ok' ? '在线' : '异常';
+        stat('stat-codec').textContent = health.encoderBackend === 'openh264'
+          ? (sessionOptions.encoder === 'hardware' ? 'H264 · OpenH264（硬件回退）' : 'H264 · OpenH264')
+          : `H264 · ${health.encoderBackend || '未知'}`;
+        stat('stat-captured').textContent = number(health.capturedFrames);
+        stat('stat-encoded').textContent = number(health.encodedFrames);
+        stat('stat-pipeline-drops').textContent = number(health.droppedFrames);
+        stat('stat-sent').textContent = formatBytes(health.sentBytes);
+      }
+    }
+  } catch (error) {
+    console.warn('Unable to update connection statistics', error);
+  }
+}
+setInterval(updateStatistics, 1000);
+</script>
+</body>
+</html>

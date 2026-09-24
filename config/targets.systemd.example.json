@@ -1,0 +1,15 @@
+{
+  "targets": [
+    {
+      "id": "server-55",
+      "name": "Windows Server 10.17.12.55",
+      "host": "10.17.12.55",
+      "port": 3389,
+      "username": "administrator",
+      "passwordFile": "/run/credentials/remote-gateway.service/server-55-password",
+      "width": 1280,
+      "height": 720,
+      "ignoreCertificate": true
+    }
+  ]
+}
