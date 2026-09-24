@@ -113,8 +113,10 @@ install -d -o root -g remote-gateway -m 0750 "${config_root}" "${config_root}/tl
 install -d -o root -g root -m 0700 "${credential_root}"
 install -d -o remote-gateway -g remote-gateway -m 0750 "${state_root}"
 install -m 0755 "${project_root}/build/remote-gateway" "${install_root}/bin/remote-gateway"
-install -m 0644 "${project_root}/build/libremote_gateway_core.so" "${install_root}/lib/"
 install -m 0644 "${project_root}/build/libremote_gateway_streaming.so" "${install_root}/lib/"
+if [[ -f "${project_root}/build/libremote_gateway_core.so" ]]; then
+  install -m 0644 "${project_root}/build/libremote_gateway_core.so" "${install_root}/lib/"
+fi
 shopt -s nullglob
 mapfile -t datachannel_libraries < <(find "${project_root}/build" -name 'libdatachannel.so*' -print)
 (( ${#datachannel_libraries[@]} > 0 )) || { echo "libdatachannel was not built" >&2; exit 1; }
