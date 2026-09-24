@@ -14,6 +14,7 @@ add_library(remote_gateway_core
     src/session.cpp
     src/test_pattern_source.cpp
 )
+set_target_properties(remote_gateway_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(remote_gateway_core PUBLIC include)
 target_compile_features(remote_gateway_core PUBLIC cxx_std_20)
