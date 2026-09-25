@@ -66,6 +66,40 @@
         gap: 18px;
         padding: 0 14px;
       }
+      .admin-title {
+        display: none;
+        align-items: center;
+        gap: 4px;
+      }
+      .admin-title a {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 4px;
+        color: var(--text);
+        text-decoration: none;
+      }
+      .admin-title a:hover {
+        background: #ffffff0d;
+      }
+      .admin-title svg {
+        width: 20px;
+        height: 20px;
+      }
+      .admin-title h1 {
+        margin: 0 0 0 4px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .app.admin-open .admin-title {
+        display: flex;
+      }
+      .app.admin-open .titlebar > .brand,
+      .app.admin-open .titlebar > .protocol-nav,
+      .app.admin-open .titlebar > .title-actions {
+        display: none;
+      }
       .brand {
         display: flex;
         align-items: center;
@@ -114,7 +148,7 @@
         background: var(--accent);
       }
       .manage-toggle {
-        margin-left: auto;
+        margin-left: 0;
         min-height: 32px;
         padding: 5px 11px;
         border: 1px solid var(--line);
@@ -377,6 +411,12 @@
         width: 18px;
         height: 18px;
       }
+      .title-actions {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        margin-left: auto;
+      }
       .avatar {
         display: grid;
         place-items: center;
@@ -490,53 +530,69 @@
   <body>
     <div class="app" id="app">
       <header class="titlebar">
+        <div class="admin-title">
+          <a href="/vnc" aria-label="返回 VNC 连接" title="返回 VNC 连接"
+            ><svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="m15 18-6-6 6-6" /></svg
+          ></a>
+          <h1>VNC 管理</h1>
+        </div>
         <div class="brand"><strong>RemoteLink</strong></div>
         <nav class="protocol-nav">
           <a href="/">RDP</a><a href="/vnc" aria-current="page">VNC</a
           ><a href="/ssh">SSH</a>
         </nav>
-        <button
-          class="manage-toggle"
-          id="manage-toggle"
-          type="button"
-          title="VNC 管理"
-          aria-label="VNC 管理"
-          aria-expanded="false"
-          hidden
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            aria-hidden="true"
-          >
-            <path d="M3 12h4l2-6 4 12 2-6h6" />
-          </svg>
-        </button>
-        <div class="account">
+        <div class="title-actions">
           <button
-            class="avatar"
-            id="account-trigger"
-            aria-label="用户账户"
+            class="manage-toggle"
+            id="manage-toggle"
+            type="button"
+            title="VNC 管理"
+            aria-label="VNC 管理"
             aria-expanded="false"
+            hidden
           >
-            <span class="avatar-icon"
-              ><svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.8"
-                aria-hidden="true"
-              >
-                <circle cx="12" cy="8" r="3.5" />
-                <path d="M5 20c.8-4 3.1-6 7-6s6.2 2 7 6" /></svg
-            ></span>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              aria-hidden="true"
+            >
+              <path d="M3 12h4l2-6 4 12 2-6h6" />
+            </svg>
           </button>
-          <div class="account-menu" id="account-menu" hidden>
-            <div id="account-name">当前账户</div>
-            <a id="users-link" href="/users" hidden>用户管理</a
-            ><button id="logout">退出登录</button>
+          <div class="account">
+            <button
+              class="avatar"
+              id="account-trigger"
+              aria-label="用户账户"
+              aria-expanded="false"
+            >
+              <span class="avatar-icon"
+                ><svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="8" r="3.5" />
+                  <path d="M5 20c.8-4 3.1-6 7-6s6.2 2 7 6" /></svg
+              ></span>
+            </button>
+            <div class="account-menu" id="account-menu" hidden>
+              <div id="account-name">当前账户</div>
+              <a id="users-link" href="/users" hidden>用户管理</a
+              ><button id="logout">退出登录</button>
+            </div>
           </div>
         </div>
       </header>

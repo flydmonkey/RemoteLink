@@ -56,12 +56,6 @@ test("VNC page follows the existing RemoteLink shell", async ({ page }) => {
   await page.goto("/vnc.html");
   await expect(page).toHaveTitle("RemoteLink · VNC");
   await expect(page.locator(".brand")).toHaveText("RemoteLink");
-  await expect(page.locator(".brand")).toHaveCSS("font-weight", "600");
-  await expect(page.getByRole("heading", { name: "SSH 连接" })).toHaveCSS(
-    "font-weight",
-    "600",
-  );
-  await expect(page.locator(".app")).toHaveCSS("height", "270px");
   await expect(page.locator(".brand .mark")).toHaveCount(0);
   await expect(page.locator('.protocol-nav a[aria-current="page"]')).toHaveText(
     "VNC",
@@ -83,6 +77,7 @@ test("VNC page follows the existing RemoteLink shell", async ({ page }) => {
     page.getByRole("button", { name: "VNC 管理", exact: true }),
   ).toBeHidden();
   await expect(page.locator("#users-link")).toBeHidden();
+  await expect(page.locator(".title-actions")).toHaveCSS("gap", "2px");
   await expect(page.locator(".app")).toHaveCSS("height", "270px");
 });
 
@@ -160,6 +155,13 @@ test("VNC administrators add connections from management only", async ({
     "Administrator · admin",
   );
   await page.getByRole("button", { name: "VNC 管理", exact: true }).click();
+  await expect(page.locator(".admin-title")).toBeVisible();
+  await expect(page.locator(".admin-title")).toContainText("VNC 管理");
+  await expect(page.locator(".admin-title a")).toHaveAttribute("href", "/vnc");
+  await expect(page.locator(".admin-title a svg")).toBeVisible();
+  await expect(page.locator(".titlebar > .brand")).toBeHidden();
+  await expect(page.locator(".titlebar > .protocol-nav")).toBeHidden();
+  await expect(page.locator(".titlebar > .title-actions")).toBeHidden();
   await expect(page.locator("#admin-nav")).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "VNC 连接管理" }),
@@ -217,6 +219,12 @@ test("SSH page exposes password and key connection management", async ({
   );
   await page.goto("/ssh.html");
   await expect(page.locator(".brand")).toHaveText("RemoteLink");
+  await expect(page.locator(".brand")).toHaveCSS("font-weight", "600");
+  await expect(page.getByRole("heading", { name: "SSH 连接" })).toHaveCSS(
+    "font-weight",
+    "600",
+  );
+  await expect(page.locator(".app")).toHaveCSS("height", "270px");
   await expect(page.locator('.nav a[aria-current="page"]')).toHaveText("SSH");
   await expect(page.getByRole("heading", { name: "SSH 连接" })).toBeVisible();
   await expect(page.locator("#target")).toHaveValue("ssh-1");
