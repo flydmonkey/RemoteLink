@@ -534,46 +534,48 @@ void HttpServer::run() {
                         std::move(*destination), ssh_session_observer_, ssh_control_handler_).detach();
             continue;
         }
+        const auto query_position = parsed.path.find('?');
+        const std::string resource_path = parsed.path.substr(0, query_position);
+        const bool versioned_resource = query_position != std::string::npos &&
+            parsed.path.find("v=", query_position + 1) != std::string::npos &&
+            parsed.path.find("__REMOTELINK_VERSION__", query_position + 1) == std::string::npos;
         const bool root_request = parsed.method == "GET" &&
-            (parsed.path == "/" || parsed.path == "/index.html");
+            (resource_path == "/" || resource_path == "/index.html");
         const bool admin_request = parsed.method == "GET" &&
-            (parsed.path == "/admin" || parsed.path == "/admin.html");
+            (resource_path == "/admin" || resource_path == "/admin.html");
         const bool session_request = parsed.method == "GET" &&
-            (parsed.path == "/session" || parsed.path == "/session.html");
+            (resource_path == "/session" || resource_path == "/session.html");
         const bool settings_request = parsed.method == "GET" &&
-            (parsed.path == "/settings" || parsed.path == "/settings.html");
+            (resource_path == "/settings" || resource_path == "/settings.html");
         const bool vnc_request = parsed.method == "GET" &&
-            (parsed.path == "/vnc" || parsed.path == "/vnc.html" ||
-             parsed.path.starts_with("/vnc?") || parsed.path.starts_with("/vnc.html?"));
+            (resource_path == "/vnc" || resource_path == "/vnc.html");
         const bool vnc_session_request = parsed.method == "GET" &&
-            (parsed.path == "/vnc/session" || parsed.path.starts_with("/vnc/session?") ||
-             parsed.path == "/vnc-session.html" || parsed.path.starts_with("/vnc-session.html?"));
+            (resource_path == "/vnc/session" || resource_path == "/vnc-session.html");
         const bool vnc_admin_request = parsed.method == "GET" &&
-            (parsed.path == "/vnc/admin" || parsed.path == "/vnc-admin.html");
+            (resource_path == "/vnc/admin" || resource_path == "/vnc-admin.html");
         const bool vnc_permissions_request = parsed.method == "GET" &&
-            (parsed.path == "/vnc/permissions" || parsed.path == "/vnc-permissions.html");
+            (resource_path == "/vnc/permissions" || resource_path == "/vnc-permissions.html");
         const bool users_request = parsed.method == "GET" &&
-            (parsed.path == "/users" || parsed.path == "/users.html");
+            (resource_path == "/users" || resource_path == "/users.html");
         const bool ssh_request = parsed.method == "GET" &&
-            (parsed.path == "/ssh" || parsed.path == "/ssh.html" || parsed.path == "/ssh/settings");
+            (resource_path == "/ssh" || resource_path == "/ssh.html" || resource_path == "/ssh/settings");
         const bool ssh_session_request = parsed.method == "GET" &&
-            (parsed.path == "/ssh/session" || parsed.path.starts_with("/ssh/session?") ||
-             parsed.path == "/ssh-session.html" || parsed.path.starts_with("/ssh-session.html?"));
-        const bool icon_request = parsed.method == "GET" && parsed.path == "/remotelink-icon.png";
-        const bool i18n_request = parsed.method == "GET" && parsed.path == "/i18n.js";
+            (resource_path == "/ssh/session" || resource_path == "/ssh-session.html");
+        const bool icon_request = parsed.method == "GET" && resource_path == "/remotelink-icon.png";
+        const bool i18n_request = parsed.method == "GET" && resource_path == "/i18n.js";
         const bool novnc_request = parsed.method == "GET" &&
-            parsed.path.starts_with("/vendor/novnc/") &&
-            parsed.path.find("..") == std::string::npos;
+            resource_path.starts_with("/vendor/novnc/") &&
+            resource_path.find("..") == std::string::npos;
         const bool xterm_request = parsed.method == "GET" &&
-            parsed.path.starts_with("/vendor/xterm/") &&
-            parsed.path.find("..") == std::string::npos;
-        const bool health_request = parsed.method == "GET" && parsed.path == "/healthz";
-        const bool api_request = parsed.path == "/api/admin/vnc" ||
-                                 parsed.path.starts_with("/api/admin/") ||
-                                 parsed.path.starts_with("/api/auth/") ||
-                                 parsed.path.starts_with("/api/vnc/") ||
-                                 parsed.path.starts_with("/api/ssh/") ||
-                                 parsed.path.starts_with("/api/admin/ssh");
+            resource_path.starts_with("/vendor/xterm/") &&
+            resource_path.find("..") == std::string::npos;
+        const bool health_request = parsed.method == "GET" && resource_path == "/healthz";
+        const bool api_request = resource_path == "/api/admin/vnc" ||
+                                 resource_path.starts_with("/api/admin/") ||
+                                 resource_path.starts_with("/api/auth/") ||
+                                 resource_path.starts_with("/api/vnc/") ||
+                                 resource_path.starts_with("/api/ssh/") ||
+                                 resource_path.starts_with("/api/admin/ssh");
 
         std::string body;
         int status_code = 404;
@@ -605,8 +607,8 @@ void HttpServer::run() {
             else if (users_request) page = "/users.html";
             else if (ssh_request) page = "/ssh.html";
             else if (ssh_session_request) page = "/ssh-session.html";
-            else if (novnc_request) page = parsed.path;
-            else if (xterm_request) page = parsed.path;
+            else if (novnc_request) page = resource_path;
+            else if (xterm_request) page = resource_path;
             std::ifstream input(web_root + page,
                                 std::ios::binary);
             std::ostringstream contents;
@@ -614,7 +616,7 @@ void HttpServer::run() {
             body = contents.str();
             status_code = input ? 200 : 500;
             content_type = icon_request ? "image/png" :
-                           xterm_request && parsed.path.ends_with(".css") ? "text/css; charset=utf-8" :
+                           xterm_request && resource_path.ends_with(".css") ? "text/css; charset=utf-8" :
                            (i18n_request || novnc_request || xterm_request) ? "application/javascript; charset=utf-8" :
                            "text/html; charset=utf-8";
         }
@@ -628,11 +630,19 @@ void HttpServer::run() {
             body = "Not found\n";
         }
 
+        const bool static_asset = icon_request || i18n_request || novnc_request || xterm_request;
+        const bool html_document = root_request || admin_request || session_request || settings_request ||
+            vnc_request || vnc_session_request || vnc_admin_request || vnc_permissions_request ||
+            users_request || ssh_request || ssh_session_request;
+        const std::string cache_control = static_asset
+            ? (versioned_resource ? "public, max-age=31536000, immutable"
+                                  : "public, max-age=3600, must-revalidate")
+            : (html_document ? "no-cache" : "no-store");
         std::ostringstream response;
         response << "HTTP/1.1 " << status_text(status_code) << "\r\n"
                  << "Content-Type: " << content_type << "\r\n"
                  << "Content-Length: " << body.size() << "\r\n"
-                 << "Cache-Control: no-store\r\n"
+                 << "Cache-Control: " << cache_control << "\r\n"
                  << "Content-Security-Policy: default-src 'self'; connect-src 'self' ws: wss:; "
                     "img-src 'self' data:; script-src 'self' 'unsafe-inline'; "
                     "style-src 'self' 'unsafe-inline'\r\n"

@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>RemoteLink · VNC 会话</title>
-    <link rel="icon" href="/remotelink-icon.png" />
-    <script src="/i18n.js" defer></script>
+    <link rel="icon" href="/remotelink-icon.png?v=__REMOTELINK_VERSION__" />
+    <script src="/i18n.js?v=__REMOTELINK_VERSION__" defer></script>
     <style>
       :root {
         color-scheme: dark;
@@ -343,7 +343,7 @@
       </div>
     </dialog>
     <script type="module">
-      import RFB from "/vendor/novnc/core/rfb.js";
+      import RFB from "/vendor/novnc/core/rfb.js?v=__REMOTELINK_VERSION__";
       const token = sessionStorage.getItem("remote-gateway-access-token") || "";
       const parameters = new URLSearchParams(location.search);
       const targetId = parameters.get("target") || "";

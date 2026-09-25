@@ -14,7 +14,7 @@
       }
     </style>
     <title>RemoteLink · 远程会话</title>
-    <link rel="icon" type="image/png" href="/remotelink-icon.png" />
+    <link rel="icon" type="image/png" href="/remotelink-icon.png?v=__REMOTELINK_VERSION__" />
     <style>
       :root {
         color-scheme: dark;
@@ -1002,7 +1002,6 @@
               id="download-print"
               type="button"
               aria-label="下载打印文件"
-              hidden
             >
               <svg
                 viewBox="0 0 24 24"
@@ -1334,7 +1333,7 @@
         </div>
       </form>
     </dialog>
-    <script src="/i18n.js"></script>
+    <script src="/i18n.js?v=__REMOTELINK_VERSION__"></script>
     <script>
       const status = document.querySelector("#status");
       document.querySelector(".brand h1").textContent = "RemoteLink";
@@ -1812,6 +1811,7 @@
       const toolbarToggle = document.querySelector("#toolbar-toggle");
       const showStats = document.querySelector("#show-stats");
       const downloadPrint = document.querySelector("#download-print");
+      downloadPrint.hidden = !sessionOptions.printer;
       const toggleAudio = document.querySelector("#toggle-audio");
       const showFiles = document.querySelector("#show-files");
       showFiles.hidden = true;
@@ -2509,6 +2509,7 @@
             : "auto",
         };
         showFiles.hidden = !sessionOptions.files;
+        downloadPrint.hidden = !sessionOptions.printer;
         printSessionStartedMs = Number(pendingSession.startedAt) || 0;
         status.textContent = opT("正在连接…");
         connectSignaling();
@@ -2916,7 +2917,10 @@
           const newest = payload.items?.[0];
           renderPrintJobs();
           if (!newest) {
-            downloadPrint.hidden = true;
+            downloadPrint.hidden = !sessionOptions.printer;
+            downloadPrint.classList.remove("print-ready");
+            downloadPrint.querySelector(".toolbar-tooltip").textContent =
+              opT("下载打印文件");
             latestPrintName = "";
             return;
           }

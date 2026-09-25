@@ -137,6 +137,8 @@ export RG_STATE_DIR=/var/lib/remote-gateway
 打开 **Actions → Package RemoteLink for Linux → Run workflow**，即可构建并下载带版本号的
 Linux x86_64 压缩包及 SHA-256 校验文件。推送 `v0.3.0` 这类版本标签时也会自动执行同一
 打包流程。Actions 构建产物保留 30 天；创建 GitHub Release 仍是独立步骤。
+发布包会把实际版本号写入 HTML 引用的 JavaScript 和样式地址。服务端要求 HTML
+重新验证，同时对带版本号的静态资源启用一年不可变缓存，升级后不会继续使用旧前端文件。
 
 在全新的 Ubuntu/Debian 主机上，可从仓库目录运行交互式一键安装脚本。脚本会安装
 编译依赖、编译并测试 RemoteLink、创建加密凭据和自签名 TLS 证书，并启动 systemd

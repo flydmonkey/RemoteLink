@@ -7,6 +7,7 @@ output_dir="${project_root}/dist"
 version="${PACKAGE_VERSION:-$(tr -d '[:space:]' < "${project_root}/VERSION")}"
 version="${version#v}"
 version="${version//\//-}"
+version="${version//[^a-zA-Z0-9._-]/-}"
 stage="$(mktemp -d)"
 cleanup() {
   case "${stage}" in /tmp/*) rm -rf -- "${stage}" ;; esac
@@ -28,6 +29,8 @@ mapfile -t datachannel_libraries < <(find "${build_dir}" -name 'libdatachannel.s
 cp -a "${datachannel_libraries[@]}" "${package_root}/lib/"
 shopt -u nullglob
 cp -a "${project_root}/web" "${package_root}/web"
+find "${package_root}/web" -type f -name '*.html' -exec \
+  sed -i "s/__REMOTELINK_VERSION__/${version}/g" {} +
 install -D -m 0644 "${project_root}/config/remote-gateway.service.example" \
   "${package_root}/config/remote-gateway.service.example"
 install -m 0644 "${project_root}/config/remote-gateway.env.example" \
@@ -35,7 +38,8 @@ install -m 0644 "${project_root}/config/remote-gateway.env.example" \
   "${project_root}/config/targets.systemd.example.json" "${package_root}/config/"
 cp -a "${project_root}/scripts" "${package_root}/scripts"
 install -m 0644 "${project_root}/README.md" "${project_root}/README.zh-CN.md" \
-  "${project_root}/VERSION" "${project_root}/CHANGELOG.md" "${package_root}/"
+  "${project_root}/CHANGELOG.md" "${package_root}/"
+printf '%s\n' "${version}" > "${package_root}/VERSION"
 cp -a "${project_root}/docs" "${package_root}/docs"
 mkdir -p "${output_dir}"
 archive="${output_dir}/RemoteLink-linux-x86_64-${version}.tar.gz"

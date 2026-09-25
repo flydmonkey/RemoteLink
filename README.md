@@ -109,6 +109,9 @@ Open **Actions → Package RemoteLink for Linux → Run workflow** to build and
 download a versioned Linux x86_64 archive and its SHA-256 checksum. Pushing a
 tag such as `v0.3.0` runs the same packaging workflow automatically. The workflow
 artifact is retained for 30 days; creating a GitHub Release is a separate step.
+Packaged HTML references JavaScript and styles with the package version. The
+server keeps HTML revalidated while serving versioned static assets with a
+one-year immutable cache, so upgrades do not reuse stale browser code.
 
 For a fresh Ubuntu/Debian host, run the interactive one-click installer from the
 repository checkout. It installs build dependencies, builds and tests RemoteLink,

@@ -477,7 +477,7 @@ test("VNC session uses noVNC Core with RemoteLink controls", async ({
       },
     });
   });
-  await page.route("**/vendor/novnc/core/rfb.js", (route) =>
+  await page.route(/\/vendor\/novnc\/core\/rfb\.js(?:\?.*)?$/, (route) =>
     route.fulfill({
       contentType: "application/javascript",
       body: 'export default class RFB extends EventTarget { constructor(target){super();window.testRfb=this;this.scaleViewport=false;this.resizeSession=false;this.viewOnly=false;this._canvas=document.createElement("canvas");this._cursor={_canvas:document.createElement("canvas"),change(){}};target.append(this._canvas)} sendCtrlAltDel(){} clipboardPasteFrom(){} disconnect(){} }',

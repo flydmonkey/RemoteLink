@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>RemoteLink · SSH 控制台</title>
-    <script src="/i18n.js" defer></script>
-    <link rel="stylesheet" href="/vendor/xterm/xterm.css" />
+    <script src="/i18n.js?v=__REMOTELINK_VERSION__" defer></script>
+    <link rel="stylesheet" href="/vendor/xterm/xterm.css?v=__REMOTELINK_VERSION__" />
     <style>
       * {
         box-sizing: border-box;
@@ -207,7 +207,7 @@
       </button>
     </aside>
     <div id="terminal"></div>
-    <script src="/vendor/xterm/xterm.js"></script>
+    <script src="/vendor/xterm/xterm.js?v=__REMOTELINK_VERSION__"></script>
     <script>
       const terminalElement = document.querySelector("#terminal"),
         status = document.querySelector("#status"),

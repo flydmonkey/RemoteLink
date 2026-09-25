@@ -9,6 +9,7 @@ test('session starts with a black localized loading screen', async ({ page }) =>
   await expect(page.locator('#session-loading')).toBeVisible();
   await expect(page.locator('#session-loading-text')).toHaveText('Connecting…');
   await expect(page.locator('#paste-text .toolbar-tooltip')).toHaveText('Paste text');
+  await expect(page.locator('#download-print')).toHaveJSProperty('hidden', false);
   await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(0, 0, 0)');
 });
 
