@@ -75,7 +75,7 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y build-essential cmake ninja-build pkg-config git python3 curl openssl \
-  ca-certificates libopenh264-dev libopus-dev libyuv-dev libssl-dev nlohmann-json3-dev
+  ca-certificates libopenh264-dev libopus-dev libyuv-dev libssl-dev libssh2-1-dev nlohmann-json3-dev
 
 if apt-cache show freerdp3-dev >/dev/null 2>&1 && apt-cache show libwinpr3-dev >/dev/null 2>&1; then
   apt-get install -y freerdp3-dev libwinpr3-dev

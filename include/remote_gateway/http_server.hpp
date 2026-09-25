@@ -43,6 +43,9 @@ public:
     void set_vnc_ticket_handler(
         std::function<std::optional<VncDestination>(const std::string&)> handler);
     void set_vnc_session_observer(std::function<void(const VncDestination&, bool)> observer);
+    void set_ssh_ticket_handler(
+        std::function<std::optional<VncDestination>(const std::string&)> handler);
+    void set_ssh_session_observer(std::function<void(const VncDestination&, bool)> observer);
 
 private:
     void run();
@@ -58,6 +61,8 @@ private:
     std::function<HttpResponse(const HttpRequest&)> api_handler_;
     std::function<std::optional<VncDestination>(const std::string&)> vnc_ticket_handler_;
     std::function<void(const VncDestination&, bool)> vnc_session_observer_;
+    std::function<std::optional<VncDestination>(const std::string&)> ssh_ticket_handler_;
+    std::function<void(const VncDestination&, bool)> ssh_session_observer_;
     std::jthread thread_;
 };
 

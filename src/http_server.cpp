@@ -68,6 +68,18 @@ void HttpServer::set_vnc_session_observer(
     vnc_session_observer_ = std::move(observer);
 }
 
+void HttpServer::set_ssh_ticket_handler(
+    std::function<std::optional<VncDestination>(const std::string&)> handler) {
+    if (thread_.joinable())
+        throw std::logic_error("SSH ticket handler must be set before HTTP server starts");
+    ssh_ticket_handler_ = std::move(handler);
+}
+void HttpServer::set_ssh_session_observer(
+    std::function<void(const VncDestination&, bool)> observer) {
+    if (thread_.joinable()) throw std::logic_error("SSH observer must be set before HTTP server starts");
+    ssh_session_observer_ = std::move(observer);
+}
+
 namespace {
 std::string status_text(int status) {
     switch (status) {
@@ -219,7 +231,7 @@ bool relay_websocket_message_to_tcp(int client, SSL* tls, int backend) {
     return write_socket(backend, payload.data(), payload.size());
 }
 
-void proxy_vnc_websocket(int client, SSL* tls, const std::string& request,
+void proxy_terminal_websocket(int client, SSL* tls, const std::string& request,
                          const VncDestination& destination,
                          const std::function<void(const VncDestination&, bool)>& observer) {
     const auto key = header_value(request, "sec-websocket-key");
@@ -490,8 +502,27 @@ void HttpServer::run() {
                 ::close(client);
                 continue;
             }
-            std::thread(proxy_vnc_websocket, client, tls, std::move(raw_request),
+            std::thread(proxy_terminal_websocket, client, tls, std::move(raw_request),
                         std::move(*destination), vnc_session_observer_).detach();
+            continue;
+        }
+        const std::string ssh_prefix = "/ssh/ws?ticket=";
+        const bool ssh_websocket_request = parsed.method == "GET" &&
+            parsed.path.starts_with(ssh_prefix) &&
+            lower(raw_request.substr(0, headers_end)).find("upgrade: websocket") != std::string::npos;
+        if (ssh_websocket_request) {
+            const auto ticket = parsed.path.substr(ssh_prefix.size());
+            const auto destination = ssh_ticket_handler_ ? ssh_ticket_handler_(ticket) : std::nullopt;
+            if (!destination) {
+                static constexpr char forbidden[] =
+                    "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                write_client(client, tls, forbidden, sizeof(forbidden) - 1);
+                if (tls != nullptr) { SSL_shutdown(tls); SSL_free(tls); }
+                ::close(client);
+                continue;
+            }
+            std::thread(proxy_terminal_websocket, client, tls, std::move(raw_request),
+                        std::move(*destination), ssh_session_observer_).detach();
             continue;
         }
         const bool root_request = parsed.method == "GET" &&
@@ -516,16 +547,24 @@ void HttpServer::run() {
             (parsed.path == "/users" || parsed.path == "/users.html");
         const bool ssh_request = parsed.method == "GET" &&
             (parsed.path == "/ssh" || parsed.path == "/ssh.html");
+        const bool ssh_session_request = parsed.method == "GET" &&
+            (parsed.path == "/ssh/session" || parsed.path.starts_with("/ssh/session?") ||
+             parsed.path == "/ssh-session.html" || parsed.path.starts_with("/ssh-session.html?"));
         const bool icon_request = parsed.method == "GET" && parsed.path == "/remotelink-icon.png";
         const bool i18n_request = parsed.method == "GET" && parsed.path == "/i18n.js";
         const bool novnc_request = parsed.method == "GET" &&
             parsed.path.starts_with("/vendor/novnc/") &&
             parsed.path.find("..") == std::string::npos;
+        const bool xterm_request = parsed.method == "GET" &&
+            parsed.path.starts_with("/vendor/xterm/") &&
+            parsed.path.find("..") == std::string::npos;
         const bool health_request = parsed.method == "GET" && parsed.path == "/healthz";
         const bool api_request = parsed.path == "/api/admin/vnc" ||
                                  parsed.path.starts_with("/api/admin/") ||
                                  parsed.path.starts_with("/api/auth/") ||
-                                 parsed.path.starts_with("/api/vnc/");
+                                 parsed.path.starts_with("/api/vnc/") ||
+                                 parsed.path.starts_with("/api/ssh/") ||
+                                 parsed.path.starts_with("/api/admin/ssh");
 
         std::string body;
         int status_code = 404;
@@ -541,7 +580,7 @@ void HttpServer::run() {
         }
         else if (root_request || admin_request || session_request || settings_request ||
                  vnc_request || vnc_session_request || vnc_admin_request || vnc_permissions_request ||
-                 users_request || ssh_request || icon_request || i18n_request || novnc_request) {
+                 users_request || ssh_request || ssh_session_request || icon_request || i18n_request || novnc_request || xterm_request) {
             const char* configured_web_root = std::getenv("RG_WEB_ROOT");
             const std::string web_root = configured_web_root && *configured_web_root
                 ? configured_web_root : REMOTE_GATEWAY_WEB_ROOT;
@@ -556,7 +595,9 @@ void HttpServer::run() {
             else if (vnc_permissions_request) page = "/users.html";
             else if (users_request) page = "/users.html";
             else if (ssh_request) page = "/ssh.html";
+            else if (ssh_session_request) page = "/ssh-session.html";
             else if (novnc_request) page = parsed.path;
+            else if (xterm_request) page = parsed.path;
             std::ifstream input(web_root + page,
                                 std::ios::binary);
             std::ostringstream contents;
@@ -564,7 +605,8 @@ void HttpServer::run() {
             body = contents.str();
             status_code = input ? 200 : 500;
             content_type = icon_request ? "image/png" :
-                           (i18n_request || novnc_request) ? "application/javascript; charset=utf-8" :
+                           xterm_request && parsed.path.ends_with(".css") ? "text/css; charset=utf-8" :
+                           (i18n_request || novnc_request || xterm_request) ? "application/javascript; charset=utf-8" :
                            "text/html; charset=utf-8";
         }
         else if (api_request && api_handler_) {

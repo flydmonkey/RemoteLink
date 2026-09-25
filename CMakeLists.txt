@@ -30,6 +30,7 @@ if(REMOTE_GATEWAY_ENABLE_STREAMING)
     pkg_check_modules(OPENH264 REQUIRED IMPORTED_TARGET openh264)
     pkg_check_modules(OPUS REQUIRED IMPORTED_TARGET opus)
     pkg_check_modules(FREERDP REQUIRED IMPORTED_TARGET freerdp3 freerdp-client3 winpr3)
+    pkg_check_modules(LIBSSH2 REQUIRED IMPORTED_TARGET libssh2)
     find_path(LIBYUV_INCLUDE_DIR libyuv/convert.h REQUIRED)
     find_library(LIBYUV_LIBRARY yuv REQUIRED)
     find_package(OpenSSL REQUIRED)
@@ -77,6 +78,7 @@ if(REMOTE_GATEWAY_ENABLE_STREAMING)
         src/http_server.cpp
         src/rdp_frame_source.cpp
         src/session_manager.cpp
+        src/ssh_bridge.cpp
         src/target_config.cpp
         src/vnc_bridge.cpp
         src/vnc_ticket_store.cpp
@@ -89,7 +91,7 @@ if(REMOTE_GATEWAY_ENABLE_STREAMING)
     target_link_libraries(remote_gateway_streaming
         PUBLIC remote_gateway_core
         PRIVATE LibDataChannel::LibDataChannel PkgConfig::OPENH264 PkgConfig::OPUS OpenSSL::SSL OpenSSL::Crypto
-                PkgConfig::FREERDP Threads::Threads ${LIBYUV_LIBRARY} vncclient vncserver
+                PkgConfig::FREERDP PkgConfig::LIBSSH2 Threads::Threads ${LIBYUV_LIBRARY} vncclient vncserver
     )
     target_compile_definitions(remote_gateway_streaming PRIVATE
         REMOTE_GATEWAY_WEB_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/web"

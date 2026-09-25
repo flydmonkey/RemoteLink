@@ -8,6 +8,7 @@
     "@playwright/test": "^1.55.0"
   },
   "dependencies": {
-    "@novnc/novnc": "^1.7.0"
+    "@novnc/novnc": "^1.7.0",
+    "@xterm/xterm": "^5.5.0"
   }
 }

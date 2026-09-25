@@ -1,1 +1,485 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RemoteLink · SSH</title><link rel="icon" type="image/png" href="/remotelink-icon.png"><style>:root{color-scheme:dark;font:14px/1.45 "Segoe UI Variable","Segoe UI","Microsoft YaHei UI",sans-serif;--bg:#202020;--panel:#2b2b2b;--stroke:#ffffff22;--text:#f5f5f5;--muted:#ffffff92;--accent:#6cc5f3;--accent-text:#10232d}*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:28px 16px;color:var(--text);background:var(--bg)}.app{width:min(760px,100%);min-height:440px;margin:auto;border:1px solid var(--stroke);border-radius:8px;background:var(--panel);box-shadow:0 18px 50px #0006}.bar{height:52px;display:flex;align-items:center;gap:18px;padding:0 14px;border-bottom:1px solid #ffffff12}.brand{font-weight:650}.nav{align-self:stretch;display:flex}.nav a{position:relative;display:flex;align-items:center;padding:0 14px;color:var(--muted);text-decoration:none;font-weight:600}.nav a[aria-current="page"]{color:var(--text)}.nav a[aria-current="page"]:after{content:"";position:absolute;left:14px;right:14px;bottom:0;height:2px;background:var(--accent)}main{display:grid;place-items:center;min-height:388px;padding:24px;text-align:center}svg{width:48px;color:var(--muted)}h1{margin:14px 0 4px;font-size:20px}p{max-width:390px;margin:0;color:var(--muted);font-size:12px}@media(max-width:560px){body{padding:0}.app{min-height:100vh;border:0;border-radius:0}.brand{display:none}}</style></head><body><div class="app"><header class="bar"><strong class="brand">RemoteLink</strong><nav class="nav" aria-label="连接协议"><a href="/">RDP</a><a href="/vnc">VNC</a><a href="/ssh" aria-current="page">SSH</a></nav></header><main><div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3m5 0h5"/></svg><h1>SSH 功能准备中</h1><p>导航入口已经保留，后续将按 RemoteLink 的权限和会话模型接入终端功能。</p></div></main></div></body></html>
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>RemoteLink · SSH</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font:
+          14px/1.45 "Segoe UI",
+          sans-serif;
+        --bg: #202020;
+        --panel: #2b2b2b;
+        --control: #222;
+        --line: #ffffff22;
+        --text: #f5f5f5;
+        --muted: #ffffff92;
+        --accent: #73bee8;
+        --danger: #ff99a4;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        padding: 28px 16px;
+        color: var(--text);
+        background: var(--bg);
+      }
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+      .app {
+        width: min(560px, 100%);
+        min-height: 270px;
+        margin: auto;
+        padding: 0 20px 20px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+      .bar {
+        height: 52px;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+      }
+      .brand {
+        font-weight: 650;
+      }
+      .nav {
+        align-self: stretch;
+        display: flex;
+      }
+      .nav a {
+        position: relative;
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        color: var(--muted);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .nav a[aria-current="page"] {
+        color: var(--text);
+      }
+      .nav a[aria-current="page"]:after {
+        content: "";
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        bottom: 0;
+        height: 2px;
+        background: var(--accent);
+      }
+      .tools {
+        margin-left: auto;
+        display: flex;
+        gap: 7px;
+      }
+      .icon {
+        width: 34px;
+        height: 34px;
+        border: 0;
+        border-radius: 50%;
+        color: #ddd;
+        background: #353535;
+        cursor: pointer;
+      }
+      .hero {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin: 18px 0;
+      }
+      .hero-icon {
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        border-radius: 8px;
+        color: #122630;
+        background: var(--accent);
+        font: 700 18px monospace;
+      }
+      .hero h1 {
+        margin: 0;
+        font-size: 21px;
+      }
+      .hero p {
+        margin: 1px 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .field {
+        display: grid;
+        grid-template-columns: 100px 1fr;
+        gap: 12px;
+        align-items: center;
+      }
+      select,
+      input,
+      textarea {
+        width: 100%;
+        min-height: 36px;
+        padding: 7px 10px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        color: var(--text);
+        background: var(--control);
+      }
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 44px;
+      }
+      .primary,
+      .secondary,
+      .danger {
+        min-width: 124px;
+        min-height: 35px;
+        border: 0;
+        border-radius: 4px;
+        background: var(--accent);
+        color: #10232d;
+        font-weight: 650;
+        cursor: pointer;
+      }
+      .secondary,
+      .danger {
+        min-width: auto;
+        padding: 5px 10px;
+        border: 1px solid var(--line);
+        color: var(--text);
+        background: #373737;
+      }
+      .danger {
+        color: var(--danger);
+      }
+      .notice {
+        min-height: 20px;
+        color: var(--danger);
+      }
+      dialog {
+        width: min(760px, calc(100% - 28px));
+        padding: 20px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--text);
+        background: var(--panel);
+      }
+      dialog::backdrop {
+        background: #0009;
+      }
+      .dialog-head,
+      .row,
+      .row-actions,
+      .dialog-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .dialog-head h2 {
+        margin: 0;
+      }
+      .dialog-head button {
+        margin-left: auto;
+      }
+      .list {
+        margin: 16px 0;
+      }
+      .row {
+        padding: 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      .row-main {
+        flex: 1;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .editor {
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        gap: 10px;
+        align-items: center;
+      }
+      .editor h2,
+      .dialog-actions,
+      .notice,
+      .key-row {
+        grid-column: 1/-1;
+      }
+      .dialog-actions {
+        justify-content: flex-end;
+        margin-top: 8px;
+      }
+      .key-row {
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        gap: 10px;
+        align-items: start;
+      }
+      textarea {
+        min-height: 120px;
+        resize: vertical;
+      }
+      @media (max-width: 560px) {
+        body {
+          padding: 0;
+        }
+        .app {
+          min-height: 100vh;
+          border: 0;
+        }
+        .brand {
+          display: none;
+        }
+        .field,
+        .editor,
+        .key-row {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="bar">
+        <strong class="brand">RemoteLink</strong>
+        <nav class="nav">
+          <a href="/">RDP</a><a href="/vnc">VNC</a
+          ><a href="/ssh" aria-current="page">SSH</a>
+        </nav>
+        <div class="tools">
+          <button id="manage" class="icon" hidden title="连接管理">⚙</button
+          ><button id="account" class="icon" title="账户">♙</button>
+        </div>
+      </header>
+      <main>
+        <div class="hero">
+          <div class="hero-icon">&gt;_</div>
+          <div>
+            <h1>SSH 连接</h1>
+            <p>选择计算机并打开远程终端。</p>
+          </div>
+        </div>
+        <div class="field">
+          <strong>我的连接</strong
+          ><select id="target">
+            <option value="">请选择 SSH 设备</option>
+          </select>
+        </div>
+        <div id="notice" class="notice"></div>
+        <div class="actions">
+          <button id="connect" class="primary">连接</button>
+        </div>
+      </main>
+    </div>
+    <dialog id="manager">
+      <div class="dialog-head">
+        <h2>SSH 连接管理</h2>
+        <button id="add" class="primary">添加连接</button>
+      </div>
+      <div id="list" class="list"></div>
+      <div class="dialog-actions">
+        <button id="manager-close" class="secondary">关闭</button>
+      </div>
+    </dialog>
+    <dialog id="editor">
+      <form id="form" class="editor">
+        <h2 id="editor-title">添加 SSH 连接</h2>
+        <label>连接名称</label
+        ><input id="name" maxlength="128" required /><label>主机</label
+        ><input id="host" maxlength="255" required /><label>端口</label
+        ><input
+          id="port"
+          type="number"
+          min="1"
+          max="65535"
+          value="22"
+          required
+        /><label>用户名</label
+        ><input id="username" maxlength="256" required /><label>认证方式</label
+        ><select id="auth">
+          <option value="password">用户名和密码</option>
+          <option value="key">SSH 私钥</option></select
+        ><label id="password-label">密码</label
+        ><input id="password" type="password" />
+        <div id="key-fields" class="key-row" hidden>
+          <label>私钥</label
+          ><textarea
+            id="private-key"
+            placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+          ></textarea
+          ><label>私钥口令（可选）</label
+          ><input id="passphrase" type="password" />
+        </div>
+        <div id="editor-notice" class="notice"></div>
+        <div class="dialog-actions">
+          <button id="cancel" type="button" class="secondary">取消</button
+          ><button class="primary">保存</button>
+        </div>
+      </form>
+    </dialog>
+    <script>
+      const token = sessionStorage.getItem("remote-gateway-access-token") || "",
+        target = document.querySelector("#target"),
+        notice = document.querySelector("#notice"),
+        manager = document.querySelector("#manager"),
+        editor = document.querySelector("#editor");
+      let connections = [],
+        editing = null;
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+            ...options,
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }),
+          data = await response.json().catch(() => ({}));
+        if (response.status === 401) {
+          location.href = "/";
+          throw new Error("请先登录");
+        }
+        if (!response.ok)
+          throw new Error(data.error || `HTTP ${response.status}`);
+        return data;
+      }
+      async function refresh() {
+        const me = await api("/api/auth/me");
+        document.querySelector("#manage").hidden = !me.admin;
+        const data = await api("/api/ssh/targets");
+        target.innerHTML = '<option value="">请选择 SSH 设备</option>';
+        for (const item of data.targets || [])
+          target.add(new Option(item.name, item.id));
+        if (target.options.length > 1) target.selectedIndex = 1;
+        if (me.admin) {
+          connections = (await api("/api/admin/ssh")).connections || [];
+          renderList();
+        }
+      }
+      function renderList() {
+        const list = document.querySelector("#list");
+        list.replaceChildren();
+        for (const item of connections) {
+          const row = document.createElement("div"),
+            main = document.createElement("div"),
+            actions = document.createElement("div");
+          row.className = "row";
+          main.className = "row-main";
+          main.innerHTML = '<strong></strong><div class="muted"></div>';
+          main.children[0].textContent = item.name;
+          main.children[1].textContent = `${item.username}@${item.host}:${item.port} · ${item.authType === "key" ? "私钥" : "密码"}`;
+          actions.className = "row-actions";
+          actions.append(
+            button("编辑", () => openEditor(item)),
+            button("删除", () => removeConnection(item), "danger"),
+          );
+          row.append(main, actions);
+          list.append(row);
+        }
+        if (!connections.length)
+          list.innerHTML = '<div class="muted">尚无 SSH 连接。</div>';
+      }
+      function button(text, handler, style = "secondary") {
+        const value = document.createElement("button");
+        value.className = style;
+        value.textContent = text;
+        value.onclick = handler;
+        return value;
+      }
+      function toggleAuth() {
+        const key = document.querySelector("#auth").value === "key";
+        document.querySelector("#key-fields").hidden = !key;
+        document.querySelector("#password").hidden = key;
+        document.querySelector("#password-label").hidden = key;
+      }
+      function openEditor(item = null) {
+        editing = item;
+        document.querySelector("#form").reset();
+        document.querySelector("#editor-title").textContent = item
+          ? "编辑 SSH 连接"
+          : "添加 SSH 连接";
+        for (const key of ["name", "host", "port", "username"])
+          document.querySelector(`#${key}`).value =
+            item?.[key] || (key === "port" ? 22 : "");
+        document.querySelector("#auth").value = item?.authType || "password";
+        toggleAuth();
+        editor.showModal();
+      }
+      async function removeConnection(item) {
+        if (!confirm(`删除“${item.name}”？`)) return;
+        await api("/api/admin/ssh/delete", {
+          method: "POST",
+          body: JSON.stringify({ id: item.id }),
+        });
+        await refresh();
+      }
+      document.querySelector("#connect").onclick = async () => {
+        if (!target.value) {
+          notice.textContent = "请选择 SSH 设备。";
+          return;
+        }
+        try {
+          notice.textContent = "正在连接…";
+          const session = await api("/api/ssh/sessions", {
+            method: "POST",
+            body: JSON.stringify({ targetId: target.value }),
+          });
+          sessionStorage.setItem(
+            "remotelink-ssh-session",
+            JSON.stringify(session),
+          );
+          location.href = `/ssh/session?name=${encodeURIComponent(target.options[target.selectedIndex].text)}`;
+        } catch (error) {
+          notice.textContent = error.message;
+        }
+      };
+      document.querySelector("#manage").onclick = () => manager.showModal();
+      document.querySelector("#manager-close").onclick = () => manager.close();
+      document.querySelector("#add").onclick = () => openEditor();
+      document.querySelector("#cancel").onclick = () => editor.close();
+      document.querySelector("#auth").onchange = toggleAuth;
+      document.querySelector("#account").onclick = () => {
+        if (confirm("退出登录？")) {
+          sessionStorage.clear();
+          location.href = "/";
+        }
+      };
+      document.querySelector("#form").onsubmit = async (event) => {
+        event.preventDefault();
+        const payload = {
+          id: editing?.id,
+          name: document.querySelector("#name").value.trim(),
+          host: document.querySelector("#host").value.trim(),
+          port: Number(document.querySelector("#port").value),
+          username: document.querySelector("#username").value.trim(),
+          authType: document.querySelector("#auth").value,
+          password: document.querySelector("#password").value,
+          privateKey: document.querySelector("#private-key").value,
+          passphrase: document.querySelector("#passphrase").value,
+        };
+        try {
+          await api("/api/admin/ssh/save", {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+          editor.close();
+          await refresh();
+        } catch (error) {
+          document.querySelector("#editor-notice").textContent = error.message;
+        }
+      };
+      refresh().catch((error) => (notice.textContent = error.message));
+    </script>
+  </body>
+</html>

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>RemoteLink · SSH 控制台</title>
+    <link rel="stylesheet" href="/vendor/xterm/xterm.css" />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        height: 100vh;
+        background: #101010;
+        color: #eee;
+        font:
+          14px/1.45 Consolas,
+          "Cascadia Mono",
+          monospace;
+      }
+      .bar {
+        height: 44px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 14px;
+        background: #292929;
+        border-bottom: 1px solid #ffffff20;
+        font-family: "Segoe UI", sans-serif;
+      }
+      .bar strong {
+        flex: 1;
+      }
+      .bar button {
+        padding: 6px 12px;
+        border: 1px solid #ffffff25;
+        border-radius: 4px;
+        color: #eee;
+        background: #383838;
+        cursor: pointer;
+      }
+      #terminal {
+        height: calc(100vh - 44px);
+        margin: 0;
+        padding: 14px;
+        overflow: auto;
+        outline: 0;
+      }
+      #status {
+        color: #9d9d9d;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="bar">
+      <strong id="title">SSH 控制台</strong><span id="status">正在连接…</span
+      ><button id="disconnect">断开连接</button>
+    </header>
+    <div id="terminal"></div>
+    <script src="/vendor/xterm/xterm.js"></script>
+    <script>
+      const terminalElement = document.querySelector("#terminal"),
+        status = document.querySelector("#status"),
+        saved = JSON.parse(
+          sessionStorage.getItem("remotelink-ssh-session") || "null",
+        ),
+        name = new URLSearchParams(location.search).get("name") || "SSH";
+      document.querySelector("#title").textContent = name;
+      let socket;
+      const terminal = new Terminal({
+        cursorBlink: true,
+        fontFamily: 'Consolas,"Cascadia Mono",monospace',
+        fontSize: 14,
+        theme: {
+          background: "#101010",
+          foreground: "#eeeeee",
+          cursor: "#73bee8",
+        },
+        scrollback: 5000,
+      });
+      terminal.open(terminalElement);
+      const append = (text) => terminal.write(text);
+      if (!saved?.websocketUrl) {
+        status.textContent = "会话已失效";
+        append("请返回 SSH 页面重新连接。\n");
+      } else {
+        const scheme = location.protocol === "https:" ? "wss:" : "ws:";
+        socket = new WebSocket(
+          `${scheme}//${location.host}${saved.websocketUrl}`,
+        );
+        socket.binaryType = "arraybuffer";
+        socket.onopen = () => {
+          status.textContent = "已连接";
+          terminal.focus();
+        };
+        socket.onmessage = (event) =>
+          append(
+            typeof event.data === "string"
+              ? event.data
+              : new TextDecoder().decode(event.data),
+          );
+        socket.onclose = () => {
+          status.textContent = "已断开";
+          append("\n[连接已断开]\n");
+        };
+        socket.onerror = () => (status.textContent = "连接失败");
+      }
+      terminal.onData((value) => {
+        if (socket?.readyState === WebSocket.OPEN)
+          socket.send(new TextEncoder().encode(value));
+      });
+      document.querySelector("#disconnect").onclick = () => {
+        if (socket) socket.close();
+        location.href = "/ssh";
+      };
+    </script>
+  </body>
+</html>

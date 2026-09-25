@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md) | English
 
-RemoteLink is a self-hosted, browser-based remote connection tool for accessing Windows desktops over RDP. It captures the desktop with FreeRDP, delivers H.264 video and Opus audio through WebRTC, and sends keyboard, mouse, wheel, touch, and text input over a WebRTC data channel.
+RemoteLink is a self-hosted, browser-based remote connection tool for RDP, VNC, and SSH. It supports server-managed SSH password and private-key authentication without exposing credentials to the browser.
 
 The gateway runs as a single Linux service. Users only need a modern browser—no extension or desktop client is required.
 

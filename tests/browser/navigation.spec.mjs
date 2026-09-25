@@ -191,12 +191,31 @@ test("VNC administrators add connections from management only", async ({
   ).toBeVisible();
 });
 
-test("SSH route has a reserved navigation destination", async ({ page }) => {
+test("SSH page exposes password and key connection management", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    sessionStorage.setItem("remote-gateway-access-token", "test"),
+  );
+  await page.route("**/api/auth/me", (route) =>
+    route.fulfill({ json: { admin: true } }),
+  );
+  await page.route("**/api/ssh/targets", (route) =>
+    route.fulfill({ json: { targets: [{ id: "ssh-1", name: "Linux" }] } }),
+  );
+  await page.route("**/api/admin/ssh", (route) =>
+    route.fulfill({ json: { connections: [] } }),
+  );
   await page.goto("/ssh.html");
   await expect(page.locator('.nav a[aria-current="page"]')).toHaveText("SSH");
+  await expect(page.getByRole("heading", { name: "SSH 连接" })).toBeVisible();
+  await expect(page.locator("#target")).toHaveValue("ssh-1");
+  await page.locator("#manage").click();
+  await page.getByRole("button", { name: "添加连接" }).click();
   await expect(
-    page.getByRole("heading", { name: "SSH 功能准备中" }),
-  ).toBeVisible();
+    page.getByRole("option", { name: "用户名和密码" }),
+  ).toBeAttached();
+  await expect(page.getByRole("option", { name: "SSH 私钥" })).toBeAttached();
 });
 
 test("VNC session uses noVNC Core with RemoteLink controls", async ({
@@ -330,6 +349,9 @@ test("user management exposes the complete account lifecycle", async ({
       json: { connections: [{ id: "vnc-1", name: "Desktop" }] },
     }),
   );
+  await page.route("**/api/admin/ssh", (route) =>
+    route.fulfill({ json: { connections: [{ id: "ssh-1", name: "Linux" }] } }),
+  );
   await page.goto("/users.html");
   await expect(page.getByRole("button", { name: "添加用户" })).toBeVisible();
   await expect(page.getByRole("button", { name: "编辑" })).toHaveCount(2);
@@ -349,7 +371,5 @@ test("user management exposes the complete account lifecycle", async ({
   ).toBeVisible();
   await expect(page.locator("#permissions").getByText("Windows")).toBeVisible();
   await expect(page.locator("#permissions").getByText("Desktop")).toBeVisible();
-  await expect(
-    page.locator("#permissions").getByText("暂无 SSH 连接"),
-  ).toBeVisible();
+  await expect(page.locator("#permissions").getByText("Linux")).toBeVisible();
 });
