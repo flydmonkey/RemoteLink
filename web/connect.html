@@ -19,8 +19,8 @@
     <div class="hero"><span class="hero-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4M8 10h8M13 7l3 3-3 3"/></svg></span><div><h2 id="connection-title">远程桌面连接</h2><p id="connection-status">正在连接网关…</p></div></div>
     <form id="connection-form">
       <label for="target">我的连接</label><div><select id="target" required disabled><option value="">请选择已授权连接</option></select><datalist id="target-list"></datalist></div>
-      <label for="username">用户名</label><input id="username" autocomplete="username" required disabled>
-      <label for="password">密码</label><input id="password" type="password" autocomplete="current-password" required disabled>
+      <label for="username">用户名（可选）</label><input id="username" autocomplete="username" disabled>
+      <label for="password">密码（可选）</label><input id="password" type="password" autocomplete="current-password" disabled>
       <label class="remember"><input id="remember" type="checkbox">在此浏览器保存这台主机的用户名和密码</label>
       <p class="hint">连接后将在独立会话页面中打开远程桌面。凭据通过当前加密连接发送。</p>
       <span id="error" role="alert"></span>
@@ -97,7 +97,7 @@ forgetButton.addEventListener('click',()=>{const profiles=savedProfiles();delete
 document.querySelector('#connection-form').addEventListener('submit',event=>{
   event.preventDefault(); error.textContent='';
   const selected=targets.find(item=>item.id===targetSelect.value);
-  if(!selected||!username.value||!password.value){error.textContent='请选择已授权连接并填写用户名和密码。';return}
+  if(!selected){error.textContent='请选择已授权连接。';return}
   const host=selected.host;
   const key=selected.id;
   const profiles=savedProfiles();

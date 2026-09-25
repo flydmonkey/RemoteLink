@@ -86,6 +86,13 @@ std::string generate_access_token() {
     return hex_encode(bytes.data(), bytes.size());
 }
 
+std::string generate_connection_id() {
+    std::array<unsigned char, 8> bytes{};
+    if (RAND_bytes(bytes.data(), static_cast<int>(bytes.size())) != 1)
+        throw std::runtime_error("unable to generate connection id");
+    return "connection-" + hex_encode(bytes.data(), bytes.size());
+}
+
 void save_users(const std::filesystem::path& path, const std::vector<GatewayUser>& users) {
     nlohmann::json data = nlohmann::json::array();
     for (const auto& user : users)
@@ -112,7 +119,8 @@ std::vector<remote_gateway::TargetConfig> load_managed_connections(
         target.id = item.value("id", ""); target.name = item.value("name", "");
         target.rdp.hostname = item.value("host", "");
         target.rdp.port = static_cast<std::uint16_t>(item.value("port", 3389));
-        target.rdp.username = item.value("username", ""); target.rdp.domain = item.value("domain", "");
+        target.rdp.username = item.value("username", "");
+        target.rdp.password = item.value("password", "");
         target.rdp.width = item.value("width", 1920U); target.rdp.height = item.value("height", 1080U);
         target.rdp.ignore_certificate = item.value("ignoreCertificate", true);
         if (target.id.empty() || target.name.empty() || target.rdp.hostname.empty() ||
@@ -129,7 +137,7 @@ void save_managed_connections(const std::filesystem::path& path,
     for (const auto& target : targets) data.push_back({
         {"id", target.id}, {"name", target.name}, {"host", target.rdp.hostname},
         {"port", target.rdp.port}, {"username", target.rdp.username},
-        {"domain", target.rdp.domain}, {"width", target.rdp.width},
+        {"password", target.rdp.password}, {"width", target.rdp.width},
         {"height", target.rdp.height}, {"ignoreCertificate", target.rdp.ignore_certificate}});
     const auto temporary = path.string() + ".tmp";
     { std::ofstream output(temporary, std::ios::trunc); output << data.dump(2) << '\n';
@@ -365,26 +373,24 @@ int main() {
             }
             if (request.method == "POST" && request.path == "/api/admin/connections/create") {
                 const auto payload = json::parse(request.body, nullptr, false);
-                const std::string id = payload.is_object() ? payload.value("id", "") : "";
+                std::string id;
+                do { id = generate_connection_id(); }
+                while (std::any_of(target_catalog.begin(), target_catalog.end(),
+                    [&](const auto& target) { return target.id == id; }));
                 const std::string name = payload.is_object() ? payload.value("name", "") : "";
                 const std::string host = payload.is_object() ? payload.value("host", "") : "";
                 const std::string username = payload.is_object() ? payload.value("username", "") : "";
-                const std::string domain = payload.is_object() ? payload.value("domain", "") : "";
+                const std::string password = payload.is_object() ? payload.value("password", "") : "";
                 const int port = payload.is_object() ? payload.value("port", 3389) : 0;
-                const bool valid_id = !id.empty() && id.size() <= 64 &&
-                    std::all_of(id.begin(), id.end(), [](unsigned char c) {
-                        return std::isalnum(c) || c == '_' || c == '-';
-                    });
-                const bool duplicate = std::any_of(target_catalog.begin(), target_catalog.end(),
-                    [&](const auto& target) { return target.id == id; });
-                if (!valid_id || name.empty() || name.size() > 128 || host.empty() || host.size() > 255 ||
-                    port < 1 || port > 65535 || duplicate || !remote_gateway::host_is_allowed(host, allowed_hosts)) {
-                    response.status = 400; response.body = json{{"error", "invalid or duplicate connection"}}.dump(); return response;
+                if (name.empty() || name.size() > 128 || host.empty() || host.size() > 255 ||
+                    port < 1 || port > 65535 || username.size() > 256 || password.size() > 4096 ||
+                    !remote_gateway::host_is_allowed(host, allowed_hosts)) {
+                    response.status = 400; response.body = json{{"error", "invalid connection"}}.dump(); return response;
                 }
                 remote_gateway::TargetConfig target;
                 target.id = id; target.name = name; target.rdp.hostname = host;
                 target.rdp.port = static_cast<std::uint16_t>(port);
-                target.rdp.username = username; target.rdp.domain = domain;
+                target.rdp.username = username; target.rdp.password = password;
                 target.rdp.width = payload.value("width", 1920U);
                 target.rdp.height = payload.value("height", 1080U);
                 target.rdp.ignore_certificate = payload.value("ignoreCertificate", true);
