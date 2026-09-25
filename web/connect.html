@@ -313,7 +313,12 @@
     </style>
     <style>
       .titlebar {
+        position: relative;
+        z-index: 10;
         gap: 18px;
+      }
+      .connection-card select:disabled {
+        pointer-events: none;
       }
       .protocol-nav {
         align-self: stretch;
@@ -449,10 +454,19 @@
       }
       .account-language select {
         position: absolute;
-        inset: 0;
-        width: 100%;
+        top: 0;
+        right: 0;
+        width: 104px;
+        height: 34px;
+        min-height: 34px;
+        padding: 0;
+        border: 0;
         opacity: 0;
         cursor: pointer;
+      }
+      .account-menu > button {
+        position: relative;
+        z-index: 1;
       }
       .account-language:hover {
         background: #ffffff0d;

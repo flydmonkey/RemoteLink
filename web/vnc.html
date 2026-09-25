@@ -60,11 +60,16 @@
         height: 532px;
       }
       .titlebar {
+        position: relative;
+        z-index: 10;
         height: 52px;
         display: flex;
         align-items: center;
         gap: 18px;
         padding: 0 14px;
+      }
+      .connect-form select:disabled {
+        pointer-events: none;
       }
       .admin-title {
         display: none;
@@ -219,10 +224,19 @@
       }
       .account-language select {
         position: absolute;
-        inset: 0;
-        width: 100%;
+        top: 0;
+        right: 0;
+        width: 104px;
+        height: 34px;
+        min-height: 34px;
+        padding: 0;
+        border: 0;
         opacity: 0;
         cursor: pointer;
+      }
+      .account-menu > button {
+        position: relative;
+        z-index: 1;
       }
       .account-language:hover {
         background: #ffffff0d;

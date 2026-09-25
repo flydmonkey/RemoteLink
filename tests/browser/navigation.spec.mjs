@@ -72,6 +72,29 @@ test("RDP page exposes the protocol navigation", async ({ page }) => {
   await expect(page.locator("#connection-form #forget")).toHaveCount(0);
 });
 
+test("a user without connections can still sign out", async ({ page }) => {
+  await page.route("**/api/auth/me", (route) =>
+    route.fulfill({ json: { name: "No Access", username: "empty", admin: false } }),
+  );
+  for (const protocol of ["rdp", "vnc", "ssh"])
+    await page.route(`**/api/${protocol}/targets`, (route) =>
+      route.fulfill({ json: { targets: [] } }),
+    );
+  await page.goto("/connect.html");
+  await page.evaluate(() =>
+    sessionStorage.setItem("remote-gateway-access-token", "test"),
+  );
+  await page.reload();
+  await page.locator("#account-trigger").click();
+  await page.locator("#logout-account").click();
+  await expect(page.locator("#login")).toHaveAttribute("open", "");
+  expect(
+    await page.evaluate(() =>
+      sessionStorage.getItem("remote-gateway-access-token"),
+    ),
+  ).toBeNull();
+});
+
 test("VNC page follows the existing RemoteLink shell", async ({ page }) => {
   await page.addInitScript(() =>
     sessionStorage.setItem("remote-gateway-access-token", "test"),
