@@ -454,7 +454,7 @@ int main() {
                 const std::string username = payload.is_object() ? payload.value("username", "") : "";
                 const std::string password = payload.is_object() ? payload.value("password", "") : "";
                 const int port = payload.is_object() ? payload.value("port", 3389) : 0;
-                if (name.empty() || name.size() > 128 || host.empty() || host.size() > 255 ||
+                if (name.empty() || name.size() > 128 || group.empty() || group.size() > 64 || host.empty() || host.size() > 255 ||
                     port < 1 || port > 65535 || username.size() > 256 || password.size() > 4096 ||
                     !remote_gateway::host_is_allowed(host, allowed_hosts)) {
                     response.status = 400; response.body = json{{"error", "invalid connection"}}.dump(); return response;
@@ -495,7 +495,7 @@ int main() {
                 const std::string username = payload.value("username", "");
                 const std::string password = payload.value("password", "");
                 const int port = payload.value("port", 3389);
-                if (name.empty() || name.size() > 128 || host.empty() || host.size() > 255 ||
+                if (name.empty() || name.size() > 128 || group.empty() || group.size() > 64 || host.empty() || host.size() > 255 ||
                     port < 1 || port > 65535 || username.size() > 256 || password.size() > 4096 ||
                     !remote_gateway::host_is_allowed(host, allowed_hosts)) {
                     response.status = 400; response.body = json{{"error", "invalid connection"}}.dump(); return response;
