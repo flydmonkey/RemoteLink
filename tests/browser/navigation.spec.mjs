@@ -245,12 +245,28 @@ test("VNC administrators add connections from management only", async ({
   await page.getByRole("button", { name: "添加连接", exact: true }).click();
   await expect(page.locator("#editor")).toBeVisible();
   await expect(page.locator("#editor").getByLabel("主机")).toBeVisible();
+  await expect(page.locator("#auth-type")).toHaveValue("password");
+  await expect(
+    page.locator("#editor").getByLabel(/用户名|Username/),
+  ).toBeHidden();
+  await expect(page.locator("#editor").getByLabel("密码")).toBeVisible();
+  await expect(page.locator("#editor").getByLabel("CA 证书")).toBeHidden();
+  await page.locator("#auth-type").selectOption("username-password");
   await expect(
     page.locator("#editor").getByLabel(/用户名|Username/),
   ).toBeVisible();
+  await expect(page.locator("#editor").getByLabel("密码")).toBeVisible();
+  await expect(page.locator("#editor").getByLabel("CA 证书")).toBeHidden();
+  await page.locator("#auth-type").selectOption("ca-certificate");
+  await expect(
+    page.locator("#editor").getByLabel(/用户名|Username/),
+  ).toBeHidden();
+  await expect(page.locator("#editor").getByLabel("密码")).toBeHidden();
   await expect(page.locator("#editor").getByLabel("CA 证书")).toBeVisible();
+  await page.locator("#auth-type").selectOption("password");
   await page.locator("#editor").getByLabel("名称").fill("Test VNC");
   await page.locator("#editor").getByLabel("主机").fill("192.168.1.10");
+  await page.locator("#editor").getByLabel("密码").fill("secret");
   await page
     .locator("#editor")
     .getByRole("button", { name: "测试连接" })

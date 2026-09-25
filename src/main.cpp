@@ -966,16 +966,31 @@ int main() {
                 auto password = payload.value("password", "");
                 std::string ca_file;
                 const auto ca_certificate = payload.value("caCertificate", "");
+                const auto auth_type = payload.value("authType", !ca_certificate.empty()
+                    ? "ca-certificate" : (!username.empty() ? "username-password" : "password"));
+                if (auth_type != "username-password" && auth_type != "password" &&
+                    auth_type != "ca-certificate") {
+                    response.status=400; response.body=json{{"error","VNC 认证类型无效"}}.dump(); return response;
+                }
                 const auto id = payload.value("id", "");
                 if (!id.empty()) {
                     std::lock_guard lock(vnc_connections_mutex);
                     const auto existing = std::find_if(vnc_connections.begin(), vnc_connections.end(),
                         [&](const auto& item) { return item.id == id; });
                     if (existing != vnc_connections.end()) {
-                        if (password.empty()) password = existing->password;
-                        if (username.empty()) username = existing->username;
-                        if (ca_certificate.empty()) ca_file = existing->ca_file;
+                        if (auth_type != "ca-certificate" && password.empty()) password = existing->password;
+                        if (auth_type == "username-password" && username.empty()) username = existing->username;
+                        if (auth_type == "ca-certificate" && ca_certificate.empty()) ca_file = existing->ca_file;
                     }
+                }
+                if (auth_type == "username-password" && username.empty()) {
+                    response.status=400; response.body=json{{"error","请填写 VNC 用户名"}}.dump(); return response;
+                }
+                if (auth_type != "ca-certificate" && password.empty()) {
+                    response.status=400; response.body=json{{"error","请填写 VNC 密码"}}.dump(); return response;
+                }
+                if (auth_type == "ca-certificate" && ca_certificate.empty() && ca_file.empty()) {
+                    response.status=400; response.body=json{{"error","请选择 CA 证书"}}.dump(); return response;
                 }
                 std::filesystem::path temporary_ca;
                 if (!ca_certificate.empty()) {
@@ -1009,12 +1024,19 @@ int main() {
                 static const std::regex valid_id("^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$");
                 const auto password = payload.value("password", "");
                 const auto ca_certificate = payload.value("caCertificate", "");
+                const auto auth_type = payload.value("authType", !ca_certificate.empty()
+                    ? "ca-certificate" : (!payload.value("username", "").empty()
+                        ? "username-password" : "password"));
                 if (!std::regex_match(id, valid_id)) { response.status=400; response.body=json{{"error","连接 ID 无效"}}.dump(); return response; }
                 if (name.empty() || name.size() > 128) { response.status=400; response.body=json{{"error","连接名称不能为空且不能超过 128 个字符"}}.dump(); return response; }
                 if (host.empty() || host.size() > 255) { response.status=400; response.body=json{{"error","目标主机不能为空且不能超过 255 个字符"}}.dump(); return response; }
                 if (port < 1 || port > 65535) { response.status=400; response.body=json{{"error","端口必须在 1 到 65535 之间"}}.dump(); return response; }
                 if (password.size() > 4096) { response.status=400; response.body=json{{"error","VNC 密码过长"}}.dump(); return response; }
                 if (payload.value("username", "").size() > 256 || ca_certificate.size() > 1024 * 1024) { response.status=400; response.body=json{{"error","VNC TLS 配置过长"}}.dump(); return response; }
+                if (auth_type != "username-password" && auth_type != "password" &&
+                    auth_type != "ca-certificate") {
+                    response.status=400; response.body=json{{"error","VNC 认证类型无效"}}.dump(); return response;
+                }
                 if (!ca_certificate.empty() &&
                     (ca_certificate.find("-----BEGIN CERTIFICATE-----") == std::string::npos ||
                      ca_certificate.find("-----END CERTIFICATE-----") == std::string::npos)) {
@@ -1023,15 +1045,29 @@ int main() {
                 std::lock_guard lock(vnc_connections_mutex);
                 auto found = std::find_if(vnc_connections.begin(), vnc_connections.end(),
                     [&](const auto& item) { return item.id == id; });
+                const auto has_saved_password = found != vnc_connections.end() && !found->password.empty();
+                const auto has_saved_ca = found != vnc_connections.end() && !found->ca_file.empty();
+                const auto selected_username = auth_type == "username-password"
+                    ? payload.value("username", "") : "";
+                if (auth_type == "username-password" && selected_username.empty()) {
+                    response.status=400; response.body=json{{"error","请填写 VNC 用户名"}}.dump(); return response;
+                }
+                if (auth_type != "ca-certificate" && password.empty() && !has_saved_password) {
+                    response.status=400; response.body=json{{"error","请填写 VNC 密码"}}.dump(); return response;
+                }
+                if (auth_type == "ca-certificate" && ca_certificate.empty() && !has_saved_ca) {
+                    response.status=400; response.body=json{{"error","请选择 CA 证书"}}.dump(); return response;
+                }
                 VncConnection updated{id, name, host,
-                    static_cast<std::uint16_t>(port), password, payload.value("viewOnly", false),
-                    payload.value("username", ""), ""};
+                    static_cast<std::uint16_t>(port), auth_type == "ca-certificate" ? "" : password,
+                    payload.value("viewOnly", false), selected_username, ""};
                 if (found == vnc_connections.end() && !payload.value("id", "").empty()) {
                     response.status=404; response.body=json{{"error","VNC connection not found"}}.dump(); return response;
                 }
                 if (found != vnc_connections.end()) {
-                    if (updated.password.empty()) updated.password = found->password;
-                    updated.ca_file = found->ca_file;
+                    if (auth_type != "ca-certificate" && updated.password.empty())
+                        updated.password = found->password;
+                    if (auth_type == "ca-certificate") updated.ca_file = found->ca_file;
                     *found = std::move(updated);
                 } else vnc_connections.push_back(std::move(updated));
                 auto saved = std::find_if(vnc_connections.begin(), vnc_connections.end(),
@@ -1044,6 +1080,10 @@ int main() {
                     std::filesystem::permissions(certificate_path, std::filesystem::perms::owner_read |
                         std::filesystem::perms::owner_write, std::filesystem::perm_options::replace);
                     saved->ca_file = certificate_path.string();
+                }
+                if (auth_type != "ca-certificate") {
+                    std::filesystem::remove(vnc_ca_path / (id + ".pem"));
+                    saved->ca_file.clear();
                 }
                 save_vnc_connections(vnc_connections_path, vnc_connection_secrets_path, vnc_connections);
                 response.body=json{{"id",id}}.dump(); return response;

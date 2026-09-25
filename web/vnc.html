@@ -326,6 +326,12 @@
       .dialog-notice {
         grid-column: 1/-1;
       }
+      .credential-field {
+        display: contents;
+      }
+      .credential-field[hidden] {
+        display: none;
+      }
       .dialog-actions {
         display: flex;
         justify-content: flex-end;
@@ -696,20 +702,29 @@
           max="65535"
           value="5900"
           required
-        /><label for="vnc-username">用户名</label
-        ><input
-          id="vnc-username"
-          maxlength="256"
-          placeholder="VeNCrypt Plain 可选"
-        /><label for="password">密码</label
-        ><input id="password" type="password" maxlength="4096" /><label
-          for="ca-file"
-          >CA 证书</label
-        ><input
-          id="ca-file"
-          type="file"
-          accept=".pem,.crt,.cer,application/x-pem-file"
-        /><label for="view-only">访问模式</label
+        /><label for="auth-type">认证类型</label
+        ><select id="auth-type">
+          <option value="username-password">用户名和密码</option>
+          <option value="password" selected>仅密码</option>
+          <option value="ca-certificate">CA 证书</option>
+        </select>
+        <div class="credential-field" id="username-credential" hidden>
+          <label for="vnc-username">用户名</label
+          ><input id="vnc-username" maxlength="256" />
+        </div>
+        <div class="credential-field" id="password-credential">
+          <label for="password">密码</label
+          ><input id="password" type="password" maxlength="4096" />
+        </div>
+        <div class="credential-field" id="ca-credential" hidden>
+          <label for="ca-file">CA 证书</label
+          ><input
+            id="ca-file"
+            type="file"
+            accept=".pem,.crt,.cer,application/x-pem-file"
+          />
+        </div>
+        <label for="view-only">访问模式</label
         ><select id="view-only">
           <option value="false">允许控制</option>
           <option value="true">只读</option>
@@ -844,12 +859,61 @@
         document.querySelector("#host").value = item?.host || "";
         document.querySelector("#port").value = item?.port || 5900;
         document.querySelector("#vnc-username").value = item?.username || "";
+        document.querySelector("#auth-type").value = item?.hasCaCertificate
+          ? "ca-certificate"
+          : item?.username
+            ? "username-password"
+            : "password";
         document.querySelector("#view-only").value = String(!!item?.viewOnly);
-        document.querySelector("#editor-notice").textContent =
-          item?.hasCaCertificate
-            ? "已托管 CA 证书；不选择新文件将保留现有证书。"
-            : "";
+        updateAuthenticationFields(false);
         editor.showModal();
+      }
+      function updateAuthenticationFields(clearHidden = true) {
+        const authType = document.querySelector("#auth-type").value,
+          username = document.querySelector("#vnc-username"),
+          password = document.querySelector("#password"),
+          caFile = document.querySelector("#ca-file"),
+          showUsername = authType === "username-password",
+          showPassword = authType !== "ca-certificate",
+          showCa = authType === "ca-certificate";
+        document.querySelector("#username-credential").hidden = !showUsername;
+        document.querySelector("#password-credential").hidden = !showPassword;
+        document.querySelector("#ca-credential").hidden = !showCa;
+        username.required = showUsername;
+        password.required = showPassword && !editingConnection?.hasPassword;
+        caFile.required = showCa && !editingConnection?.hasCaCertificate;
+        if (clearHidden) {
+          if (!showUsername) username.value = "";
+          if (!showPassword) password.value = "";
+          if (!showCa) caFile.value = "";
+        }
+        document.querySelector("#editor-notice").textContent =
+          showCa && editingConnection?.hasCaCertificate
+            ? "已托管 CA 证书；不选择新文件将保留现有证书。"
+            : showPassword && editingConnection?.hasPassword
+              ? "已配置密码；留空将保留现有密码。"
+              : "";
+      }
+      document.querySelector("#auth-type").onchange = () =>
+        updateAuthenticationFields();
+      async function selectedCredentials() {
+        const authType = document.querySelector("#auth-type").value;
+        return {
+          authType,
+          username:
+            authType === "username-password"
+              ? document.querySelector("#vnc-username").value.trim()
+              : "",
+          password:
+            authType === "ca-certificate"
+              ? ""
+              : document.querySelector("#password").value,
+          caCertificate:
+            authType === "ca-certificate"
+              ? (await document.querySelector("#ca-file").files[0]?.text()) ||
+                ""
+              : "",
+        };
       }
       async function removeConnection(item) {
         if (!confirm(`删除“${item.name}”？`)) return;
@@ -876,17 +940,14 @@
         button.disabled = true;
         message.textContent = "正在验证 VNC 协议和身份信息…";
         try {
-          const caCertificate =
-            (await document.querySelector("#ca-file").files[0]?.text()) || "";
+          const credentials = await selectedCredentials();
           const result = await api("/api/admin/vnc/test", {
             method: "POST",
             body: JSON.stringify({
               id: editingConnection?.id,
               host,
               port,
-              username: document.querySelector("#vnc-username").value.trim(),
-              password: document.querySelector("#password").value,
-              caCertificate,
+              ...credentials,
             }),
           });
           message.textContent = result.authenticated
@@ -901,8 +962,7 @@
       document.querySelector("#editor-form").onsubmit = async (event) => {
         event.preventDefault();
         try {
-          const caCertificate =
-            (await document.querySelector("#ca-file").files[0]?.text()) || "";
+          const credentials = await selectedCredentials();
           await api("/api/admin/vnc/save", {
             method: "POST",
             body: JSON.stringify({
@@ -910,9 +970,7 @@
               name: document.querySelector("#name").value.trim(),
               host: document.querySelector("#host").value.trim(),
               port: Number(document.querySelector("#port").value),
-              username: document.querySelector("#vnc-username").value.trim(),
-              password: document.querySelector("#password").value,
-              caCertificate,
+              ...credentials,
               viewOnly: document.querySelector("#view-only").value === "true",
             }),
           });
