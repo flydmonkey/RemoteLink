@@ -14,7 +14,7 @@ The gateway runs as a single Linux service. Users only need a modern browser—n
 - Username/password accounts with administrator and standard-user roles
 - User creation, enable/disable, and password reset in the administration console
 - Administrator-managed connections with per-user authorization
-- Standard users see only authorized connections and configure only session parameters
+- Standard users see only authorized connections; protocol tabs with no available connections are hidden
 - Per-user file manager with folders, chunked uploads, downloads, rename, delete, quotas, and audit logs
 - RDP drive redirection through **Gateway Files**
 - Printer redirection with downloadable PDF print jobs
@@ -28,6 +28,7 @@ The gateway runs as a single Linux service. Users only need a modern browser—n
 - Responsive desktop and mobile browser interface
 - Standalone VNC support using noVNC Core and a one-time-ticket WSS-to-RFB proxy
 - Native RemoteLink VNC device, session toolbar, administration, and user-permission UI
+- VNC password, username/password, and CA-certificate authentication modes with automatic reconnect
 - Native SSH terminal with password or private-key credentials and administrator-confirmed host fingerprints
 - Unified RDP, VNC, and SSH active-session and recent-activity audit views
 - Non-revealing credential status with replace and clear operations for every protocol
@@ -35,35 +36,28 @@ The gateway runs as a single Linux service. Users only need a modern browser—n
 ## Architecture
 
 ```text
-Browser
-  ├─ HTTPS UI and authenticated APIs             :18080
-  └─ WSS signaling `/ws` + WebRTC media/data     :18080
-                         │
-                    RemoteLink
-              ┌──────────┴──────────┐
-              │ FreeRDP session     │
-              │ H.264 / Opus        │
-              │ input forwarding    │
-              │ files / PDF prints  │
-              └──────────┬──────────┘
-                         │ RDP
-                    Windows host
+Browser (plain HTML/CSS/JavaScript)
+  ├─ RDP: WSS signaling + WebRTC H.264/Opus/data ── RemoteLink ── FreeRDP ── Windows
+  ├─ VNC: one-time-ticket WSS ───────────────────── RemoteLink ── TCP/RFB ─── VNC server
+  └─ SSH: one-time-ticket WSS + xterm.js ────────── RemoteLink ── libssh2 ─── SSH server
 ```
 
-Each browser connection owns an isolated RDP, capture, encoder, audio, and input lifecycle. Video and input are never broadcast between users.
+The VNC client uses only noVNC Core; RemoteLink supplies its own connection and session interface. VNC and SSH credentials remain on the server, and browsers receive only short-lived, single-use session tickets. Each RDP browser connection owns an isolated capture, encoder, audio, and input lifecycle; video and input are never broadcast between users.
 
 ## Requirements
 
 - Linux (the maintained deployment target)
 - CMake 3.20+ and a C++20 compiler
 - FreeRDP 3 and WinPR 3 development packages
-- OpenH264, Opus, libyuv, OpenSSL, and libdatachannel
+- OpenH264, Opus, libyuv, OpenSSL, libssh2, and libdatachannel
 - A TLS certificate trusted by client browsers
 - TCP 18080 and WebRTC UDP ICE connectivity (`18081` is loopback-only internally)
 
 ## Build
 
 ```bash
+npm ci
+bash ./scripts/copy-novnc-core.sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
@@ -73,6 +67,8 @@ For WSL2 development:
 
 ```bash
 cd /mnt/c/Users/Administrator/Projects/apache/remote-gateway
+npm ci
+bash ./scripts/copy-novnc-core.sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
@@ -80,11 +76,11 @@ ctest --test-dir build --output-on-failure
 
 ## Configuration
 
-Copy `config/targets.example.json` to a protected location outside the repository and configure the allowed Windows targets. Supply passwords through environment variables or systemd encrypted credentials rather than storing them in JSON.
+After first login, administrators manage RDP, VNC, and SSH connections from each protocol's **Management** page and grant access from **User management**. Connection credentials are stored in owner-only files under `RG_STATE_DIR`, are never returned by the API, and can be replaced or cleared from the interface. `RG_TARGETS_FILE` remains available for importing legacy RDP targets; imported connections are migrated to managed state on first start.
 
 | Variable | Purpose |
 | --- | --- |
-| `RG_TARGETS_FILE` | RDP target configuration file |
+| `RG_TARGETS_FILE` | Optional legacy RDP target import file |
 | `RG_ALLOWED_HOSTS` | RDP host/CIDR allow-list; defaults to `*` (all DNS names and IP addresses). VNC destinations are unrestricted. |
 | `RG_ACCESS_TOKEN_FILE` | Protected primary-administrator recovery credential |
 | `RG_TLS_CERTIFICATE` | TLS certificate chain |
@@ -111,7 +107,8 @@ export RG_STATE_DIR=/var/lib/remote-gateway
 
 Open **Actions → Package RemoteLink for Linux → Run workflow** to build and
 download a versioned Linux x86_64 archive and its SHA-256 checksum. Pushing a
-tag such as `v0.1.0` runs the same packaging workflow automatically.
+tag such as `v0.3.0` runs the same packaging workflow automatically. The workflow
+artifact is retained for 30 days; creating a GitHub Release is a separate step.
 
 For a fresh Ubuntu/Debian host, run the interactive one-click installer from the
 repository checkout. It installs build dependencies, builds and tests RemoteLink,
@@ -221,7 +218,10 @@ gpupdate /force
 ## Security
 
 - The certificate SAN must contain the gateway hostname or IP address.
-- Keep RDP passwords and the recovery token in a secret manager or systemd encrypted credentials.
+- Change the bootstrap administrator password immediately after installation.
+- Connection passwords, SSH private keys and VNC CA certificates are stored server-side and never returned to browsers.
+- Verify an SSH SHA-256 host fingerprint out of band before confirming trust; reset and confirm it again after a host reinstall or key change.
+- Keep the recovery token in a secret manager or systemd encrypted credentials.
 - `RG_ALLOWED_HOSTS` defaults to `*`, allowing every domain name and IPv4/IPv6 address. Set an explicit comma-separated host/CIDR list when deployment policy requires destination restrictions.
 - User files and print jobs are isolated by stable user identity.
 - The persistent user registry uses owner-only permissions.
@@ -231,6 +231,9 @@ gpupdate /force
 ```bash
 curl --fail https://GATEWAY-IP:18080/healthz
 ctest --test-dir build --output-on-failure
+npm run test:release
+# With Docker or Podman test targets and a local installed service:
+npm run test:e2e
 ```
 
 Additional signaling and WebRTC smoke clients are available under `tests/`.

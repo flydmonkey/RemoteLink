@@ -18,6 +18,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm install
+      - run: npm ci
+      - run: bash ./scripts/copy-novnc-core.sh
       - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run test:browser
