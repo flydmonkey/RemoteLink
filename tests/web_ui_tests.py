@@ -7,6 +7,20 @@ connect = (web / "connect.html").read_text(encoding="utf-8")
 session = (web / "index.html").read_text(encoding="utf-8")
 settings = (web / "settings.html").read_text(encoding="utf-8")
 i18n = (web / "i18n.js").read_text(encoding="utf-8")
+localized_pages = [
+    web / name
+    for name in (
+        "connect.html",
+        "admin.html",
+        "settings.html",
+        "index.html",
+        "vnc.html",
+        "vnc-session.html",
+        "ssh.html",
+        "ssh-session.html",
+        "users.html",
+    )
+]
 
 for native_dialog in ("prompt(", "confirm(", "alert("):
     assert native_dialog not in "\n".join((admin, connect, session, settings))
@@ -24,4 +38,12 @@ for language in ("zh-TW", "en", "ja", "ko"):
     assert language in session
 assert "requestVideoFrameCallback" in session
 assert "whiteRatio" in session
+for page in localized_pages:
+    source = page.read_text(encoding="utf-8")
+    assert "/i18n.js" in source, f"{page.name} is missing shared i18n"
+    assert "Remote Gateway" not in source, f"{page.name} contains the old brand"
+for retired_copy in ("连接历史", "VNC 管理", "SSH 设置", "SSH 管理"):
+    assert retired_copy not in "\n".join(
+        page.read_text(encoding="utf-8") for page in localized_pages
+    )
 print("web-ui-tests-ok")

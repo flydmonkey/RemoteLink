@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>RemoteLink · 用户管理</title>
+    <script src="/i18n.js" defer></script>
     <style>
       :root {
         color-scheme: dark;
@@ -53,9 +54,20 @@
         border-bottom: 1px solid var(--line);
       }
       .back {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 4px;
         color: var(--text);
-        font-size: 22px;
         text-decoration: none;
+      }
+      .back:hover {
+        background: #ffffff0d;
+      }
+      .back svg {
+        width: 20px;
+        height: 20px;
       }
       .bar h1 {
         font-size: 14px;
@@ -230,7 +242,18 @@
   <body>
     <div class="app">
       <header class="bar">
-        <a class="back" href="/" aria-label="返回">‹</a>
+        <a class="back" href="/" aria-label="返回连接页面" title="返回连接页面"
+          ><svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m15 18-6-6 6-6" /></svg
+        ></a>
         <h1>用户管理</h1>
         <button class="primary" id="add">添加用户</button>
       </header>

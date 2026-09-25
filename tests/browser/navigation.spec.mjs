@@ -1,5 +1,11 @@
 import { test, expect } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() =>
+    localStorage.setItem("remotelink-language", "zh-CN"),
+  );
+});
+
 test("RDP page exposes the protocol navigation", async ({ page }) => {
   await page.goto("/connect.html");
   await expect(page).toHaveTitle("RemoteLink · RDP");
@@ -264,6 +270,49 @@ test("SSH page exposes password and key connection management", async ({
     page.getByRole("option", { name: "用户名和密码" }),
   ).toBeAttached();
   await expect(page.getByRole("option", { name: "SSH 私钥" })).toBeAttached();
+});
+
+test("SSH and user management use the shared English interface vocabulary", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem("remote-gateway-access-token", "test");
+    localStorage.setItem("remotelink-language", "en");
+  });
+  await page.route("**/api/auth/me", (route) =>
+    route.fulfill({
+      json: { username: "admin", name: "Administrator", admin: true },
+    }),
+  );
+  await page.route("**/api/ssh/targets", (route) =>
+    route.fulfill({ json: { targets: [{ id: "ssh-1", name: "Linux" }] } }),
+  );
+  await page.route("**/api/admin/ssh", (route) =>
+    route.fulfill({ json: { connections: [] } }),
+  );
+  await page.route("**/api/admin/ssh/activity", (route) =>
+    route.fulfill({ json: { active: [], history: [] } }),
+  );
+  await page.goto("/ssh.html");
+  await expect(
+    page.getByRole("heading", { name: "SSH connection" }),
+  ).toBeVisible();
+  await expect(page.getByText("Select a computer and connect")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Manage" })).toBeVisible();
+
+  await page.route("**/api/admin/users", (route) =>
+    route.fulfill({ json: { items: [] } }),
+  );
+  await page.route("**/api/admin/targets", (route) =>
+    route.fulfill({ json: { targets: [] } }),
+  );
+  await page.goto("/users.html");
+  await expect(page).toHaveTitle("RemoteLink · User management");
+  await expect(
+    page.getByRole("heading", { name: "User management" }),
+  ).toBeVisible();
+  await expect(page.locator(".back svg")).toBeVisible();
+  await expect(page.locator(".back")).toHaveCSS("width", "34px");
 });
 
 test("VNC session uses noVNC Core with RemoteLink controls", async ({
