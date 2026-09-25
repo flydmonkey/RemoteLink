@@ -542,7 +542,7 @@
             >
               <path d="m15 18-6-6 6-6" /></svg
           ></a>
-          <h1>VNC 管理</h1>
+          <h1>管理</h1>
         </div>
         <div class="brand"><strong>RemoteLink</strong></div>
         <nav class="protocol-nav">
@@ -554,8 +554,8 @@
             class="manage-toggle"
             id="manage-toggle"
             type="button"
-            title="VNC 管理"
-            aria-label="VNC 管理"
+            title="管理"
+            aria-label="管理"
             aria-expanded="false"
             hidden
           >
@@ -780,7 +780,7 @@
         app.classList.toggle("admin-open", opening);
         workspace.classList.toggle("admin-open", opening);
         manageToggle.setAttribute("aria-expanded", String(opening));
-        manageToggle.title = opening ? "返回 VNC 连接" : "VNC 管理";
+        manageToggle.title = opening ? "返回 VNC 连接" : "管理";
         manageToggle.setAttribute("aria-label", manageToggle.title);
         if (opening) {
           const [connections, activity] = await Promise.all([

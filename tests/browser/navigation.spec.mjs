@@ -74,7 +74,7 @@ test("VNC page follows the existing RemoteLink shell", async ({ page }) => {
   await expect(page.locator("#target")).toHaveValue("first-vnc");
   await expect(page.locator("#admin-nav")).toBeHidden();
   await expect(
-    page.getByRole("button", { name: "VNC 管理", exact: true }),
+    page.getByRole("button", { name: "管理", exact: true }),
   ).toBeHidden();
   await expect(page.locator("#users-link")).toBeHidden();
   await expect(page.locator(".title-actions")).toHaveCSS("gap", "2px");
@@ -154,9 +154,9 @@ test("VNC administrators add connections from management only", async ({
   await expect(page.locator("#account-name")).toHaveText(
     "Administrator · admin",
   );
-  await page.getByRole("button", { name: "VNC 管理", exact: true }).click();
+  await page.getByRole("button", { name: "管理", exact: true }).click();
   await expect(page.locator(".admin-title")).toBeVisible();
-  await expect(page.locator(".admin-title")).toContainText("VNC 管理");
+  await expect(page.locator(".admin-title")).toContainText("管理");
   await expect(page.locator(".admin-title a")).toHaveAttribute("href", "/vnc");
   await expect(page.locator(".admin-title a svg")).toBeVisible();
   await expect(page.locator(".titlebar > .brand")).toBeHidden();
@@ -234,6 +234,12 @@ test("SSH page exposes password and key connection management", async ({
     "href",
     "/ssh/settings",
   );
+  await expect(page.locator("#manage")).toHaveAttribute("aria-label", "管理");
+  await expect(page.locator("#manage path")).toHaveAttribute(
+    "d",
+    "M3 12h4l2-6 4 12 2-6h6",
+  );
+  await expect(page.locator("#manage circle")).toHaveCount(0);
   await expect(page.locator("#manage")).toHaveCSS("width", "34px");
   await expect(page.locator("#account-trigger")).toHaveCSS("width", "34px");
   await page.locator("#account-trigger").click();
