@@ -24,6 +24,7 @@ public:
         std::string name;
         std::string host;
         std::string username;
+        std::uint16_t port = 3389;
         std::uint32_t width = 0;
         std::uint32_t height = 0;
         bool busy = false;

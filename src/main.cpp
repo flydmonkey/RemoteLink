@@ -407,6 +407,74 @@ int main() {
                 webrtc.set_targets(std::move(published));
                 response.body = json{{"id", id}, {"name", name}}.dump(); return response;
             }
+            if (request.method == "POST" && request.path == "/api/admin/connections/update") {
+                const auto payload = json::parse(request.body, nullptr, false);
+                const std::string id = payload.is_object() ? payload.value("id", "") : "";
+                auto managed = std::find_if(managed_targets.begin(), managed_targets.end(),
+                    [&](const auto& target) { return target.id == id; });
+                auto catalog = std::find_if(target_catalog.begin(), target_catalog.end(),
+                    [&](const auto& target) { return target.id == id; });
+                if (managed == managed_targets.end() || catalog == target_catalog.end()) {
+                    response.status = 404; response.body = json{{"error", "connection not found"}}.dump(); return response;
+                }
+                const std::string name = payload.value("name", "");
+                const std::string host = payload.value("host", "");
+                const std::string username = payload.value("username", "");
+                const std::string password = payload.value("password", "");
+                const int port = payload.value("port", 3389);
+                if (name.empty() || name.size() > 128 || host.empty() || host.size() > 255 ||
+                    port < 1 || port > 65535 || username.size() > 256 || password.size() > 4096 ||
+                    !remote_gateway::host_is_allowed(host, allowed_hosts)) {
+                    response.status = 400; response.body = json{{"error", "invalid connection"}}.dump(); return response;
+                }
+                auto updated = *managed;
+                updated.name = name; updated.rdp.hostname = host;
+                updated.rdp.port = static_cast<std::uint16_t>(port);
+                updated.rdp.username = username;
+                if (!password.empty()) updated.rdp.password = password;
+                *managed = updated; *catalog = updated;
+                save_managed_connections(connections_path, managed_targets);
+                sessions.set_targets(target_catalog);
+                std::vector<remote_gateway::WebRtcServer::PublicTarget> published;
+                for (const auto& item : target_catalog) published.push_back({item.id, item.name,
+                    item.rdp.hostname, item.rdp.username, item.rdp.width, item.rdp.height});
+                webrtc.set_targets(std::move(published));
+                response.body = json{{"id", id}, {"name", name}}.dump(); return response;
+            }
+            if (request.method == "POST" && request.path == "/api/admin/connections/delete") {
+                const auto payload = json::parse(request.body, nullptr, false);
+                const std::string id = payload.is_object() ? payload.value("id", "") : "";
+                const auto managed = std::find_if(managed_targets.begin(), managed_targets.end(),
+                    [&](const auto& target) { return target.id == id; });
+                if (managed == managed_targets.end()) {
+                    response.status = 404; response.body = json{{"error", "connection not found"}}.dump(); return response;
+                }
+                const auto snapshots = sessions.target_snapshots();
+                const auto active = std::find_if(snapshots.begin(), snapshots.end(),
+                    [&](const auto& target) { return target.id == id && target.busy; });
+                if (active != snapshots.end()) {
+                    response.status = 409; response.body = json{{"error", "connection has an active session"}}.dump(); return response;
+                }
+                managed_targets.erase(managed);
+                std::erase_if(target_catalog, [&](const auto& target) { return target.id == id; });
+                save_managed_connections(connections_path, managed_targets);
+                sessions.set_targets(target_catalog);
+                std::vector<remote_gateway::WebRtcServer::PublicTarget> published;
+                for (const auto& item : target_catalog) published.push_back({item.id, item.name,
+                    item.rdp.hostname, item.rdp.username, item.rdp.width, item.rdp.height});
+                webrtc.set_targets(std::move(published));
+                {
+                    std::lock_guard lock(users_mutex);
+                    std::vector<std::vector<std::string>> permissions;
+                    for (auto& user : users) {
+                        std::erase(user.allowed_targets, id);
+                        permissions.push_back(user.allowed_targets);
+                    }
+                    save_users(users_path, users);
+                    webrtc.set_user_target_permissions(std::move(permissions));
+                }
+                response.body = json{{"id", id}, {"status", "deleted"}}.dump(); return response;
+            }
             response.status = 404; response.body = json{{"error", "not found"}}.dump(); return response;
         }
         if (request.path.starts_with("/api/admin/users")) {
@@ -751,7 +819,9 @@ int main() {
             for (const auto& target : sessions.target_snapshots()) {
                 targets_json.push_back({
                     {"id", target.id}, {"name", target.name},
-                    {"host", target.host}, {"username", target.username},
+                    {"host", target.host}, {"username", target.username}, {"port", target.port},
+                    {"managed", std::any_of(managed_targets.begin(), managed_targets.end(),
+                        [&](const auto& item) { return item.id == target.id; })},
                     {"width", target.width}, {"height", target.height},
                     {"busy", target.busy}, {"peerId", target.peer_id},
                     {"state", target.state},

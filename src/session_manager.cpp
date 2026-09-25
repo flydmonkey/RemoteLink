@@ -240,6 +240,7 @@ std::vector<SessionManager::TargetSnapshot> SessionManager::target_snapshots() c
             .name = target.name,
             .host = target.rdp.hostname,
             .username = target.rdp.username,
+            .port = target.rdp.port,
             .width = target.rdp.width,
             .height = target.rdp.height,
         };
