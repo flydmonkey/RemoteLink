@@ -23,6 +23,7 @@
       <section class="section"><h3>本地资源</h3>
         <div class="row"><div class="field"><label for="sound">播放远程声音</label><p class="description">通过 WebRTC 在本机播放 Windows 会话声音</p></div><label class="switch"><input id="sound" type="checkbox"><span></span></label></div>
         <div class="row"><div class="field"><label for="printer">打印机重定向</label><p class="description">将网关打印队列提供给远程 Windows</p></div><label class="switch"><input id="printer" type="checkbox"><span></span></label></div>
+        <div class="row"><div class="field"><label for="files">文件管理</label><p id="files-description" class="description">将 Gateway Files 映射到远程 Windows</p></div><label class="switch"><input id="files" type="checkbox"><span></span></label></div>
         <p class="notice">浏览器首次播放声音时可能需要点击一次远程画面。打印任务将由网关的 PDF 打印队列接收。</p>
       </section>
       <div class="actions"><span id="saved" class="saved" role="status">设置已保存</span><button type="submit">保存设置</button></div>
@@ -31,12 +32,13 @@
 </div>
 <script src="/i18n.js"></script>
 <script>
-const defaults={width:1920,height:1080,bitrate:4000000,sound:true,printer:true,encoder:'auto'};
+const defaults={width:1920,height:1080,bitrate:4000000,sound:true,printer:true,files:false,encoder:'auto'};
 document.querySelector('.nav a[href="/admin"]')?.remove();
 let settings={...defaults};try{settings={...settings,...JSON.parse(localStorage.getItem('remote-gateway-settings')||'{}')}}catch{}
-const language=document.querySelector('#language');const resolution=document.querySelector('#resolution');const quality=document.querySelector('#quality');const encoder=document.querySelector('#encoder');const sound=document.querySelector('#sound');const printer=document.querySelector('#printer');const saved=document.querySelector('#saved');
+const language=document.querySelector('#language');const resolution=document.querySelector('#resolution');const quality=document.querySelector('#quality');const encoder=document.querySelector('#encoder');const sound=document.querySelector('#sound');const printer=document.querySelector('#printer');const files=document.querySelector('#files');const saved=document.querySelector('#saved');
+document.querySelector('#files-description').textContent=({'zh-TW':'將 Gateway Files 對應至遠端 Windows',en:'Map Gateway Files into remote Windows',ja:'Gateway Files をリモート Windows にマッピングします',ko:'Gateway Files를 원격 Windows에 매핑합니다'})[window.RemoteLinkI18n.language]||'将 Gateway Files 映射到远程 Windows';
 const screenScale=Math.max(1,window.devicePixelRatio||1);const screenWidth=Math.min(7680,Math.max(640,Math.round(screen.width*screenScale/2)*2));const screenHeight=Math.min(4320,Math.max(480,Math.round(screen.height*screenScale/2)*2));resolution.options[0].textContent=`自动 · 当前设备 (${screenWidth} × ${screenHeight})`;
 language.value=window.RemoteLinkI18n.preference;resolution.value=settings.width&&settings.height?`${settings.width}x${settings.height}`:'auto';if(!resolution.value)resolution.value='auto';
-quality.value=String(settings.bitrate);if(!quality.value)quality.value='4000000';encoder.value=settings.encoder||'auto';sound.checked=settings.sound!==false;printer.checked=settings.printer!==false;
-document.querySelector('#settings-form').addEventListener('submit',event=>{event.preventDefault();if(language.value!==window.RemoteLinkI18n.preference){window.RemoteLinkI18n.setLanguage(language.value);return}const [width,height]=resolution.value==='auto'?[0,0]:resolution.value.split('x').map(Number);localStorage.setItem('remote-gateway-settings',JSON.stringify({width,height,bitrate:Number(quality.value),encoder:encoder.value,sound:sound.checked,printer:printer.checked}));saved.classList.add('show');setTimeout(()=>saved.classList.remove('show'),1800)});
+quality.value=String(settings.bitrate);if(!quality.value)quality.value='4000000';encoder.value=settings.encoder||'auto';sound.checked=settings.sound!==false;printer.checked=settings.printer!==false;files.checked=settings.files===true;
+document.querySelector('#settings-form').addEventListener('submit',event=>{event.preventDefault();if(language.value!==window.RemoteLinkI18n.preference){window.RemoteLinkI18n.setLanguage(language.value);return}const [width,height]=resolution.value==='auto'?[0,0]:resolution.value.split('x').map(Number);localStorage.setItem('remote-gateway-settings',JSON.stringify({width,height,bitrate:Number(quality.value),encoder:encoder.value,sound:sound.checked,printer:printer.checked,files:files.checked}));saved.classList.add('show');setTimeout(()=>saved.classList.remove('show'),1800)});
 </script></body></html>

@@ -32,7 +32,7 @@ public:
     using StartHandler = std::function<bool(const std::string&, const std::string&,
                                             const std::string&, const std::string&,
                                             const std::string&, std::uint32_t,
-                                            std::uint32_t, std::uint32_t, bool, bool, std::size_t,
+                                            std::uint32_t, std::uint32_t, bool, bool, bool, std::size_t,
                                             std::string&)>;
     using PeerHandler = std::function<void(const std::string&)>;
     using InputHandler = std::function<void(const std::string&, const std::string&)>;

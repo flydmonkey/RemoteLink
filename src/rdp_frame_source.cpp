@@ -588,13 +588,12 @@ void RdpFrameSource::run(std::stop_token stop_token, FrameHandler on_frame) {
     }
     freerdp_settings_set_bool(settings, FreeRDP_RedirectPrinters,
                               options_.redirect_printers ? TRUE : FALSE);
-    const std::string shared_files = options_.shared_files_path.empty()
-        ? std::string(state_root && *state_root ? state_root : "/var/lib/remote-gateway") + "/files"
-        : options_.shared_files_path;
-    const char* drive_channel[] = { "drive", "Gateway Files", shared_files.c_str() };
-    if (!freerdp_client_add_device_channel(
-            settings, std::size(drive_channel), drive_channel)) {
-        std::cerr << "unable to configure Gateway Files drive; continuing without file redirection\n";
+    if (!options_.shared_files_path.empty()) {
+        const char* drive_channel[] = { "drive", "Gateway Files", options_.shared_files_path.c_str() };
+        if (!freerdp_client_add_device_channel(
+                settings, std::size(drive_channel), drive_channel)) {
+            std::cerr << "unable to configure Gateway Files drive; continuing without file redirection\n";
+        }
     }
 
     if (!freerdp_connect(instance)) {

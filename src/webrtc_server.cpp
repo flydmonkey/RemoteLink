@@ -251,11 +251,12 @@ void WebRtcServer::handle_message(const std::shared_ptr<Peer>& peer,
         const std::uint32_t bitrate = payload.value("bitrate", 4'000'000U);
         const bool audio_playback = payload.value("sound", true);
         const bool redirect_printers = payload.value("printer", false);
+        const bool redirect_files = payload.value("files", false);
         StartHandler start;
         { std::lock_guard lock(mutex_); start = start_handler_; }
         std::string error;
         if (!start || !start(peer->id, target, host, username, password, width, height,
-                             bitrate, audio_playback, redirect_printers,
+                             bitrate, audio_playback, redirect_printers, redirect_files,
                              peer->user_identity, error)) {
             peer->socket->send(json{{"type", "error"}, {"message", error.empty() ? "unable to start session" : error}}.dump());
             return;

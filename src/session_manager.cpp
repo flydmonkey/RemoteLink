@@ -36,7 +36,7 @@ bool SessionManager::start(const std::string& peer_id, const std::string& target
                            const std::string& password,
                            std::uint32_t width, std::uint32_t height,
                            std::uint32_t bitrate, bool audio_playback,
-                           bool redirect_printers, std::size_t user_identity,
+                           bool redirect_printers, bool redirect_files, std::size_t user_identity,
                            std::string& error) {
     std::vector<TargetConfig> targets;
     { std::lock_guard lock(mutex_); targets = targets_; }
@@ -55,11 +55,15 @@ bool SessionManager::start(const std::string& peer_id, const std::string& target
     }
     rdp.audio_playback = audio_playback;
     rdp.redirect_printers = redirect_printers;
-    const char* state_root = std::getenv("RG_STATE_DIR");
-    rdp.shared_files_path = (std::filesystem::path(state_root && *state_root
-        ? state_root : "/var/lib/remote-gateway") / "users" /
-        std::to_string(user_identity) / "files").string();
-    std::filesystem::create_directories(rdp.shared_files_path);
+    if (redirect_files) {
+        const char* state_root = std::getenv("RG_STATE_DIR");
+        rdp.shared_files_path = (std::filesystem::path(state_root && *state_root
+            ? state_root : "/var/lib/remote-gateway") / "users" /
+            std::to_string(user_identity) / "files").string();
+        std::filesystem::create_directories(rdp.shared_files_path);
+    } else {
+        rdp.shared_files_path.clear();
+    }
     bitrate = std::clamp<std::uint32_t>(bitrate == 0 ? 4'000'000 : bitrate,
                                        500'000, 20'000'000);
     if (rdp.username.empty() || rdp.password.empty() ||

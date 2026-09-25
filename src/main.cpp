@@ -280,14 +280,24 @@ int main() {
     save_users(users_path, users);
     std::mutex users_mutex;
     const auto connections_path = state_root / "connections.json";
+    const auto connections_migration_marker = state_root / "connections.migrated";
     const auto configured_targets = remote_gateway::load_targets(targets_file, allowed_hosts);
     auto managed_targets = load_managed_connections(connections_path, allowed_hosts);
-    auto target_catalog = configured_targets;
-    for (const auto& target : managed_targets) {
-        const bool duplicate = std::any_of(target_catalog.begin(), target_catalog.end(),
-            [&](const auto& existing) { return existing.id == target.id; });
-        if (!duplicate) target_catalog.push_back(target);
+    if (!std::filesystem::exists(connections_migration_marker)) {
+        for (const auto& target : configured_targets) {
+            const bool duplicate = std::any_of(managed_targets.begin(), managed_targets.end(),
+                [&](const auto& existing) { return existing.id == target.id; });
+            if (!duplicate) managed_targets.push_back(target);
+        }
+        save_managed_connections(connections_path, managed_targets);
+        std::ofstream marker(connections_migration_marker, std::ios::trunc);
+        marker << "Legacy target configuration migrated to managed connections.\n";
+        if (!marker) throw std::runtime_error("cannot save connection migration marker");
+        std::filesystem::permissions(connections_migration_marker,
+            std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
+            std::filesystem::perm_options::replace);
     }
+    auto target_catalog = managed_targets;
     remote_gateway::HttpServer http(
         "0.0.0.0", 18080, certificate ? certificate : "", private_key ? private_key : "");
     // Signaling remains an in-process backend on loopback. HttpServer exposes
@@ -309,11 +319,12 @@ int main() {
                                          const std::string& password,
                                          std::uint32_t width, std::uint32_t height,
                                          std::uint32_t bitrate, bool audio_playback,
-                                         bool redirect_printers,
+                                         bool redirect_printers, bool redirect_files,
                                          std::size_t user_identity,
                                          std::string& error) {
         return sessions.start(peer, target, host, username, password, width, height,
-                              bitrate, audio_playback, redirect_printers, user_identity, error);
+                              bitrate, audio_playback, redirect_printers, redirect_files,
+                              user_identity, error);
     });
     webrtc.set_input_handler([&sessions](const std::string& peer, const std::string& input) { sessions.input(peer, input); });
     webrtc.set_key_frame_handler([&sessions](const std::string& peer) { sessions.request_key_frame(peer); });

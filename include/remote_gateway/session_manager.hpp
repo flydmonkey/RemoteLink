@@ -50,7 +50,8 @@ public:
                const std::string& host, const std::string& username,
                const std::string& password, std::uint32_t width,
                std::uint32_t height, std::uint32_t bitrate,
-               bool audio_playback, bool redirect_printers, std::size_t user_identity,
+               bool audio_playback, bool redirect_printers, bool redirect_files,
+               std::size_t user_identity,
                std::string& error);
     void input(const std::string& peer_id, const std::string& data);
     void request_key_frame(const std::string& peer_id);
