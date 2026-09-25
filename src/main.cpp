@@ -121,6 +121,12 @@ std::vector<remote_gateway::TargetConfig> load_managed_connections(
         target.rdp.port = static_cast<std::uint16_t>(item.value("port", 3389));
         target.rdp.username = item.value("username", "");
         target.rdp.password = item.value("password", "");
+        const auto password_file = item.value("passwordFile", "");
+        if (!password_file.empty()) {
+            std::ifstream secret(password_file, std::ios::binary);
+            if (!secret) throw std::runtime_error("cannot read managed connection credential: " + target.id);
+            target.rdp.password.assign(std::istreambuf_iterator<char>(secret), {});
+        }
         target.rdp.width = item.value("width", 1920U); target.rdp.height = item.value("height", 1080U);
         target.rdp.ignore_certificate = item.value("ignoreCertificate", true);
         if (target.id.empty() || target.name.empty() || target.rdp.hostname.empty() ||
@@ -132,13 +138,28 @@ std::vector<remote_gateway::TargetConfig> load_managed_connections(
 }
 
 void save_managed_connections(const std::filesystem::path& path,
+                              const std::filesystem::path& secret_directory,
                               const std::vector<remote_gateway::TargetConfig>& targets) {
+    std::filesystem::create_directories(secret_directory);
+    std::filesystem::permissions(secret_directory, std::filesystem::perms::owner_all,
+                                 std::filesystem::perm_options::replace);
     nlohmann::json data = nlohmann::json::array();
-    for (const auto& target : targets) data.push_back({
-        {"id", target.id}, {"name", target.name}, {"host", target.rdp.hostname},
-        {"port", target.rdp.port}, {"username", target.rdp.username},
-        {"password", target.rdp.password}, {"width", target.rdp.width},
-        {"height", target.rdp.height}, {"ignoreCertificate", target.rdp.ignore_certificate}});
+    for (const auto& target : targets) {
+        std::string safe_id = target.id;
+        for (auto& c : safe_id) if (!std::isalnum(static_cast<unsigned char>(c)) && c != '-' && c != '_') c = '_';
+        const auto secret_path = secret_directory / (safe_id + ".password");
+        if (!target.rdp.password.empty()) {
+            { std::ofstream secret(secret_path, std::ios::binary | std::ios::trunc);
+              secret << target.rdp.password; if (!secret) throw std::runtime_error("cannot save connection credential"); }
+            std::filesystem::permissions(secret_path, std::filesystem::perms::owner_read |
+                std::filesystem::perms::owner_write, std::filesystem::perm_options::replace);
+        } else std::filesystem::remove(secret_path);
+        data.push_back({{"id", target.id}, {"name", target.name}, {"host", target.rdp.hostname},
+            {"port", target.rdp.port}, {"username", target.rdp.username},
+            {"passwordFile", target.rdp.password.empty() ? "" : secret_path.string()},
+            {"width", target.rdp.width}, {"height", target.rdp.height},
+            {"ignoreCertificate", target.rdp.ignore_certificate}});
+    }
     const auto temporary = path.string() + ".tmp";
     { std::ofstream output(temporary, std::ios::trunc); output << data.dump(2) << '\n';
       if (!output) throw std::runtime_error("cannot save managed connections"); }
@@ -280,6 +301,7 @@ int main() {
     save_users(users_path, users);
     std::mutex users_mutex;
     const auto connections_path = state_root / "connections.json";
+    const auto connection_secrets_path = state_root / "connection-secrets";
     const auto connections_migration_marker = state_root / "connections.migrated";
     const auto configured_targets = remote_gateway::load_targets(targets_file, allowed_hosts);
     auto managed_targets = load_managed_connections(connections_path, allowed_hosts);
@@ -289,7 +311,7 @@ int main() {
                 [&](const auto& existing) { return existing.id == target.id; });
             if (!duplicate) managed_targets.push_back(target);
         }
-        save_managed_connections(connections_path, managed_targets);
+        save_managed_connections(connections_path, connection_secrets_path, managed_targets);
         std::ofstream marker(connections_migration_marker, std::ios::trunc);
         marker << "Legacy target configuration migrated to managed connections.\n";
         if (!marker) throw std::runtime_error("cannot save connection migration marker");
@@ -297,6 +319,8 @@ int main() {
             std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
             std::filesystem::perm_options::replace);
     }
+    // Rewrite legacy inline passwords into owner-only credential files.
+    save_managed_connections(connections_path, connection_secrets_path, managed_targets);
     auto target_catalog = managed_targets;
     remote_gateway::HttpServer http(
         "0.0.0.0", 18080, certificate ? certificate : "", private_key ? private_key : "");
@@ -335,6 +359,7 @@ int main() {
     http.set_health_handler([] { return std::string("{\"status\":\"ok\"}\n"); });
     http.set_api_handler([&sessions, &webrtc, &access_tokens, &users, &users_mutex,
                           &users_path, &target_catalog, &managed_targets, &connections_path,
+                          &connection_secrets_path,
                           &allowed_hosts, tls_enabled](
                              const remote_gateway::HttpRequest& request) {
         using json = nlohmann::json;
@@ -410,7 +435,7 @@ int main() {
                     response.status = 400; response.body = json{{"error", "invalid dimensions"}}.dump(); return response;
                 }
                 managed_targets.push_back(target); target_catalog.push_back(target);
-                save_managed_connections(connections_path, managed_targets);
+                save_managed_connections(connections_path, connection_secrets_path, managed_targets);
                 sessions.set_targets(target_catalog);
                 std::vector<remote_gateway::WebRtcServer::PublicTarget> published;
                 for (const auto& item : target_catalog) published.push_back({item.id, item.name,
@@ -444,7 +469,7 @@ int main() {
                 updated.rdp.username = username;
                 if (!password.empty()) updated.rdp.password = password;
                 *managed = updated; *catalog = updated;
-                save_managed_connections(connections_path, managed_targets);
+                save_managed_connections(connections_path, connection_secrets_path, managed_targets);
                 sessions.set_targets(target_catalog);
                 std::vector<remote_gateway::WebRtcServer::PublicTarget> published;
                 for (const auto& item : target_catalog) published.push_back({item.id, item.name,
@@ -468,7 +493,7 @@ int main() {
                 }
                 managed_targets.erase(managed);
                 std::erase_if(target_catalog, [&](const auto& target) { return target.id == id; });
-                save_managed_connections(connections_path, managed_targets);
+                save_managed_connections(connections_path, connection_secrets_path, managed_targets);
                 sessions.set_targets(target_catalog);
                 std::vector<remote_gateway::WebRtcServer::PublicTarget> published;
                 for (const auto& item : target_catalog) published.push_back({item.id, item.name,

@@ -82,6 +82,9 @@ endif()
 
 if(REMOTE_GATEWAY_BUILD_TESTS)
     enable_testing()
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME remote_gateway_web_ui_tests
+             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/web_ui_tests.py)
     add_executable(remote_gateway_tests tests/core_tests.cpp)
     target_link_libraries(remote_gateway_tests PRIVATE remote_gateway_core)
     add_test(NAME remote_gateway_tests COMMAND remote_gateway_tests)

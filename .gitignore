@@ -11,3 +11,6 @@ compile_commands.json
 *.user
 __pycache__/
 *.py[cod]
+/node_modules/
+/test-results/
+/playwright-report/

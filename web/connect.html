@@ -109,6 +109,9 @@ document.querySelector('#connection-form').addEventListener('submit',event=>{
   let settings={};try{settings=JSON.parse(localStorage.getItem('remote-gateway-settings')||'{}')}catch{}
   if(!(Number(settings.width)>0&&Number(settings.height)>0))Object.assign(settings,automaticResolution());
   settings.bitrate=Number(settings.bitrate)||4000000;
+  const network=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+  const networkCaps={'slow-2g':750000,'2g':1000000,'3g':2000000};
+  if(networkCaps[network?.effectiveType])settings.bitrate=Math.min(settings.bitrate,networkCaps[network.effectiveType]);
   sessionStorage.setItem('remote-gateway-session',JSON.stringify({target:selected?.id||'',host,username:username.value,password:password.value,accessToken,startedAt:Date.now(),...settings}));
   if(socket&&socket.readyState<WebSocket.CLOSING){socket.onclose=null;socket.close()}
   location.href='/session';
