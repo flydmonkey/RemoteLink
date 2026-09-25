@@ -2,11 +2,14 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <netdb.h>
 #include <poll.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <openssl/sha.h>
+#include <openssl/evp.h>
 
 #include <cerrno>
 #include <cstring>
@@ -19,6 +22,7 @@
 #include <array>
 #include <cctype>
 #include <unordered_map>
+#include <vector>
 
 namespace remote_gateway {
 
@@ -50,6 +54,20 @@ void HttpServer::set_api_handler(
     api_handler_ = std::move(handler);
 }
 
+void HttpServer::set_vnc_ticket_handler(
+    std::function<std::optional<VncDestination>(const std::string&)> handler) {
+    if (thread_.joinable())
+        throw std::logic_error("VNC ticket handler must be set before HTTP server starts");
+    vnc_ticket_handler_ = std::move(handler);
+}
+
+void HttpServer::set_vnc_session_observer(
+    std::function<void(const VncDestination&, bool)> observer) {
+    if (thread_.joinable())
+        throw std::logic_error("VNC session observer must be set before HTTP server starts");
+    vnc_session_observer_ = std::move(observer);
+}
+
 namespace {
 std::string status_text(int status) {
     switch (status) {
@@ -60,6 +78,7 @@ std::string status_text(int status) {
         case 404: return "404 Not Found";
         case 405: return "405 Method Not Allowed";
         case 409: return "409 Conflict";
+        case 502: return "502 Bad Gateway";
         default: return "500 Internal Server Error";
     }
 }
@@ -90,6 +109,154 @@ bool write_client(int client, SSL* tls, const char* data, std::size_t size) {
         sent += static_cast<std::size_t>(result);
     }
     return true;
+}
+
+bool read_client_exact(int client, SSL* tls, char* data, std::size_t size) {
+    std::size_t received = 0;
+    while (received < size) {
+        const auto result = tls != nullptr
+            ? SSL_read(tls, data + received, static_cast<int>(size - received))
+            : ::recv(client, data + received, size - received, 0);
+        if (result <= 0) return false;
+        received += static_cast<std::size_t>(result);
+    }
+    return true;
+}
+
+std::string header_value(const std::string& request, const std::string& expected_name) {
+    std::istringstream stream(request);
+    std::string line;
+    std::getline(stream, line);
+    while (std::getline(stream, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        const auto separator = line.find(':');
+        if (separator == std::string::npos) continue;
+        if (lower(line.substr(0, separator)) != expected_name) continue;
+        auto value = line.substr(separator + 1);
+        while (!value.empty() && std::isspace(static_cast<unsigned char>(value.front())))
+            value.erase(value.begin());
+        return value;
+    }
+    return {};
+}
+
+std::string websocket_accept(const std::string& key) {
+    const auto source = key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+    std::array<unsigned char, SHA_DIGEST_LENGTH> digest {};
+    SHA1(reinterpret_cast<const unsigned char*>(source.data()), source.size(), digest.data());
+    std::array<unsigned char, 32> encoded {};
+    const auto length = EVP_EncodeBlock(encoded.data(), digest.data(), digest.size());
+    return std::string(reinterpret_cast<char*>(encoded.data()), static_cast<std::size_t>(length));
+}
+
+int connect_tcp(const std::string& hostname, std::uint16_t port) {
+    addrinfo hints {};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    addrinfo* addresses = nullptr;
+    const auto service = std::to_string(port);
+    if (::getaddrinfo(hostname.c_str(), service.c_str(), &hints, &addresses) != 0) return -1;
+    int socket_fd = -1;
+    for (auto* address = addresses; address != nullptr; address = address->ai_next) {
+        socket_fd = ::socket(address->ai_family, address->ai_socktype, address->ai_protocol);
+        if (socket_fd >= 0 && ::connect(socket_fd, address->ai_addr, address->ai_addrlen) == 0) break;
+        if (socket_fd >= 0) ::close(socket_fd);
+        socket_fd = -1;
+    }
+    ::freeaddrinfo(addresses);
+    return socket_fd;
+}
+
+bool write_websocket_frame(int client, SSL* tls, std::uint8_t opcode,
+                           const char* data, std::size_t size) {
+    std::array<char, 10> header {};
+    std::size_t header_size = 2;
+    header[0] = static_cast<char>(0x80U | opcode);
+    if (size <= 125) header[1] = static_cast<char>(size);
+    else if (size <= 0xffff) {
+        header[1] = 126;
+        header[2] = static_cast<char>((size >> 8) & 0xff);
+        header[3] = static_cast<char>(size & 0xff);
+        header_size = 4;
+    } else {
+        header[1] = 127;
+        for (int index = 0; index < 8; ++index)
+            header[2 + index] = static_cast<char>((size >> (56 - index * 8)) & 0xff);
+        header_size = 10;
+    }
+    return write_client(client, tls, header.data(), header_size) &&
+           write_client(client, tls, data, size);
+}
+
+bool relay_websocket_message_to_tcp(int client, SSL* tls, int backend) {
+    std::array<unsigned char, 2> header {};
+    if (!read_client_exact(client, tls, reinterpret_cast<char*>(header.data()), header.size()))
+        return false;
+    const bool final = (header[0] & 0x80U) != 0;
+    const auto opcode = static_cast<std::uint8_t>(header[0] & 0x0fU);
+    if (!final || (opcode != 0x2 && opcode != 0x8 && opcode != 0x9)) return false;
+    if ((header[1] & 0x80U) == 0) return false;
+    std::uint64_t length = header[1] & 0x7fU;
+    if (length == 126) {
+        std::array<unsigned char, 2> extended {};
+        if (!read_client_exact(client, tls, reinterpret_cast<char*>(extended.data()), 2)) return false;
+        length = static_cast<std::uint64_t>(extended[0]) << 8 | extended[1];
+    } else if (length == 127) {
+        std::array<unsigned char, 8> extended {};
+        if (!read_client_exact(client, tls, reinterpret_cast<char*>(extended.data()), 8)) return false;
+        length = 0;
+        for (const auto byte : extended) length = (length << 8) | byte;
+    }
+    if (length > 16U * 1024U * 1024U) return false;
+    std::array<unsigned char, 4> mask {};
+    if (!read_client_exact(client, tls, reinterpret_cast<char*>(mask.data()), mask.size())) return false;
+    std::vector<char> payload(static_cast<std::size_t>(length));
+    if (length > 0 && !read_client_exact(client, tls, payload.data(), payload.size())) return false;
+    for (std::size_t index = 0; index < payload.size(); ++index)
+        payload[index] ^= static_cast<char>(mask[index % mask.size()]);
+    if (opcode == 0x8) return false;
+    if (opcode == 0x9) return write_websocket_frame(client, tls, 0xA, payload.data(), payload.size());
+    return write_socket(backend, payload.data(), payload.size());
+}
+
+void proxy_vnc_websocket(int client, SSL* tls, const std::string& request,
+                         const VncDestination& destination,
+                         const std::function<void(const VncDestination&, bool)>& observer) {
+    const auto key = header_value(request, "sec-websocket-key");
+    const int backend = key.empty() ? -1 : connect_tcp(destination.hostname, destination.port);
+    if (backend < 0) {
+        static constexpr char unavailable[] =
+            "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        write_client(client, tls, unavailable, sizeof(unavailable) - 1);
+    } else {
+        const auto response = "HTTP/1.1 101 Switching Protocols\r\n"
+            "Upgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: " +
+            websocket_accept(key) + "\r\n\r\n";
+        if (write_client(client, tls, response.data(), response.size())) {
+            if (observer) observer(destination, true);
+            std::array<char, 64 * 1024> buffer {};
+            while (true) {
+                pollfd descriptors[2] {{client, POLLIN, 0}, {backend, POLLIN, 0}};
+                const auto ready = ::poll(descriptors, 2, -1);
+                if (ready < 0 && errno == EINTR) continue;
+                if (ready <= 0 || descriptors[0].revents & (POLLERR | POLLHUP | POLLNVAL) ||
+                    descriptors[1].revents & (POLLERR | POLLHUP | POLLNVAL)) break;
+                if (descriptors[0].revents & POLLIN &&
+                    !relay_websocket_message_to_tcp(client, tls, backend)) break;
+                if (descriptors[1].revents & POLLIN) {
+                    const auto received = ::recv(backend, buffer.data(), buffer.size(), 0);
+                    if (received <= 0 || !write_websocket_frame(client, tls, 0x2,
+                        buffer.data(), static_cast<std::size_t>(received))) break;
+                }
+            }
+        }
+        if (observer) observer(destination, false);
+        ::shutdown(backend, SHUT_RDWR);
+        ::close(backend);
+    }
+    if (tls != nullptr) { SSL_shutdown(tls); SSL_free(tls); }
+    ::shutdown(client, SHUT_RDWR);
+    ::close(client);
 }
 
 void proxy_websocket(int client, SSL* tls, std::string request) {
@@ -308,6 +475,25 @@ void HttpServer::run() {
             std::thread(proxy_websocket, client, tls, std::move(raw_request)).detach();
             continue;
         }
+        const std::string vnc_prefix = "/vnc/ws?ticket=";
+        const bool vnc_websocket_request = parsed.method == "GET" &&
+            parsed.path.starts_with(vnc_prefix) &&
+            lower(raw_request.substr(0, headers_end)).find("upgrade: websocket") != std::string::npos;
+        if (vnc_websocket_request) {
+            const auto ticket = parsed.path.substr(vnc_prefix.size());
+            const auto destination = vnc_ticket_handler_ ? vnc_ticket_handler_(ticket) : std::nullopt;
+            if (!destination) {
+                static constexpr char forbidden[] =
+                    "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                write_client(client, tls, forbidden, sizeof(forbidden) - 1);
+                if (tls != nullptr) { SSL_shutdown(tls); SSL_free(tls); }
+                ::close(client);
+                continue;
+            }
+            std::thread(proxy_vnc_websocket, client, tls, std::move(raw_request),
+                        std::move(*destination), vnc_session_observer_).detach();
+            continue;
+        }
         const bool root_request = parsed.method == "GET" &&
             (parsed.path == "/" || parsed.path == "/index.html");
         const bool admin_request = parsed.method == "GET" &&
@@ -316,11 +502,30 @@ void HttpServer::run() {
             (parsed.path == "/session" || parsed.path == "/session.html");
         const bool settings_request = parsed.method == "GET" &&
             (parsed.path == "/settings" || parsed.path == "/settings.html");
+        const bool vnc_request = parsed.method == "GET" &&
+            (parsed.path == "/vnc" || parsed.path == "/vnc.html" ||
+             parsed.path.starts_with("/vnc?") || parsed.path.starts_with("/vnc.html?"));
+        const bool vnc_session_request = parsed.method == "GET" &&
+            (parsed.path == "/vnc/session" || parsed.path.starts_with("/vnc/session?") ||
+             parsed.path == "/vnc-session.html" || parsed.path.starts_with("/vnc-session.html?"));
+        const bool vnc_admin_request = parsed.method == "GET" &&
+            (parsed.path == "/vnc/admin" || parsed.path == "/vnc-admin.html");
+        const bool vnc_permissions_request = parsed.method == "GET" &&
+            (parsed.path == "/vnc/permissions" || parsed.path == "/vnc-permissions.html");
+        const bool users_request = parsed.method == "GET" &&
+            (parsed.path == "/users" || parsed.path == "/users.html");
+        const bool ssh_request = parsed.method == "GET" &&
+            (parsed.path == "/ssh" || parsed.path == "/ssh.html");
         const bool icon_request = parsed.method == "GET" && parsed.path == "/remotelink-icon.png";
         const bool i18n_request = parsed.method == "GET" && parsed.path == "/i18n.js";
+        const bool novnc_request = parsed.method == "GET" &&
+            parsed.path.starts_with("/vendor/novnc/") &&
+            parsed.path.find("..") == std::string::npos;
         const bool health_request = parsed.method == "GET" && parsed.path == "/healthz";
-        const bool api_request = parsed.path.starts_with("/api/admin/") ||
-                                 parsed.path.starts_with("/api/auth/");
+        const bool api_request = parsed.path == "/api/admin/vnc" ||
+                                 parsed.path.starts_with("/api/admin/") ||
+                                 parsed.path.starts_with("/api/auth/") ||
+                                 parsed.path.starts_with("/api/vnc/");
 
         std::string body;
         int status_code = 404;
@@ -334,15 +539,24 @@ void HttpServer::run() {
             content_type = "application/json";
             body = health_handler_ ? health_handler_() : "{\"status\":\"ok\"}\n";
         }
-        else if (root_request || admin_request || session_request || settings_request || icon_request || i18n_request) {
+        else if (root_request || admin_request || session_request || settings_request ||
+                 vnc_request || vnc_session_request || vnc_admin_request || vnc_permissions_request ||
+                 users_request || ssh_request || icon_request || i18n_request || novnc_request) {
             const char* configured_web_root = std::getenv("RG_WEB_ROOT");
             const std::string web_root = configured_web_root && *configured_web_root
                 ? configured_web_root : REMOTE_GATEWAY_WEB_ROOT;
-            const std::string page = icon_request ? "/remotelink-icon.png" :
+            std::string page = icon_request ? "/remotelink-icon.png" :
                                      i18n_request ? "/i18n.js" :
                                      admin_request ? "/admin.html" :
                                      session_request ? "/index.html" :
                                      settings_request ? "/settings.html" : "/connect.html";
+            if (vnc_request) page = "/vnc.html";
+            else if (vnc_session_request) page = "/vnc-session.html";
+            else if (vnc_admin_request) page = "/vnc-admin.html";
+            else if (vnc_permissions_request) page = "/users.html";
+            else if (users_request) page = "/users.html";
+            else if (ssh_request) page = "/ssh.html";
+            else if (novnc_request) page = parsed.path;
             std::ifstream input(web_root + page,
                                 std::ios::binary);
             std::ostringstream contents;
@@ -350,7 +564,7 @@ void HttpServer::run() {
             body = contents.str();
             status_code = input ? 200 : 500;
             content_type = icon_request ? "image/png" :
-                           i18n_request ? "application/javascript; charset=utf-8" :
+                           (i18n_request || novnc_request) ? "application/javascript; charset=utf-8" :
                            "text/html; charset=utf-8";
         }
         else if (api_request && api_handler_) {

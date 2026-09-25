@@ -8,7 +8,7 @@ createServer(async (request, response) => {
     const relative = normalize(decodeURIComponent(new URL(request.url, 'http://localhost').pathname)).replace(/^[/\\]+/, '');
     const path = join(root, relative || 'connect.html');
     const body = await readFile(path);
-    const types = {'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.png':'image/png'};
+    const types = {'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.png':'image/png'};
     response.writeHead(200, {'Content-Type':types[extname(path)]||'application/octet-stream','Cache-Control':'no-store'});
     response.end(body);
   } catch {

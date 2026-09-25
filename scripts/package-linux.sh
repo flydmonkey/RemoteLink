@@ -15,6 +15,7 @@ trap cleanup EXIT
 
 cmake --build "${build_dir}" -j"$(nproc)"
 ctest --test-dir "${build_dir}" --output-on-failure
+bash "${project_root}/scripts/copy-novnc-core.sh"
 package_root="${stage}/RemoteLink"
 install -D -m 0755 "${build_dir}/remote-gateway" "${package_root}/bin/remote-gateway"
 install -D -m 0755 "${build_dir}/libremote_gateway_streaming.so" "${package_root}/lib/libremote_gateway_streaming.so"

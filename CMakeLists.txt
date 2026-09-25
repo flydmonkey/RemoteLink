@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(remote_gateway VERSION 0.1.0 LANGUAGES CXX)
+project(remote_gateway VERSION 0.1.0 LANGUAGES C CXX)
 
 option(REMOTE_GATEWAY_BUILD_TESTS "Build unit tests" ON)
 option(REMOTE_GATEWAY_ENABLE_STREAMING "Build WebRTC/H.264 streaming support" ON)
@@ -34,6 +34,26 @@ if(REMOTE_GATEWAY_ENABLE_STREAMING)
     find_library(LIBYUV_LIBRARY yuv REQUIRED)
     find_package(OpenSSL REQUIRED)
 
+    set(WITH_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(WITH_TESTS OFF CACHE BOOL "" FORCE)
+    set(WITH_GNUTLS OFF CACHE BOOL "" FORCE)
+    set(WITH_OPENSSL ON CACHE BOOL "" FORCE)
+    set(WITH_GCRYPT OFF CACHE BOOL "" FORCE)
+    set(WITH_SASL OFF CACHE BOOL "" FORCE)
+    set(WITH_SDL OFF CACHE BOOL "" FORCE)
+    set(WITH_GTK OFF CACHE BOOL "" FORCE)
+    set(WITH_QT OFF CACHE BOOL "" FORCE)
+    set(WITH_FFMPEG OFF CACHE BOOL "" FORCE)
+    set(WITH_SYSTEMD OFF CACHE BOOL "" FORCE)
+    set(WITH_XCB OFF CACHE BOOL "" FORCE)
+    set(WITH_WEBSOCKETS OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(libvncserver
+        GIT_REPOSITORY https://github.com/LibVNC/libvncserver.git
+        GIT_TAG LibVNCServer-0.9.15
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(libvncserver)
+
     set(NO_EXAMPLES ON CACHE BOOL "" FORCE)
     set(NO_TESTS ON CACHE BOOL "" FORCE)
     set(NO_WEBSOCKET OFF CACHE BOOL "" FORCE)
@@ -58,15 +78,18 @@ if(REMOTE_GATEWAY_ENABLE_STREAMING)
         src/rdp_frame_source.cpp
         src/session_manager.cpp
         src/target_config.cpp
+        src/vnc_bridge.cpp
+        src/vnc_ticket_store.cpp
         src/webrtc_server.cpp
         src/webrtc_video_sink.cpp
     )
-    target_include_directories(remote_gateway_streaming PUBLIC include PRIVATE ${LIBYUV_INCLUDE_DIR})
+    target_include_directories(remote_gateway_streaming PUBLIC include PRIVATE
+        ${LIBYUV_INCLUDE_DIR} ${libvncserver_SOURCE_DIR}/include ${libvncserver_BINARY_DIR}/include)
     target_compile_features(remote_gateway_streaming PUBLIC cxx_std_20)
     target_link_libraries(remote_gateway_streaming
         PUBLIC remote_gateway_core
         PRIVATE LibDataChannel::LibDataChannel PkgConfig::OPENH264 PkgConfig::OPUS OpenSSL::SSL OpenSSL::Crypto
-                PkgConfig::FREERDP Threads::Threads ${LIBYUV_LIBRARY}
+                PkgConfig::FREERDP Threads::Threads ${LIBYUV_LIBRARY} vncclient vncserver
     )
     target_compile_definitions(remote_gateway_streaming PRIVATE
         REMOTE_GATEWAY_WEB_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/web"
@@ -93,6 +116,10 @@ if(REMOTE_GATEWAY_BUILD_TESTS)
         target_compile_features(remote_gateway_target_config_tests PRIVATE cxx_std_20)
         target_link_libraries(remote_gateway_target_config_tests PRIVATE remote_gateway_streaming)
         add_test(NAME remote_gateway_target_config_tests COMMAND remote_gateway_target_config_tests)
+        add_executable(remote_gateway_vnc_ticket_tests tests/vnc_ticket_store_tests.cpp)
+        target_compile_features(remote_gateway_vnc_ticket_tests PRIVATE cxx_std_20)
+        target_link_libraries(remote_gateway_vnc_ticket_tests PRIVATE remote_gateway_streaming)
+        add_test(NAME remote_gateway_vnc_ticket_tests COMMAND remote_gateway_vnc_ticket_tests)
         add_executable(remote_gateway_webrtc_smoke tests/webrtc_smoke.cpp)
         target_compile_features(remote_gateway_webrtc_smoke PRIVATE cxx_std_20)
         target_link_libraries(remote_gateway_webrtc_smoke PRIVATE LibDataChannel::LibDataChannel)

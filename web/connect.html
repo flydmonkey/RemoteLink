@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>RemoteLink · 连接</title>
+  <title>RemoteLink · RDP</title>
+  <style>.app{height:270px}</style>
   <link rel="icon" type="image/png" href="/remotelink-icon.png">
   <style>
     :root{color-scheme:light;font-family:"Segoe UI Variable","Segoe UI","Microsoft YaHei UI",sans-serif;--mica:#f3f3f3;--layer:#fff;--stroke:#0000001a;--stroke-strong:#0000002e;--text:#1a1a1a;--muted:#0009;--accent:#005fb8;--accent-hover:#196fc2;--accent-text:#fff;--danger:#c42b1c;--control:#ffffffb8;--glow:#d7effb}
@@ -13,18 +14,18 @@
   </style>
   <style>.logout-nav{width:34px!important;min-width:34px!important;padding:0!important;border:0!important;background:transparent!important}.logout-nav svg{width:18px;height:18px}.logout-nav:hover{background:var(--control)!important}</style>
 <style>dialog[open]{position:fixed;inset-block-start:45%;inset-block-end:auto;max-height:80vh;overflow:auto;transform:translateY(-50%)}</style>
+<style>
+  .titlebar{gap:18px}.protocol-nav{align-self:stretch;display:flex;align-items:stretch;gap:2px}.protocol-link{position:relative;display:flex;align-items:center;min-width:58px;padding:0 14px;color:var(--muted);text-decoration:none;font-weight:600}.protocol-link:hover{color:var(--text);background:#ffffff0a}.protocol-link[aria-current="page"]{color:var(--text)}.protocol-link[aria-current="page"]:after{content:"";position:absolute;left:14px;right:14px;bottom:0;height:2px;border-radius:2px 2px 0 0;background:var(--accent)}.nav-group{margin-left:auto}.account{position:relative}.account-trigger{display:flex!important;width:auto!important;min-width:34px!important;gap:8px;padding:0 8px!important;border:0!important;background:transparent!important}.account-avatar{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;color:var(--accent-text);background:var(--accent);font-size:11px;font-weight:700}.account-name{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);font-size:12px}.account-menu{position:absolute;z-index:5;top:40px;right:0;width:190px;padding:6px;border:1px solid var(--stroke-strong);border-radius:7px;background:#2b2b2b;box-shadow:0 14px 36px #0008}.account-menu[hidden]{display:none}.account-summary{padding:9px 10px 10px;border-bottom:1px solid var(--stroke);color:var(--muted);font-size:12px}.account-menu a,.account-menu button{display:flex;align-items:center;width:100%;min-width:0;min-height:34px;padding:7px 10px;border:0;border-radius:4px;color:var(--text);background:transparent;text-decoration:none;font-weight:400}.account-menu a:hover,.account-menu button:hover{background:#ffffff0d}@media(max-width:700px){.titlebar{padding:0 8px}.brand h1{display:none}.protocol-link{min-width:48px;padding:0 9px}.protocol-link[aria-current="page"]:after{left:9px;right:9px}.account-name{display:none}.status-nav,.settings-nav{display:none!important}}
+</style>
 </head>
 <body><div class="app">
-  <header class="titlebar"><div class="brand"><span class="app-icon">RG</span><h1>Remote Gateway</h1></div><nav class="nav-group" aria-label="应用导航"><a class="nav status-nav" href="/admin" aria-label="状态" title="状态"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg></a><a class="nav settings-nav" href="/settings" aria-label="设置" title="设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.1A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.1A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.1A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.12.38.33.72.6 1 .3.28.68.42 1.1.4h.1v4h-.1a1.7 1.7 0 0 0-1.7.6Z"/></svg></a><button class="nav logout-nav" id="logout-account" type="button">退出</button></nav></header>
+  <header class="titlebar"><div class="brand"><span class="app-icon">RG</span><h1>Remote Gateway</h1></div><nav class="protocol-nav" aria-label="连接协议"><a class="protocol-link" href="/" aria-current="page">RDP</a><a class="protocol-link" href="/vnc">VNC</a><a class="protocol-link" href="/ssh">SSH</a></nav><nav class="nav-group" aria-label="应用导航"><a class="nav status-nav" href="/admin" aria-label="状态" title="状态"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg></a><a class="nav settings-nav" href="/settings" aria-label="设置" title="设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.1A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.1A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.1A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06-.06A1.7 1.7 0 0 0 19.4 9c.12.38.33.72.6 1 .3.28.68.42 1.1.4h.1v4h-.1a1.7 1.7 0 0 0-1.7.6Z"/></svg></a><div class="account"><button class="nav account-trigger" id="account-trigger" type="button" aria-haspopup="menu" aria-expanded="false"><span class="account-avatar" id="account-avatar">RL</span><span class="account-name" id="account-name">账户</span></button><div class="account-menu" id="account-menu" role="menu" hidden><div class="account-summary" id="account-summary">当前账户</div><a class="account-admin" href="/admin#users" role="menuitem" hidden>用户管理</a><button id="logout-account" type="button" role="menuitem">退出登录</button></div></div></nav></header>
   <main><section class="connection-card" aria-labelledby="connection-title">
     <div class="hero"><span class="hero-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4M8 10h8M13 7l3 3-3 3"/></svg></span><div><h2 id="connection-title">远程桌面连接</h2><p id="connection-status">正在连接网关…</p></div></div>
     <form id="connection-form">
       <label for="target">我的连接</label><div><select id="target" required disabled><option value="">请选择已授权连接</option></select><datalist id="target-list"></datalist></div>
-      <label for="username">用户名（可选）</label><input id="username" autocomplete="username" disabled>
-      <label for="password">密码（可选）</label><input id="password" type="password" autocomplete="current-password" disabled>
-      <label class="remember"><input id="remember" type="checkbox">在此浏览器保存这台主机的用户名和密码</label>
       <span id="error" role="alert"></span>
-      <div class="actions"><button type="button" id="forget" disabled>清除凭据</button><button class="primary" id="connect" type="submit" disabled>连接</button></div>
+      <div class="actions"><button class="primary" id="connect" type="submit" disabled>连接</button></div>
     </form>
   </section></main>
 </div>
@@ -38,11 +39,7 @@
 <script>
 const targetSelect=document.querySelector('#target');
 const targetList=document.querySelector('#target-list');
-const username=document.querySelector('#username');
-const password=document.querySelector('#password');
-const remember=document.querySelector('#remember');
 const connectButton=document.querySelector('#connect');
-const forgetButton=document.querySelector('#forget');
 const status=document.querySelector('#connection-status');
 const error=document.querySelector('#error');
 const login=document.querySelector('#login');
@@ -51,23 +48,23 @@ const loginUsername=document.querySelector('#login-username');
 const loginPassword=document.querySelector('#login-password');
 const authError=document.querySelector('#auth-error');
 const logoutAccount=document.querySelector('#logout-account');
+const accountTrigger=document.querySelector('#account-trigger');
+const accountMenu=document.querySelector('#account-menu');
+accountMenu.querySelector('.account-admin').href='/users';
+const accountName=document.querySelector('#account-name');
+const accountSummary=document.querySelector('#account-summary');
+const accountAvatar=document.querySelector('#account-avatar');
+accountAvatar.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-4 3.1-6 7-6s6.2 2 7 6"/></svg>';accountAvatar.style.cssText='padding:4px;color:#b3b3b3;background:#363636';accountAvatar.querySelector('svg').style.cssText='width:16px;height:16px';accountName.hidden=true;
 document.querySelector('.brand h1').textContent='RemoteLink';document.querySelector('.app-icon').textContent='RL';document.querySelector('#login-form strong').textContent='登录 RemoteLink';
 const statusNav=document.querySelector('.status-nav');statusNav.hidden=true;statusNav.title='管理控制台';statusNav.setAttribute('aria-label','管理控制台');
-logoutAccount.title='退出登录';logoutAccount.setAttribute('aria-label','退出登录');logoutAccount.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M14 8l4 4-4 4M9 12h9"/></svg>';
+logoutAccount.title='退出登录';logoutAccount.setAttribute('aria-label','退出登录');logoutAccount.textContent='退出登录';
+function showAccount(account){const name=account.name||account.username||'账户',userManagement=document.querySelector('.account-admin');accountSummary.textContent=account.username&&account.username!==name?`${name} · ${account.username}`:name;userManagement.href='/users';userManagement.hidden=!account.admin}
+accountTrigger.addEventListener('click',()=>{const open=accountMenu.hidden;accountMenu.hidden=!open;accountTrigger.setAttribute('aria-expanded',String(open))});
+document.addEventListener('click',event=>{if(!event.target.closest('.account')){accountMenu.hidden=true;accountTrigger.setAttribute('aria-expanded','false')}});
 let accessToken='';
 let socket;
 let targets=[];
-function savedProfiles(){try{return JSON.parse(localStorage.getItem('remote-gateway-profiles')||'{}')}catch{return {}}}
 function automaticResolution(){const scale=Math.max(1,window.devicePixelRatio||1);return {width:Math.min(7680,Math.max(640,Math.round(screen.width*scale/2)*2)),height:Math.min(4320,Math.max(480,Math.round(screen.height*scale/2)*2))}}
-function applyProfile(){
-  const key=targetSelect.value;
-  const target=targets.find(item=>item.id===key);
-  const saved=savedProfiles()[key];
-  username.value=saved?.username||target?.username||'';
-  password.value=saved?.password||'';
-  remember.checked=!!saved;
-  forgetButton.disabled=!saved;
-}
 function connectGateway(){
   const scheme=location.protocol==='https:'?'wss':'ws';
   socket=new WebSocket(`${scheme}://${location.host}/ws`);
@@ -86,24 +83,17 @@ function connectGateway(){
     const preferred=localStorage.getItem('remote-gateway-last-target');
     targetSelect.value=targets.some(item=>item.id===preferred)?preferred:targets[0]?.id||'';
     const enabled=targets.length>0;
-    targetSelect.disabled=!enabled; username.disabled=!enabled; password.disabled=!enabled; connectButton.disabled=!enabled;
-    status.textContent=enabled?'选择计算机并输入登录信息':'没有可用的远程主机';
-    applyProfile();
+    targetSelect.disabled=!enabled; connectButton.disabled=!enabled;
+    status.textContent=enabled?'选择计算机并连接':'没有可用的远程主机';
   };
   socket.onerror=()=>{status.textContent='无法连接网关';error.textContent='请确认网关服务已启动。'};
 }
-loginForm.addEventListener('submit',async event=>{event.preventDefault();authError.textContent='';try{const response=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:loginUsername.value,password:loginPassword.value})});if(!response.ok){authError.textContent='用户名或密码不正确';loginPassword.value='';return}const account=await response.json();accessToken=account.token;sessionStorage.setItem('remote-gateway-access-token',accessToken);loginPassword.value='';statusNav.hidden=!account.admin;connectGateway()}catch(error){authError.textContent='无法连接登录服务'}});
-targetSelect.addEventListener('change',applyProfile);
-forgetButton.addEventListener('click',()=>{const profiles=savedProfiles();delete profiles[targetSelect.value.trim().toLowerCase()];localStorage.setItem('remote-gateway-profiles',JSON.stringify(profiles));password.value='';remember.checked=false;forgetButton.disabled=true});
+loginForm.addEventListener('submit',async event=>{event.preventDefault();authError.textContent='';try{const response=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:loginUsername.value,password:loginPassword.value})});if(!response.ok){authError.textContent='用户名或密码不正确';loginPassword.value='';return}const account=await response.json();accessToken=account.token;sessionStorage.setItem('remote-gateway-access-token',accessToken);loginPassword.value='';statusNav.hidden=!account.admin;showAccount(account);connectGateway()}catch(error){authError.textContent='无法连接登录服务'}});
 document.querySelector('#connection-form').addEventListener('submit',event=>{
   event.preventDefault(); error.textContent='';
   const selected=targets.find(item=>item.id===targetSelect.value);
   if(!selected){error.textContent='请选择已授权连接。';return}
   const host=selected.host;
-  const key=selected.id;
-  const profiles=savedProfiles();
-  if(remember.checked)profiles[key]={username:username.value,password:password.value};else delete profiles[key];
-  localStorage.setItem('remote-gateway-profiles',JSON.stringify(profiles));
   localStorage.setItem('remote-gateway-last-target',selected.id);
   let settings={};try{settings=JSON.parse(localStorage.getItem('remote-gateway-settings')||'{}')}catch{}
   if(!(Number(settings.width)>0&&Number(settings.height)>0))Object.assign(settings,automaticResolution());
@@ -111,14 +101,14 @@ document.querySelector('#connection-form').addEventListener('submit',event=>{
   const network=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
   const networkCaps={'slow-2g':750000,'2g':1000000,'3g':2000000};
   if(networkCaps[network?.effectiveType])settings.bitrate=Math.min(settings.bitrate,networkCaps[network.effectiveType]);
-  sessionStorage.setItem('remote-gateway-session',JSON.stringify({target:selected?.id||'',host,username:username.value,password:password.value,accessToken,startedAt:Date.now(),...settings}));
+  sessionStorage.setItem('remote-gateway-session',JSON.stringify({target:selected?.id||'',host,accessToken,startedAt:Date.now(),...settings}));
   if(socket&&socket.readyState<WebSocket.CLOSING){socket.onclose=null;socket.close()}
   location.href='/session';
 });
 accessToken=sessionStorage.getItem('remote-gateway-access-token')||'';
 const returnedError=sessionStorage.getItem('remote-gateway-error');
 if(returnedError){error.textContent=returnedError;sessionStorage.removeItem('remote-gateway-error')}
-async function resumeAccount(){if(!accessToken){login.showModal();return}try{const response=await fetch('/api/auth/me',{headers:{Authorization:`Bearer ${accessToken}`},cache:'no-store'});if(!response.ok)throw new Error();const account=await response.json();statusNav.hidden=!account.admin;connectGateway()}catch{accessToken='';sessionStorage.removeItem('remote-gateway-access-token');login.showModal()}}
+async function resumeAccount(){if(!accessToken){login.showModal();return}try{const response=await fetch('/api/auth/me',{headers:{Authorization:`Bearer ${accessToken}`},cache:'no-store'});if(!response.ok)throw new Error();const account=await response.json();statusNav.hidden=!account.admin;showAccount(account);connectGateway()}catch{accessToken='';sessionStorage.removeItem('remote-gateway-access-token');login.showModal()}}
 logoutAccount.addEventListener('click',()=>{if(socket&&socket.readyState<WebSocket.CLOSING){socket.onclose=null;socket.close()}sessionStorage.removeItem('remote-gateway-access-token');sessionStorage.removeItem('remote-gateway-session');location.reload()});
 resumeAccount();
 </script></body></html>

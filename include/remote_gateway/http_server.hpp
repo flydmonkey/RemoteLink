@@ -3,8 +3,11 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <thread>
+
+#include "remote_gateway/vnc_ticket_store.hpp"
 
 typedef struct ssl_ctx_st SSL_CTX;
 
@@ -37,6 +40,9 @@ public:
     void stop();
     void set_health_handler(std::function<std::string()> handler);
     void set_api_handler(std::function<HttpResponse(const HttpRequest&)> handler);
+    void set_vnc_ticket_handler(
+        std::function<std::optional<VncDestination>(const std::string&)> handler);
+    void set_vnc_session_observer(std::function<void(const VncDestination&, bool)> observer);
 
 private:
     void run();
@@ -50,6 +56,8 @@ private:
     SSL_CTX* tls_context_ = nullptr;
     std::function<std::string()> health_handler_;
     std::function<HttpResponse(const HttpRequest&)> api_handler_;
+    std::function<std::optional<VncDestination>(const std::string&)> vnc_ticket_handler_;
+    std::function<void(const VncDestination&, bool)> vnc_session_observer_;
     std::jthread thread_;
 };
 

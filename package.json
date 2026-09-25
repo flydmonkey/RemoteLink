@@ -1,6 +1,13 @@
 {
   "name": "remotelink-browser-tests",
   "private": true,
-  "scripts": {"test:browser": "playwright test"},
-  "devDependencies": {"@playwright/test": "^1.55.0"}
+  "scripts": {
+    "test:browser": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0"
+  },
+  "dependencies": {
+    "@novnc/novnc": "^1.7.0"
+  }
 }

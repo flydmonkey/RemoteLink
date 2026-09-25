@@ -26,8 +26,26 @@ RemoteLink 是一款可自行部署、通过浏览器使用的远程连接工具
 - 可配置分辨率、码率、声音、打印和实验性硬件加速
 - HTTPS/WSS、systemd 加密凭据和用户数据隔离
 - 适配桌面与移动浏览器
+- 独立 VNC 支持：使用 noVNC Core，通过一次性票据建立 WSS 到 RFB 的代理连接
+- RemoteLink 自有 VNC 设备页、会话工具栏、连接管理和用户授权界面
 
 ## 架构
+
+VNC 使用独立链路，不依赖 Guacamole 或 guacd：
+
+```text
+RemoteLink VNC 页面（noVNC Core，不含 noVNC UI）
+  └─ WSS `/vnc/ws?ticket=一次性票据`
+                  │
+             RemoteLink
+       WebSocket ↔ TCP/RFB 代理
+                  │
+            VNC 主机 :5900
+```
+
+管理员可在 `/vnc/admin` 维护 VNC 连接并为用户授权。VNC 地址和密码保存在服务端；
+浏览器只在创建会话后获得 30 秒有效且只能消费一次的连接票据。VNC 密码不会写入 URL
+或持久化到浏览器存储。
 
 ```text
 浏览器

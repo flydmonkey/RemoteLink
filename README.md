@@ -26,6 +26,8 @@ The gateway runs as a single Linux service. Users only need a modern browser—n
 - Configurable resolution, bitrate, audio, printing, and experimental hardware acceleration
 - HTTPS/WSS, encrypted systemd credentials, and isolated per-user storage
 - Responsive desktop and mobile browser interface
+- Standalone VNC support using noVNC Core and a one-time-ticket WSS-to-RFB proxy
+- Native RemoteLink VNC device, session toolbar, administration, and user-permission UI
 
 ## Architecture
 
@@ -80,7 +82,7 @@ Copy `config/targets.example.json` to a protected location outside the repositor
 | Variable | Purpose |
 | --- | --- |
 | `RG_TARGETS_FILE` | RDP target configuration file |
-| `RG_ALLOWED_HOSTS` | Host/CIDR allow-list; defaults to `*` (all DNS names and IP addresses) |
+| `RG_ALLOWED_HOSTS` | RDP host/CIDR allow-list; defaults to `*` (all DNS names and IP addresses). VNC destinations are unrestricted. |
 | `RG_ACCESS_TOKEN_FILE` | Protected primary-administrator recovery credential |
 | `RG_TLS_CERTIFICATE` | TLS certificate chain |
 | `RG_TLS_PRIVATE_KEY` | TLS private key |

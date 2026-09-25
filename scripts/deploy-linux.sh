@@ -6,6 +6,7 @@ release_id="$(date -u +%Y%m%d%H%M%S)"
 backup_dir="/opt/remote-gateway/backups/${release_id}"
 
 if [[ ${EUID} -ne 0 ]]; then echo "run as root" >&2; exit 1; fi
+bash "${project_root}/scripts/copy-novnc-core.sh"
 install -d -m 0755 "${backup_dir}"
 cp -a /opt/remote-gateway/bin /opt/remote-gateway/lib /opt/remote-gateway/web "${backup_dir}/"
 install -m 0755 "${project_root}/build/remote-gateway" /opt/remote-gateway/bin/remote-gateway

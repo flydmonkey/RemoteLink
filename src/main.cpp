@@ -9,6 +9,8 @@
 #include "remote_gateway/rdp_frame_source.hpp"
 #include "remote_gateway/session_manager.hpp"
 #include "remote_gateway/target_config.hpp"
+#include "remote_gateway/vnc_ticket_store.hpp"
+#include "remote_gateway/vnc_bridge.hpp"
 #endif
 
 #include <atomic>
@@ -23,6 +25,7 @@
 #include <iterator>
 #include <algorithm>
 #include <memory>
+#include <regex>
 #include <sstream>
 #include <thread>
 #include <mutex>
@@ -48,6 +51,27 @@ struct GatewayUser {
     std::string password_salt;
     std::string password_hash;
     std::vector<std::string> allowed_targets;
+};
+
+struct VncConnection {
+    std::string id;
+    std::string name;
+    std::string hostname;
+    std::uint16_t port = 5900;
+    std::string password;
+    bool view_only = false;
+    std::string username;
+    std::string ca_file;
+};
+
+struct VncActivity {
+    std::string id;
+    std::string target_id;
+    std::string target_name;
+    std::string username;
+    std::int64_t started_at = 0;
+    std::int64_t ended_at = 0;
+    bool active = true;
 };
 
 std::string hex_encode(const unsigned char* bytes, std::size_t size) {
@@ -192,6 +216,72 @@ void save_managed_connections(const std::filesystem::path& path,
     std::filesystem::rename(temporary, path);
 }
 
+std::vector<VncConnection> load_vnc_connections(const std::filesystem::path& path,
+                                                const std::string& allowed_hosts) {
+    (void)allowed_hosts;
+    std::vector<VncConnection> result;
+    if (!std::filesystem::is_regular_file(path)) return result;
+    std::ifstream input(path);
+    const auto data = nlohmann::json::parse(input, nullptr, false);
+    if (!data.is_array()) throw std::runtime_error("invalid VNC connection registry");
+    for (const auto& item : data) {
+        VncConnection connection;
+        connection.id = item.value("id", "");
+        connection.name = item.value("name", "");
+        connection.hostname = item.value("host", "");
+        const auto port = item.value("port", 5900);
+        connection.view_only = item.value("viewOnly", false);
+        connection.username = item.value("username", "");
+        connection.ca_file = item.value("caFile", "");
+        const auto password_file = item.value("passwordFile", "");
+        if (!password_file.empty()) {
+            std::ifstream secret(password_file, std::ios::binary);
+            if (!secret) throw std::runtime_error("cannot read VNC credential: " + connection.id);
+            connection.password.assign(std::istreambuf_iterator<char>(secret), {});
+        }
+        if (connection.id.empty() || connection.name.empty() || connection.hostname.empty() ||
+            port < 1 || port > 65535)
+            throw std::runtime_error("invalid VNC connection: " + connection.id);
+        connection.port = static_cast<std::uint16_t>(port);
+        result.push_back(std::move(connection));
+    }
+    return result;
+}
+
+void save_vnc_connections(const std::filesystem::path& path,
+                          const std::filesystem::path& secret_directory,
+                          const std::vector<VncConnection>& connections) {
+    std::filesystem::create_directories(secret_directory);
+    std::filesystem::permissions(secret_directory, std::filesystem::perms::owner_all,
+                                 std::filesystem::perm_options::replace);
+    nlohmann::json data = nlohmann::json::array();
+    for (const auto& connection : connections) {
+        std::string safe_id = connection.id;
+        for (auto& character : safe_id)
+            if (!std::isalnum(static_cast<unsigned char>(character)) && character != '-' && character != '_')
+                character = '_';
+        const auto secret_path = secret_directory / (safe_id + ".password");
+        if (!connection.password.empty()) {
+            { std::ofstream secret(secret_path, std::ios::binary | std::ios::trunc);
+              secret << connection.password;
+              if (!secret) throw std::runtime_error("cannot save VNC credential"); }
+            std::filesystem::permissions(secret_path, std::filesystem::perms::owner_read |
+                std::filesystem::perms::owner_write, std::filesystem::perm_options::replace);
+        } else std::filesystem::remove(secret_path);
+        data.push_back({{"id", connection.id}, {"name", connection.name},
+            {"host", connection.hostname},
+            {"port", connection.port}, {"viewOnly", connection.view_only},
+            {"username", connection.username}, {"caFile", connection.ca_file},
+            {"passwordFile", connection.password.empty() ? "" : secret_path.string()}});
+    }
+    const auto temporary = path.string() + ".tmp";
+    { std::ofstream output(temporary, std::ios::trunc); output << data.dump(2) << '\n';
+      if (!output) throw std::runtime_error("cannot save VNC connections"); }
+    std::filesystem::permissions(temporary, std::filesystem::perms::owner_read |
+        std::filesystem::perms::owner_write, std::filesystem::perm_options::replace);
+    std::filesystem::rename(temporary, path);
+}
+
 void request_stop(int) {
     running = false;
 }
@@ -326,6 +416,16 @@ int main() {
     std::mutex users_mutex;
     const auto connections_path = state_root / "connections.json";
     const auto connection_secrets_path = state_root / "connection-secrets";
+    const auto vnc_connections_path = state_root / "vnc-connections.json";
+    const auto vnc_connection_secrets_path = state_root / "vnc-connection-secrets";
+    auto vnc_connections = load_vnc_connections(vnc_connections_path, allowed_hosts);
+    save_vnc_connections(vnc_connections_path, vnc_connection_secrets_path, vnc_connections);
+    std::mutex vnc_connections_mutex;
+    remote_gateway::VncTicketStore vnc_tickets;
+    std::mutex vnc_bridges_mutex;
+    std::unordered_map<std::string, std::shared_ptr<remote_gateway::VncBridge>> vnc_bridges;
+    std::mutex vnc_activity_mutex;
+    std::vector<VncActivity> vnc_activity;
     const auto connections_migration_marker = state_root / "connections.migrated";
     const auto configured_targets = remote_gateway::load_targets(targets_file, allowed_hosts);
     auto managed_targets = load_managed_connections(connections_path, allowed_hosts);
@@ -382,9 +482,38 @@ int main() {
     // Detailed session and performance data is available through the
     // authenticated admin API below.
     http.set_health_handler([] { return std::string("{\"status\":\"ok\"}\n"); });
+    http.set_vnc_ticket_handler([&vnc_tickets](const std::string& ticket) {
+        return vnc_tickets.consume(ticket);
+    });
+    http.set_vnc_session_observer([&vnc_activity, &vnc_activity_mutex,
+                                   &vnc_bridges, &vnc_bridges_mutex](
+                                      const remote_gateway::VncDestination& destination,
+                                      bool connected) {
+        const auto now = std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        std::lock_guard lock(vnc_activity_mutex);
+        const auto found = std::find_if(vnc_activity.begin(), vnc_activity.end(),
+            [&](const auto& item) { return item.id == destination.session_id; });
+        if (connected && found == vnc_activity.end()) {
+            vnc_activity.push_back({destination.session_id, destination.target_id,
+                destination.target_name, destination.username, now, 0, true});
+            if (vnc_activity.size() > 200) vnc_activity.erase(vnc_activity.begin());
+        } else if (!connected && found != vnc_activity.end()) {
+            found->active = false;
+            found->ended_at = now;
+        }
+        if (!connected) {
+            std::lock_guard bridge_lock(vnc_bridges_mutex);
+            vnc_bridges.erase(destination.session_id);
+        }
+    });
     http.set_api_handler([&sessions, &webrtc, &access_tokens, &users, &users_mutex,
                           &users_path, &target_catalog, &managed_targets, &connections_path,
                           &connection_secrets_path,
+                          &vnc_connections, &vnc_connections_mutex, &vnc_connections_path,
+                          &vnc_connection_secrets_path, &vnc_tickets,
+                          &vnc_bridges, &vnc_bridges_mutex,
+                          &vnc_activity, &vnc_activity_mutex,
                           &allowed_hosts, tls_enabled](
                              const remote_gateway::HttpRequest& request) {
         using json = nlohmann::json;
@@ -421,6 +550,138 @@ int main() {
             response.body = json{{"id", *user_identity}, {"name", users[*user_identity].name},
                 {"username", users[*user_identity].username}, {"admin", *user_identity == 0}}.dump();
             return response;
+        }
+        if (request.method == "GET" && request.path == "/api/vnc/targets") {
+            std::vector<std::string> allowed;
+            bool administrator = false;
+            { std::lock_guard lock(users_mutex);
+              administrator = *user_identity == 0;
+              allowed = users[*user_identity].allowed_targets; }
+            json targets = json::array();
+            std::lock_guard lock(vnc_connections_mutex);
+            for (const auto& connection : vnc_connections) {
+                if (!administrator && std::find(allowed.begin(), allowed.end(), connection.id) == allowed.end())
+                    continue;
+                targets.push_back({{"id", connection.id}, {"name", connection.name},
+                    {"viewOnly", connection.view_only}});
+            }
+            response.body = json{{"targets", std::move(targets)}}.dump();
+            return response;
+        }
+        if (request.method == "POST" && request.path == "/api/vnc/sessions") {
+            const auto payload = json::parse(request.body, nullptr, false);
+            const std::string target_id = payload.is_object() ? payload.value("targetId", "") : "";
+            std::vector<std::string> allowed;
+            bool administrator = false;
+            std::string vnc_username;
+            { std::lock_guard lock(users_mutex);
+              administrator = *user_identity == 0;
+              vnc_username = users[*user_identity].username;
+              allowed = users[*user_identity].allowed_targets; }
+            if (!administrator && std::find(allowed.begin(), allowed.end(), target_id) == allowed.end()) {
+                response.status = 403; response.body = json{{"error", "target not authorized"}}.dump(); return response;
+            }
+            std::lock_guard lock(vnc_connections_mutex);
+            const auto connection = std::find_if(vnc_connections.begin(), vnc_connections.end(),
+                [&](const auto& item) { return item.id == target_id; });
+            if (connection == vnc_connections.end()) {
+                response.status = 404; response.body = json{{"error", "VNC target not found"}}.dump(); return response;
+            }
+            std::string bridge_error;
+            auto bridge = remote_gateway::VncBridge::create({.hostname=connection->hostname,
+                .port=connection->port, .username=connection->username,
+                .password=connection->password, .ca_file=connection->ca_file}, bridge_error);
+            if (!bridge) {
+                response.status=502; response.body=json{{"error",bridge_error}}.dump(); return response;
+            }
+            const auto ticket = vnc_tickets.issue({.target_id=connection->id,
+                .target_name=connection->name, .username=vnc_username,
+                .hostname="127.0.0.1", .port=bridge->port()});
+            { std::lock_guard bridge_lock(vnc_bridges_mutex);
+              vnc_bridges.emplace(ticket, std::move(bridge)); }
+            response.body = json{{"ticket", ticket},
+                {"websocketUrl", "/vnc/ws?ticket=" + ticket},
+                {"viewOnly", connection->view_only},
+                {"expiresIn", 30}}.dump();
+            return response;
+        }
+        if (request.path.starts_with("/api/admin/vnc")) {
+            if (*user_identity != 0) {
+                response.status = 403; response.body = json{{"error", "primary administrator required"}}.dump(); return response;
+            }
+            if (request.method == "GET" && request.path == "/api/admin/vnc") {
+                json connections = json::array();
+                std::lock_guard lock(vnc_connections_mutex);
+                for (const auto& connection : vnc_connections)
+                    connections.push_back({{"id", connection.id}, {"name", connection.name},
+                        {"host", connection.hostname},
+                        {"port", connection.port}, {"viewOnly", connection.view_only},
+                        {"username", connection.username}, {"caFile", connection.ca_file},
+                        {"hasPassword", !connection.password.empty()}});
+                response.body = json{{"connections", std::move(connections)}}.dump(); return response;
+            }
+            if (request.method == "GET" && request.path == "/api/admin/vnc/activity") {
+                json active = json::array(), history = json::array();
+                std::lock_guard lock(vnc_activity_mutex);
+                for (auto item = vnc_activity.rbegin(); item != vnc_activity.rend(); ++item) {
+                    json entry={{"id",item->id},{"targetId",item->target_id},
+                        {"targetName",item->target_name},{"username",item->username},
+                        {"startedAt",item->started_at},{"endedAt",item->ended_at}};
+                    (item->active ? active : history).push_back(std::move(entry));
+                }
+                response.body=json{{"active",std::move(active)},{"history",std::move(history)}}.dump(); return response;
+            }
+            const auto payload = json::parse(request.body, nullptr, false);
+            if (!payload.is_object()) { response.status=400; response.body=json{{"error","invalid payload"}}.dump(); return response; }
+            if (request.method == "POST" && request.path == "/api/admin/vnc/test") {
+                const auto host = payload.value("host", ""); const auto port = payload.value("port", 5900);
+                if (host.empty() || port < 1 || port > 65535) {
+                    response.status=400; response.body=json{{"error","invalid VNC destination"}}.dump(); return response;
+                }
+                response.body=json{{"reachable",test_tcp_connection(host,static_cast<std::uint16_t>(port))}}.dump(); return response;
+            }
+            if (request.method == "POST" && request.path == "/api/admin/vnc/save") {
+                auto id = payload.value("id", ""); const auto name = payload.value("name", "");
+                const auto host = payload.value("host", ""); const auto port = payload.value("port", 5900);
+                if (id.empty()) id = "vnc-" + generate_connection_id();
+                static const std::regex valid_id("^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$");
+                const auto password = payload.value("password", "");
+                if (!std::regex_match(id, valid_id)) { response.status=400; response.body=json{{"error","连接 ID 无效"}}.dump(); return response; }
+                if (name.empty() || name.size() > 128) { response.status=400; response.body=json{{"error","连接名称不能为空且不能超过 128 个字符"}}.dump(); return response; }
+                if (host.empty() || host.size() > 255) { response.status=400; response.body=json{{"error","目标主机不能为空且不能超过 255 个字符"}}.dump(); return response; }
+                if (port < 1 || port > 65535) { response.status=400; response.body=json{{"error","端口必须在 1 到 65535 之间"}}.dump(); return response; }
+                if (password.size() > 4096) { response.status=400; response.body=json{{"error","VNC 密码过长"}}.dump(); return response; }
+                if (payload.value("username", "").size() > 256 || payload.value("caFile", "").size() > 1024) { response.status=400; response.body=json{{"error","VNC TLS 配置过长"}}.dump(); return response; }
+                std::lock_guard lock(vnc_connections_mutex);
+                auto found = std::find_if(vnc_connections.begin(), vnc_connections.end(),
+                    [&](const auto& item) { return item.id == id; });
+                VncConnection updated{id, name, host,
+                    static_cast<std::uint16_t>(port), password, payload.value("viewOnly", false),
+                    payload.value("username", ""), payload.value("caFile", "")};
+                if (found == vnc_connections.end() && !payload.value("id", "").empty()) {
+                    response.status=404; response.body=json{{"error","VNC connection not found"}}.dump(); return response;
+                }
+                if (found != vnc_connections.end()) {
+                    if (updated.password.empty()) updated.password = found->password;
+                    *found = std::move(updated);
+                } else vnc_connections.push_back(std::move(updated));
+                save_vnc_connections(vnc_connections_path, vnc_connection_secrets_path, vnc_connections);
+                response.body=json{{"id",id}}.dump(); return response;
+            }
+            if (request.method == "POST" && request.path == "/api/admin/vnc/delete") {
+                const auto id = payload.value("id", "");
+                { std::lock_guard lock(vnc_connections_mutex);
+                  const auto before = vnc_connections.size();
+                  std::erase_if(vnc_connections, [&](const auto& item) { return item.id == id; });
+                  if (before == vnc_connections.size()) { response.status=404; response.body=json{{"error","VNC connection not found"}}.dump(); return response; }
+                  save_vnc_connections(vnc_connections_path, vnc_connection_secrets_path, vnc_connections); }
+                std::filesystem::remove(vnc_connection_secrets_path / (id + ".password"));
+                { std::lock_guard users_lock(users_mutex);
+                  for (auto& user : users) std::erase(user.allowed_targets, id);
+                  save_users(users_path, users); }
+                response.body=json{{"deleted",true}}.dump(); return response;
+            }
+            response.status=405; response.body=json{{"error","method not allowed"}}.dump(); return response;
         }
         if (*user_identity != 0 &&
             (request.path == "/api/admin/state" || request.path == "/api/admin/disconnect")) {
@@ -613,6 +874,21 @@ int main() {
                 publish_users();
                 response.body = json{{"status", enabled ? "enabled" : "disabled"}}.dump(); return response;
             }
+            if (request.method == "POST" && request.path == "/api/admin/users/update") {
+                std::string name = payload.value("name", "");
+                const std::string username = payload.value("username", "");
+                while (!name.empty() && std::isspace(static_cast<unsigned char>(name.front()))) name.erase(name.begin());
+                while (!name.empty() && std::isspace(static_cast<unsigned char>(name.back()))) name.pop_back();
+                const bool duplicate = std::any_of(users.begin(), users.end(), [&](const auto& user) {
+                    return &user != &users[id] && user.username == username;
+                });
+                if (name.empty() || name.size() > 64 || username.size() < 2 || username.size() > 64 || duplicate) {
+                    response.status = 400; response.body = json{{"error", "invalid or duplicate account details"}}.dump(); return response;
+                }
+                users[id].name = name; users[id].username = username;
+                publish_users();
+                response.body = json{{"id", id}, {"name", name}, {"username", username}}.dump(); return response;
+            }
             if (request.method == "POST" && request.path == "/api/admin/users/rotate") {
                 const std::string password = payload.value("password", "");
                 if (password.size() < 4 || password.size() > 256) {
@@ -634,9 +910,15 @@ int main() {
                 for (const auto& value : payload["targetIds"]) {
                     if (!value.is_string()) continue;
                     const auto target_id = value.get<std::string>();
-                    if (std::any_of(snapshots.begin(), snapshots.end(), [&](const auto& target) {
+                    bool known = std::any_of(snapshots.begin(), snapshots.end(), [&](const auto& target) {
                         return target.id == target_id;
-                    }) && std::find(allowed.begin(), allowed.end(), target_id) == allowed.end())
+                    });
+                    if (!known) {
+                        std::lock_guard vnc_lock(vnc_connections_mutex);
+                        known = std::any_of(vnc_connections.begin(), vnc_connections.end(),
+                            [&](const auto& target) { return target.id == target_id; });
+                    }
+                    if (known && std::find(allowed.begin(), allowed.end(), target_id) == allowed.end())
                         allowed.push_back(target_id);
                 }
                 users[id].allowed_targets = std::move(allowed);
