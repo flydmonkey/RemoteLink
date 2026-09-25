@@ -213,7 +213,14 @@ test("SSH page exposes password and key connection management", async ({
   await expect(page.locator('.nav a[aria-current="page"]')).toHaveText("SSH");
   await expect(page.getByRole("heading", { name: "SSH 连接" })).toBeVisible();
   await expect(page.locator("#target")).toHaveValue("ssh-1");
-  await page.locator("#manage").click();
+  await expect(page.locator("#manage")).toHaveAttribute(
+    "href",
+    "/ssh/settings",
+  );
+  await page.locator("#account-trigger").click();
+  await expect(page.locator("#account-menu")).toBeVisible();
+  await expect(page.locator("#logout")).toHaveText("退出登录");
+  await page.evaluate(() => document.querySelector("#manager").showModal());
   await page.getByRole("button", { name: "添加连接" }).click();
   await expect(page.locator("#key-fields")).toBeHidden();
   await expect(page.locator("#password")).toBeVisible();

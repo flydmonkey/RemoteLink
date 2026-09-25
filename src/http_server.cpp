@@ -555,7 +555,7 @@ void HttpServer::run() {
         const bool users_request = parsed.method == "GET" &&
             (parsed.path == "/users" || parsed.path == "/users.html");
         const bool ssh_request = parsed.method == "GET" &&
-            (parsed.path == "/ssh" || parsed.path == "/ssh.html");
+            (parsed.path == "/ssh" || parsed.path == "/ssh.html" || parsed.path == "/ssh/settings");
         const bool ssh_session_request = parsed.method == "GET" &&
             (parsed.path == "/ssh/session" || parsed.path.starts_with("/ssh/session?") ||
              parsed.path == "/ssh-session.html" || parsed.path.starts_with("/ssh-session.html?"));

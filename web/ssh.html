@@ -86,6 +86,63 @@
         display: flex;
         gap: 7px;
       }
+      .account {
+        position: relative;
+      }
+      .account-menu {
+        position: absolute;
+        z-index: 5;
+        top: 40px;
+        right: 0;
+        width: 190px;
+        padding: 6px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--panel);
+        box-shadow: 0 14px 36px #0008;
+      }
+      .account-menu[hidden] {
+        display: none !important;
+      }
+      .account-summary {
+        padding: 9px 10px 10px;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .account-menu a,
+      .account-menu button {
+        display: flex;
+        width: 100%;
+        min-height: 34px;
+        padding: 7px 10px;
+        border: 0;
+        border-radius: 4px;
+        color: var(--text);
+        background: transparent;
+        text-decoration: none;
+      }
+      .account-menu a:hover,
+      .account-menu button:hover {
+        background: #ffffff0d;
+      }
+      .avatar svg,
+      .settings-link svg {
+        width: 18px;
+        height: 18px;
+      }
+      .settings-link {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 4px;
+        color: #b3b3b3;
+        text-decoration: none;
+      }
+      .settings-link:hover {
+        background: #ffffff0d;
+      }
       .icon {
         width: 34px;
         height: 34px;
@@ -180,6 +237,21 @@
       dialog::backdrop {
         background: #0009;
       }
+      body.settings-mode {
+        padding: 28px 16px;
+      }
+      body.settings-mode .app {
+        display: none;
+      }
+      body.settings-mode #manager {
+        display: block;
+        position: static;
+        width: min(900px, 100%);
+        margin: 0 auto;
+      }
+      body.settings-mode #manager-close {
+        display: none;
+      }
       .dialog-head,
       .row,
       .row-actions,
@@ -262,8 +334,47 @@
           ><a href="/ssh" aria-current="page">SSH</a>
         </nav>
         <div class="tools">
-          <button id="manage" class="icon" hidden title="连接管理">⚙</button
-          ><button id="account" class="icon" title="账户">♙</button>
+          <a
+            id="manage"
+            class="settings-link"
+            href="/ssh/settings"
+            hidden
+            title="设置"
+            aria-label="设置"
+            ><svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l-2.83 2.83A1.7 1.7 0 0 0 15 19.4 1.7 1.7 0 0 0 13.6 21h-3.2A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.91.31l-2.8-2.8A1.7 1.7 0 0 0 4.6 15 1.7 1.7 0 0 0 3 13.6v-3.2A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.31-1.91l2.8-2.8A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10.4 3h3.2A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.91-.31l2.8 2.8A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.6 1.4v3.2a1.7 1.7 0 0 0-1.6 1.4Z"
+              /></svg
+          ></a>
+          <div class="account">
+            <button
+              id="account-trigger"
+              class="icon avatar"
+              aria-label="用户账户"
+              aria-expanded="false"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+              >
+                <circle cx="12" cy="8" r="3.5" />
+                <path d="M5 20c.8-4 3.1-6 7-6s6.2 2 7 6" />
+              </svg>
+            </button>
+            <div id="account-menu" class="account-menu" hidden>
+              <div id="account-summary" class="account-summary">当前账户</div>
+              <a id="users-link" href="/users" hidden>用户管理</a
+              ><button id="logout">退出登录</button>
+            </div>
+          </div>
         </div>
       </header>
       <main>
@@ -345,6 +456,11 @@
         editor = document.querySelector("#editor");
       let connections = [],
         editing = null;
+      const settingsMode = location.pathname === "/ssh/settings";
+      if (settingsMode) {
+        document.body.classList.add("settings-mode");
+        manager.setAttribute("open", "");
+      }
       async function api(path, options = {}) {
         const response = await fetch(path, {
             ...options,
@@ -365,6 +481,11 @@
       async function refresh() {
         const me = await api("/api/auth/me");
         document.querySelector("#manage").hidden = !me.admin;
+        document.querySelector("#users-link").hidden = !me.admin;
+        document.querySelector("#account-summary").textContent =
+          me.username && me.username !== me.name
+            ? `${me.name} · ${me.username}`
+            : me.name;
         const data = await api("/api/ssh/targets");
         target.innerHTML = '<option value="">请选择 SSH 设备</option>';
         for (const item of data.targets || [])
@@ -512,7 +633,22 @@
           notice.textContent = error.message;
         }
       };
-      document.querySelector("#manage").onclick = () => manager.showModal();
+      const accountTrigger = document.querySelector("#account-trigger"),
+        accountMenu = document.querySelector("#account-menu");
+      accountTrigger.onclick = () => {
+        accountMenu.hidden = !accountMenu.hidden;
+        accountTrigger.setAttribute(
+          "aria-expanded",
+          String(!accountMenu.hidden),
+        );
+      };
+      document.addEventListener("click", (event) => {
+        if (!event.target.closest(".account")) accountMenu.hidden = true;
+      });
+      document.querySelector("#logout").onclick = () => {
+        sessionStorage.clear();
+        location.href = "/";
+      };
       document.querySelector("#manager-close").onclick = () => manager.close();
       document.querySelector("#add").onclick = () => openEditor();
       document.querySelector("#cancel").onclick = () => editor.close();
@@ -543,12 +679,6 @@
             : result.error || "连接失败";
         } catch (error) {
           output.textContent = error.message;
-        }
-      };
-      document.querySelector("#account").onclick = () => {
-        if (confirm("退出登录？")) {
-          sessionStorage.clear();
-          location.href = "/";
         }
       };
       document.querySelector("#form").onsubmit = async (event) => {
