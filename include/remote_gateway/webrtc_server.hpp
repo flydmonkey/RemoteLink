@@ -36,6 +36,7 @@ public:
                                             std::string&)>;
     using PeerHandler = std::function<void(const std::string&)>;
     using InputHandler = std::function<void(const std::string&, const std::string&)>;
+    using BitrateHandler = std::function<bool(const std::string&, std::uint32_t)>;
 
     WebRtcServer(std::uint16_t signaling_port, std::vector<std::string> access_tokens,
                  std::string certificate_file = {}, std::string key_file = {},
@@ -53,6 +54,7 @@ public:
     void set_access_tokens(std::vector<std::string> access_tokens);
     void set_start_handler(StartHandler handler);
     void set_input_handler(InputHandler handler);
+    void set_bitrate_handler(BitrateHandler handler);
     void set_key_frame_handler(PeerHandler handler);
     void set_close_handler(PeerHandler handler);
     [[nodiscard]] std::size_t peer_count() const;
@@ -71,6 +73,7 @@ private:
     std::vector<std::vector<std::string>> user_target_permissions_;
     StartHandler start_handler_;
     InputHandler input_handler_;
+    BitrateHandler bitrate_handler_;
     PeerHandler key_frame_handler_;
     PeerHandler close_handler_;
     std::vector<std::string> access_tokens_;

@@ -68,6 +68,12 @@ void H264Encoder::request_key_frame() {
     key_frame_requested_ = true;
 }
 
+bool H264Encoder::set_bitrate(std::uint32_t bitrate) {
+    std::lock_guard lock(mutex_);
+    SBitrateInfo info{SPATIAL_LAYER_ALL, static_cast<int>(bitrate)};
+    return encoder_ && encoder_->SetOption(ENCODER_OPTION_BITRATE, &info) == cmResultSuccess;
+}
+
 void H264Encoder::convert_bgra_to_i420(const Frame& frame) {
     auto* y_plane = i420_.data();
     auto* u_plane = y_plane + static_cast<std::size_t>(width_) * height_;
@@ -84,6 +90,7 @@ void H264Encoder::convert_bgra_to_i420(const Frame& frame) {
 }
 
 EncodedFrame H264Encoder::encode(const Frame& frame) {
+    std::lock_guard lock(mutex_);
     if (frame.width != width_ || frame.height != height_ ||
         frame.pixels.size() < static_cast<std::size_t>(frame.stride) * frame.height) {
         throw std::invalid_argument("frame does not match encoder dimensions");

@@ -10,6 +10,7 @@ namespace remote_gateway {
 struct TargetConfig {
     std::string id;
     std::string name;
+    std::string group;
     RdpConnectionOptions rdp;
 };
 

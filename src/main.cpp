@@ -29,6 +29,12 @@
 #include <nlohmann/json.hpp>
 #include <openssl/rand.h>
 #include <openssl/evp.h>
+#include <cerrno>
+#include <fcntl.h>
+#include <netdb.h>
+#include <poll.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 namespace {
 
@@ -93,6 +99,23 @@ std::string generate_connection_id() {
     return "connection-" + hex_encode(bytes.data(), bytes.size());
 }
 
+bool test_tcp_connection(const std::string& host, std::uint16_t port) {
+    addrinfo hints{}; hints.ai_socktype = SOCK_STREAM; hints.ai_family = AF_UNSPEC;
+    addrinfo* addresses = nullptr;
+    if (getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &addresses) != 0) return false;
+    bool connected = false;
+    for (auto* address = addresses; address && !connected; address = address->ai_next) {
+        const int socket_fd = socket(address->ai_family, address->ai_socktype, address->ai_protocol);
+        if (socket_fd < 0) continue;
+        const int flags = fcntl(socket_fd, F_GETFL, 0); fcntl(socket_fd, F_SETFL, flags | O_NONBLOCK);
+        const int result = connect(socket_fd, address->ai_addr, address->ai_addrlen);
+        if (result == 0) connected = true;
+        else if (errno == EINPROGRESS) { pollfd descriptor{socket_fd, POLLOUT, 0}; if (poll(&descriptor, 1, 1500) > 0) { int error=0; socklen_t size=sizeof(error); connected=getsockopt(socket_fd,SOL_SOCKET,SO_ERROR,&error,&size)==0&&error==0; } }
+        close(socket_fd);
+    }
+    freeaddrinfo(addresses); return connected;
+}
+
 void save_users(const std::filesystem::path& path, const std::vector<GatewayUser>& users) {
     nlohmann::json data = nlohmann::json::array();
     for (const auto& user : users)
@@ -117,6 +140,7 @@ std::vector<remote_gateway::TargetConfig> load_managed_connections(
     for (const auto& item : data) {
         remote_gateway::TargetConfig target;
         target.id = item.value("id", ""); target.name = item.value("name", "");
+        target.group = item.value("group", "默认分组");
         target.rdp.hostname = item.value("host", "");
         target.rdp.port = static_cast<std::uint16_t>(item.value("port", 3389));
         target.rdp.username = item.value("username", "");
@@ -154,7 +178,7 @@ void save_managed_connections(const std::filesystem::path& path,
             std::filesystem::permissions(secret_path, std::filesystem::perms::owner_read |
                 std::filesystem::perms::owner_write, std::filesystem::perm_options::replace);
         } else std::filesystem::remove(secret_path);
-        data.push_back({{"id", target.id}, {"name", target.name}, {"host", target.rdp.hostname},
+        data.push_back({{"id", target.id}, {"name", target.name}, {"group", target.group}, {"host", target.rdp.hostname},
             {"port", target.rdp.port}, {"username", target.rdp.username},
             {"passwordFile", target.rdp.password.empty() ? "" : secret_path.string()},
             {"width", target.rdp.width}, {"height", target.rdp.height},
@@ -351,6 +375,7 @@ int main() {
                               user_identity, error);
     });
     webrtc.set_input_handler([&sessions](const std::string& peer, const std::string& input) { sessions.input(peer, input); });
+    webrtc.set_bitrate_handler([&sessions](const std::string& peer, std::uint32_t bitrate) { return sessions.set_bitrate(peer, bitrate); });
     webrtc.set_key_frame_handler([&sessions](const std::string& peer) { sessions.request_key_frame(peer); });
     webrtc.set_close_handler([&sessions](const std::string& peer) { sessions.stop(peer); });
     // Keep the unauthenticated liveness endpoint intentionally minimal.
@@ -407,6 +432,16 @@ int main() {
             if (*user_identity != 0) {
                 response.status = 403; response.body = json{{"error", "primary administrator required"}}.dump(); return response;
             }
+            if (request.method == "POST" && request.path == "/api/admin/connections/test") {
+                const auto payload = json::parse(request.body, nullptr, false);
+                const std::string id = payload.is_object() ? payload.value("id", "") : "";
+                const auto target = std::find_if(target_catalog.begin(), target_catalog.end(),
+                    [&](const auto& item) { return item.id == id; });
+                if (target == target_catalog.end()) { response.status=404; response.body=json{{"error","connection not found"}}.dump(); return response; }
+                const bool reachable = test_tcp_connection(target->rdp.hostname, target->rdp.port);
+                response.status = reachable ? 200 : 503;
+                response.body = json{{"reachable",reachable},{"host",target->rdp.hostname},{"port",target->rdp.port}}.dump(); return response;
+            }
             if (request.method == "POST" && request.path == "/api/admin/connections/create") {
                 const auto payload = json::parse(request.body, nullptr, false);
                 std::string id;
@@ -414,6 +449,7 @@ int main() {
                 while (std::any_of(target_catalog.begin(), target_catalog.end(),
                     [&](const auto& target) { return target.id == id; }));
                 const std::string name = payload.is_object() ? payload.value("name", "") : "";
+                const std::string group = payload.is_object() ? payload.value("group", "默认分组") : "默认分组";
                 const std::string host = payload.is_object() ? payload.value("host", "") : "";
                 const std::string username = payload.is_object() ? payload.value("username", "") : "";
                 const std::string password = payload.is_object() ? payload.value("password", "") : "";
@@ -424,7 +460,7 @@ int main() {
                     response.status = 400; response.body = json{{"error", "invalid connection"}}.dump(); return response;
                 }
                 remote_gateway::TargetConfig target;
-                target.id = id; target.name = name; target.rdp.hostname = host;
+                target.id = id; target.name = name; target.group = group; target.rdp.hostname = host;
                 target.rdp.port = static_cast<std::uint16_t>(port);
                 target.rdp.username = username; target.rdp.password = password;
                 target.rdp.width = payload.value("width", 1920U);
@@ -454,6 +490,7 @@ int main() {
                     response.status = 404; response.body = json{{"error", "connection not found"}}.dump(); return response;
                 }
                 const std::string name = payload.value("name", "");
+                const std::string group = payload.value("group", "默认分组");
                 const std::string host = payload.value("host", "");
                 const std::string username = payload.value("username", "");
                 const std::string password = payload.value("password", "");
@@ -464,7 +501,7 @@ int main() {
                     response.status = 400; response.body = json{{"error", "invalid connection"}}.dump(); return response;
                 }
                 auto updated = *managed;
-                updated.name = name; updated.rdp.hostname = host;
+                updated.name = name; updated.group = group; updated.rdp.hostname = host;
                 updated.rdp.port = static_cast<std::uint16_t>(port);
                 updated.rdp.username = username;
                 if (!password.empty()) updated.rdp.password = password;
@@ -854,7 +891,7 @@ int main() {
             json targets_json = json::array();
             for (const auto& target : sessions.target_snapshots()) {
                 targets_json.push_back({
-                    {"id", target.id}, {"name", target.name},
+                    {"id", target.id}, {"name", target.name}, {"group", target.group},
                     {"host", target.host}, {"username", target.username}, {"port", target.port},
                     {"managed", std::any_of(managed_targets.begin(), managed_targets.end(),
                         [&](const auto& item) { return item.id == target.id; })},

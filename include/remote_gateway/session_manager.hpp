@@ -22,6 +22,7 @@ public:
     struct TargetSnapshot {
         std::string id;
         std::string name;
+        std::string group;
         std::string host;
         std::string username;
         std::uint16_t port = 3389;
@@ -55,6 +56,7 @@ public:
                std::string& error);
     void input(const std::string& peer_id, const std::string& data);
     void request_key_frame(const std::string& peer_id);
+    bool set_bitrate(const std::string& peer_id, std::uint32_t bitrate);
     void stop(const std::string& peer_id);
     void stop_all();
     [[nodiscard]] std::size_t session_count() const;

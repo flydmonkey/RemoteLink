@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 struct ISVCEncoder;
@@ -23,6 +24,7 @@ public:
 
     EncodedFrame encode(const Frame& frame);
     void request_key_frame();
+    bool set_bitrate(std::uint32_t bitrate);
 
 private:
     void convert_bgra_to_i420(const Frame& frame);
@@ -33,6 +35,7 @@ private:
     std::uint32_t fps_;
     std::vector<std::uint8_t> i420_;
     std::atomic_bool key_frame_requested_ = false;
+    std::mutex mutex_;
 };
 
 }  // namespace remote_gateway

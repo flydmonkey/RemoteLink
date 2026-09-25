@@ -16,6 +16,7 @@ public:
                     std::uint32_t bitrate);
     void consume(const Frame& frame) override;
     void request_key_frame();
+    bool set_bitrate(std::uint32_t bitrate);
     [[nodiscard]] std::uint64_t encoded_frames() const noexcept;
     [[nodiscard]] std::uint64_t sent_bytes() const noexcept;
 

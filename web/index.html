@@ -221,6 +221,9 @@ const pressedKeys = new Map();
 const pressedButtons = new Set();
 let lastVideoSample = null;
 let lastAudioSample = null;
+let adaptiveBitrate=0,adaptivePackets=null,healthyNetworkSamples=0;
+async function adaptVideoBitrate(){if(!pc||pc.connectionState!=='connected'||ws?.readyState!==WebSocket.OPEN)return;const stats=await pc.getStats();let inbound;stats.forEach(report=>{if(report.type==='inbound-rtp'&&report.kind==='video')inbound=report});if(!inbound)return;const received=Number(inbound.packetsReceived)||0,lost=Number(inbound.packetsLost)||0,total=received+lost;let loss=0;if(adaptivePackets){const deltaTotal=total-adaptivePackets.total,deltaLost=lost-adaptivePackets.lost;if(deltaTotal>0)loss=Math.max(0,deltaLost/deltaTotal)}adaptivePackets={total,lost};let rtt=0;stats.forEach(report=>{if(report.type==='candidate-pair'&&report.state==='succeeded'&&report.currentRoundTripTime)rtt=Math.max(rtt,report.currentRoundTripTime)});if(!adaptiveBitrate)adaptiveBitrate=sessionOptions.bitrate;const maximum=sessionOptions.bitrate;let next=adaptiveBitrate;if(loss>.03||rtt>.3){next=Math.max(500000,Math.floor(adaptiveBitrate*.72/100000)*100000);healthyNetworkSamples=0}else if(loss<.01&&rtt<.18&&++healthyNetworkSamples>=3){next=Math.min(maximum,Math.ceil(adaptiveBitrate*1.15/100000)*100000);healthyNetworkSamples=0}if(next!==adaptiveBitrate){adaptiveBitrate=next;ws.send(JSON.stringify({type:'set-bitrate',bitrate:next}));metrics.textContent=`自动码率 ${(next/1000000).toFixed(1)} Mbps · 丢包 ${(loss*100).toFixed(1)}%`}}
+setInterval(()=>adaptVideoBitrate().catch(()=>{}),5000);
 let textDialogResolve = null;
 let conflictDialogResolve = null;
 function finishTextDialog(value) {

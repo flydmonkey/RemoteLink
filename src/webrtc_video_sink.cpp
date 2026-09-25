@@ -17,6 +17,7 @@ void WebRtcVideoSink::consume(const Frame& frame) {
 }
 
 void WebRtcVideoSink::request_key_frame() { encoder_.request_key_frame(); }
+bool WebRtcVideoSink::set_bitrate(std::uint32_t bitrate) { return encoder_.set_bitrate(bitrate); }
 std::uint64_t WebRtcVideoSink::encoded_frames() const noexcept { return encoded_frames_.load(); }
 std::uint64_t WebRtcVideoSink::sent_bytes() const noexcept { return sent_bytes_.load(); }
 

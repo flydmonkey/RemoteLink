@@ -136,6 +136,9 @@ void WebRtcServer::set_input_handler(InputHandler handler) {
     std::lock_guard lock(mutex_);
     input_handler_ = std::move(handler);
 }
+void WebRtcServer::set_bitrate_handler(BitrateHandler handler) {
+    std::lock_guard lock(mutex_); bitrate_handler_ = std::move(handler);
+}
 
 void WebRtcServer::set_key_frame_handler(PeerHandler handler) {
     std::lock_guard lock(mutex_);
@@ -228,8 +231,16 @@ void WebRtcServer::handle_message(const std::shared_ptr<Peer>& peer,
     if (type == "start") {
         if (peer->started) {
             peer->socket->send(json{{"type", "error"}, {"message", "session already started"}}.dump());
-            return;
-        }
+        return;
+    }
+    if (type == "set-bitrate") {
+        BitrateHandler handler;
+        { std::lock_guard lock(mutex_); handler = bitrate_handler_; }
+        const auto bitrate = payload.value("bitrate", 0U);
+        if (handler && bitrate >= 500'000U && bitrate <= 20'000'000U)
+            handler(peer->id, bitrate);
+        return;
+    }
         const std::string target = payload.value("target", "");
         {
             std::lock_guard lock(mutex_);

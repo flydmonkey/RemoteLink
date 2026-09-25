@@ -31,6 +31,7 @@ std::vector<TargetConfig> load_targets(const std::string& path,
         TargetConfig target;
         target.id = item.value("id", "");
         target.name = item.value("name", "");
+        target.group = item.value("group", "默认分组");
         target.rdp.hostname = item.value("host", "");
         const int port = item.value("port", 3389);
         target.rdp.username = item.value("username", "");

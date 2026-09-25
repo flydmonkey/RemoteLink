@@ -137,6 +137,13 @@ void SessionManager::request_key_frame(const std::string& peer_id) {
     if (auto it = sessions_.find(peer_id); it != sessions_.end()) it->second->sink->request_key_frame();
 }
 
+bool SessionManager::set_bitrate(const std::string& peer_id, std::uint32_t bitrate) {
+    bitrate = std::clamp<std::uint32_t>(bitrate, 500'000, 20'000'000);
+    std::lock_guard lock(mutex_);
+    const auto found = sessions_.find(peer_id);
+    return found != sessions_.end() && found->second->sink->set_bitrate(bitrate);
+}
+
 void SessionManager::stop(const std::string& peer_id) {
     std::unique_ptr<ManagedSession> removed;
     {
@@ -242,6 +249,7 @@ std::vector<SessionManager::TargetSnapshot> SessionManager::target_snapshots() c
         TargetSnapshot snapshot {
             .id = target.id,
             .name = target.name,
+            .group = target.group,
             .host = target.rdp.hostname,
             .username = target.rdp.username,
             .port = target.rdp.port,
