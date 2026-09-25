@@ -289,6 +289,10 @@
         <button id="add" class="primary">添加连接</button>
       </div>
       <div id="list" class="list"></div>
+      <h3>活动会话</h3>
+      <div id="active" class="list"></div>
+      <h3>连接历史</h3>
+      <div id="history" class="list"></div>
       <div class="dialog-actions">
         <button id="manager-close" class="secondary">关闭</button>
       </div>
@@ -325,6 +329,7 @@
         <div id="editor-notice" class="notice"></div>
         <div class="dialog-actions">
           <button id="cancel" type="button" class="secondary">取消</button
+          ><button id="test" type="button" class="secondary">测试连接</button
           ><button class="primary">保存</button>
         </div>
       </form>
@@ -364,6 +369,8 @@
         if (target.options.length > 1) target.selectedIndex = 1;
         if (me.admin) {
           connections = (await api("/api/admin/ssh")).connections || [];
+          const activity = await api("/api/admin/ssh/activity");
+          renderActivity(activity);
           renderList();
         }
       }
@@ -378,7 +385,7 @@
           main.className = "row-main";
           main.innerHTML = '<strong></strong><div class="muted"></div>';
           main.children[0].textContent = item.name;
-          main.children[1].textContent = `${item.username}@${item.host}:${item.port} · ${item.authType === "key" ? "私钥" : "密码"}`;
+          main.children[1].textContent = `${item.username}@${item.host}:${item.port} · ${item.authType === "key" ? "私钥" : "密码"}${item.hostKeySha256 ? " · 指纹已信任" : ""}`;
           actions.className = "row-actions";
           actions.append(
             button("编辑", () => openEditor(item)),
@@ -389,6 +396,42 @@
         }
         if (!connections.length)
           list.innerHTML = '<div class="muted">尚无 SSH 连接。</div>';
+      }
+      function renderActivity(data) {
+        for (const [key, items] of [
+          ["active", data.active || []],
+          ["history", data.history || []],
+        ]) {
+          const root = document.querySelector(`#${key}`);
+          root.replaceChildren();
+          for (const item of items) {
+            const row = document.createElement("div");
+            row.className = "row";
+            const main = document.createElement("div");
+            main.className = "row-main";
+            main.innerHTML = '<strong></strong><div class="muted"></div>';
+            main.children[0].textContent = item.targetName;
+            main.children[1].textContent = `${item.username || "用户"} · ${new Date(item.startedAt * 1000).toLocaleString()}`;
+            row.append(main);
+            if (key === "active")
+              row.append(
+                button(
+                  "断开",
+                  async () => {
+                    await api("/api/admin/ssh/disconnect", {
+                      method: "POST",
+                      body: JSON.stringify({ id: item.id }),
+                    });
+                    await refresh();
+                  },
+                  "danger",
+                ),
+              );
+            root.append(row);
+          }
+          if (!items.length)
+            root.innerHTML = '<div class="muted">暂无记录。</div>';
+        }
       }
       function button(text, handler, style = "secondary") {
         const value = document.createElement("button");
@@ -449,15 +492,8 @@
       document.querySelector("#add").onclick = () => openEditor();
       document.querySelector("#cancel").onclick = () => editor.close();
       document.querySelector("#auth").onchange = toggleAuth;
-      document.querySelector("#account").onclick = () => {
-        if (confirm("退出登录？")) {
-          sessionStorage.clear();
-          location.href = "/";
-        }
-      };
-      document.querySelector("#form").onsubmit = async (event) => {
-        event.preventDefault();
-        const payload = {
+      function formPayload() {
+        return {
           id: editing?.id,
           name: document.querySelector("#name").value.trim(),
           host: document.querySelector("#host").value.trim(),
@@ -468,6 +504,31 @@
           privateKey: document.querySelector("#private-key").value,
           passphrase: document.querySelector("#passphrase").value,
         };
+      }
+      document.querySelector("#test").onclick = async () => {
+        const output = document.querySelector("#editor-notice");
+        try {
+          output.textContent = "正在验证连接和身份…";
+          const result = await api("/api/admin/ssh/test", {
+            method: "POST",
+            body: JSON.stringify(formPayload()),
+          });
+          output.textContent = result.authenticated
+            ? `连接成功 · ${result.hostKeySha256}`
+            : result.error || "连接失败";
+        } catch (error) {
+          output.textContent = error.message;
+        }
+      };
+      document.querySelector("#account").onclick = () => {
+        if (confirm("退出登录？")) {
+          sessionStorage.clear();
+          location.href = "/";
+        }
+      };
+      document.querySelector("#form").onsubmit = async (event) => {
+        event.preventDefault();
+        const payload = formPayload();
         try {
           await api("/api/admin/ssh/save", {
             method: "POST",

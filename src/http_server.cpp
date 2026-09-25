@@ -79,6 +79,11 @@ void HttpServer::set_ssh_session_observer(
     if (thread_.joinable()) throw std::logic_error("SSH observer must be set before HTTP server starts");
     ssh_session_observer_ = std::move(observer);
 }
+void HttpServer::set_ssh_control_handler(
+    std::function<void(const VncDestination&, const std::string&)> handler) {
+    if (thread_.joinable()) throw std::logic_error("SSH control handler must be set before HTTP server starts");
+    ssh_control_handler_ = std::move(handler);
+}
 
 namespace {
 std::string status_text(int status) {
@@ -200,13 +205,14 @@ bool write_websocket_frame(int client, SSL* tls, std::uint8_t opcode,
            write_client(client, tls, data, size);
 }
 
-bool relay_websocket_message_to_tcp(int client, SSL* tls, int backend) {
+bool relay_websocket_message_to_tcp(int client, SSL* tls, int backend,
+    const std::function<void(const std::string&)>& control = {}) {
     std::array<unsigned char, 2> header {};
     if (!read_client_exact(client, tls, reinterpret_cast<char*>(header.data()), header.size()))
         return false;
     const bool final = (header[0] & 0x80U) != 0;
     const auto opcode = static_cast<std::uint8_t>(header[0] & 0x0fU);
-    if (!final || (opcode != 0x2 && opcode != 0x8 && opcode != 0x9)) return false;
+    if (!final || (opcode != 0x1 && opcode != 0x2 && opcode != 0x8 && opcode != 0x9)) return false;
     if ((header[1] & 0x80U) == 0) return false;
     std::uint64_t length = header[1] & 0x7fU;
     if (length == 126) {
@@ -228,12 +234,14 @@ bool relay_websocket_message_to_tcp(int client, SSL* tls, int backend) {
         payload[index] ^= static_cast<char>(mask[index % mask.size()]);
     if (opcode == 0x8) return false;
     if (opcode == 0x9) return write_websocket_frame(client, tls, 0xA, payload.data(), payload.size());
+    if (opcode == 0x1) { if (control) control(std::string(payload.begin(), payload.end())); return true; }
     return write_socket(backend, payload.data(), payload.size());
 }
 
 void proxy_terminal_websocket(int client, SSL* tls, const std::string& request,
                          const VncDestination& destination,
-                         const std::function<void(const VncDestination&, bool)>& observer) {
+                         const std::function<void(const VncDestination&, bool)>& observer,
+                         const std::function<void(const VncDestination&, const std::string&)>& control = {}) {
     const auto key = header_value(request, "sec-websocket-key");
     const int backend = key.empty() ? -1 : connect_tcp(destination.hostname, destination.port);
     if (backend < 0) {
@@ -254,7 +262,8 @@ void proxy_terminal_websocket(int client, SSL* tls, const std::string& request,
                 if (ready <= 0 || descriptors[0].revents & (POLLERR | POLLHUP | POLLNVAL) ||
                     descriptors[1].revents & (POLLERR | POLLHUP | POLLNVAL)) break;
                 if (descriptors[0].revents & POLLIN &&
-                    !relay_websocket_message_to_tcp(client, tls, backend)) break;
+                    !relay_websocket_message_to_tcp(client, tls, backend,
+                        [&](const std::string& message) { if (control) control(destination, message); })) break;
                 if (descriptors[1].revents & POLLIN) {
                     const auto received = ::recv(backend, buffer.data(), buffer.size(), 0);
                     if (received <= 0 || !write_websocket_frame(client, tls, 0x2,
@@ -503,7 +512,7 @@ void HttpServer::run() {
                 continue;
             }
             std::thread(proxy_terminal_websocket, client, tls, std::move(raw_request),
-                        std::move(*destination), vnc_session_observer_).detach();
+                        std::move(*destination), vnc_session_observer_, nullptr).detach();
             continue;
         }
         const std::string ssh_prefix = "/ssh/ws?ticket=";
@@ -522,7 +531,7 @@ void HttpServer::run() {
                 continue;
             }
             std::thread(proxy_terminal_websocket, client, tls, std::move(raw_request),
-                        std::move(*destination), ssh_session_observer_).detach();
+                        std::move(*destination), ssh_session_observer_, ssh_control_handler_).detach();
             continue;
         }
         const bool root_request = parsed.method == "GET" &&

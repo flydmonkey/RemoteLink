@@ -206,6 +206,9 @@ test("SSH page exposes password and key connection management", async ({
   await page.route("**/api/admin/ssh", (route) =>
     route.fulfill({ json: { connections: [] } }),
   );
+  await page.route("**/api/admin/ssh/activity", (route) =>
+    route.fulfill({ json: { active: [], history: [] } }),
+  );
   await page.goto("/ssh.html");
   await expect(page.locator('.nav a[aria-current="page"]')).toHaveText("SSH");
   await expect(page.getByRole("heading", { name: "SSH 连接" })).toBeVisible();

@@ -74,6 +74,7 @@ struct SshConnection {
     std::string password;
     std::string private_key;
     std::string passphrase;
+    std::string host_key_sha256;
 };
 
 struct VncActivity {
@@ -341,6 +342,7 @@ std::vector<SshConnection> load_ssh_connections(const std::filesystem::path& pat
         SshConnection connection{item.value("id", ""), item.value("name", ""),
             item.value("host", ""), static_cast<std::uint16_t>(item.value("port", 22)),
             item.value("username", "")};
+        connection.host_key_sha256 = item.value("hostKeySha256", "");
         const auto credential_file = item.value("credentialFile", "");
         if (!credential_file.empty()) {
             std::ifstream secret(credential_file);
@@ -375,6 +377,7 @@ void save_ssh_connections(const std::filesystem::path& path,
             std::filesystem::perms::owner_write, std::filesystem::perm_options::replace);
         data.push_back({{"id",connection.id},{"name",connection.name},{"host",connection.hostname},
             {"port",connection.port},{"username",connection.username},
+            {"hostKeySha256",connection.host_key_sha256},
             {"credentialFile",secret_path.string()}});
     }
     const auto temporary = path.string() + ".tmp";
@@ -533,6 +536,13 @@ int main() {
     remote_gateway::VncTicketStore ssh_tickets;
     std::mutex ssh_bridges_mutex;
     std::unordered_map<std::string, SshBridgeLease> ssh_bridges;
+    const auto ssh_activity_path=state_root/"ssh-activity.json";
+    std::mutex ssh_activity_mutex;
+    auto ssh_activity=load_vnc_activity(ssh_activity_path);
+    const auto ssh_startup_time=std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    for(auto& item:ssh_activity)if(item.active){item.active=false;item.ended_at=ssh_startup_time;}
+    if(!ssh_activity.empty())save_vnc_activity(ssh_activity_path,ssh_activity);
     remote_gateway::VncTicketStore vnc_tickets;
     std::mutex vnc_bridges_mutex;
     std::unordered_map<std::string, VncBridgeLease> vnc_bridges;
@@ -625,13 +635,28 @@ int main() {
     http.set_ssh_ticket_handler([&ssh_tickets](const std::string& ticket) {
         return ssh_tickets.consume(ticket);
     });
-    http.set_ssh_session_observer([&ssh_bridges, &ssh_bridges_mutex](
+    http.set_ssh_session_observer([&ssh_bridges, &ssh_bridges_mutex,
+                                   &ssh_activity,&ssh_activity_mutex,&ssh_activity_path](
         const remote_gateway::VncDestination& destination, bool connected) {
+        const auto now=std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        {std::lock_guard activity_lock(ssh_activity_mutex);
+         const auto entry=std::find_if(ssh_activity.begin(),ssh_activity.end(),[&](const auto& item){return item.id==destination.session_id;});
+         if(connected&&entry==ssh_activity.end()){ssh_activity.push_back({destination.session_id,destination.target_id,destination.target_name,destination.username,now,0,true});if(ssh_activity.size()>200)ssh_activity.erase(ssh_activity.begin());}
+         else if(!connected&&entry!=ssh_activity.end()){entry->active=false;entry->ended_at=now;}
+         try{save_vnc_activity(ssh_activity_path,ssh_activity);}catch(const std::exception& error){std::cerr<<"cannot persist SSH activity: "<<error.what()<<'\n';}}
+        {std::lock_guard lock(ssh_bridges_mutex);const auto found=ssh_bridges.find(destination.session_id);
+         if(connected&&found!=ssh_bridges.end())found->second.expires_at=std::chrono::steady_clock::time_point::max();
+         if(!connected)ssh_bridges.erase(destination.session_id);}
+    });
+    http.set_ssh_control_handler([&ssh_bridges, &ssh_bridges_mutex](
+        const remote_gateway::VncDestination& destination, const std::string& message) {
+        const auto payload=nlohmann::json::parse(message,nullptr,false);
+        if(!payload.is_object()||payload.value("type","")!="resize") return;
         std::lock_guard lock(ssh_bridges_mutex);
         const auto found=ssh_bridges.find(destination.session_id);
-        if(connected && found!=ssh_bridges.end())
-            found->second.expires_at=std::chrono::steady_clock::time_point::max();
-        if(!connected) ssh_bridges.erase(destination.session_id);
+        if(found!=ssh_bridges.end()) found->second.bridge->resize(
+            payload.value("columns",0U),payload.value("rows",0U));
     });
     http.set_vnc_session_observer([&vnc_activity, &vnc_activity_mutex, &vnc_activity_path,
                                    &vnc_bridges, &vnc_bridges_mutex](
@@ -675,7 +700,7 @@ int main() {
                           &vnc_activity, &vnc_activity_mutex,
                           &ssh_connections, &ssh_connections_mutex, &ssh_connections_path,
                           &ssh_connection_secrets_path, &ssh_tickets, &ssh_bridges,
-                          &ssh_bridges_mutex,
+                          &ssh_bridges_mutex, &ssh_activity, &ssh_activity_mutex,
                           &allowed_hosts, tls_enabled](
                              const remote_gateway::HttpRequest& request) {
         using json = nlohmann::json;
@@ -741,8 +766,13 @@ int main() {
             std::string error;
             auto bridge=remote_gateway::SshBridge::create({.hostname=connection->hostname,
                 .port=connection->port,.username=connection->username,.password=connection->password,
-                .private_key=connection->private_key,.passphrase=connection->passphrase},error);
+                .private_key=connection->private_key,.passphrase=connection->passphrase,
+                .host_key_sha256=connection->host_key_sha256},error);
             if(!bridge){response.status=502;response.body=json{{"error",error}}.dump();return response;}
+            if(connection->host_key_sha256.empty()){
+                connection->host_key_sha256=bridge->host_key_sha256();
+                save_ssh_connections(ssh_connections_path,ssh_connection_secrets_path,ssh_connections);
+            }
             const auto ticket=ssh_tickets.issue({.target_id=connection->id,.target_name=connection->name,
                 .username=gateway_username,.hostname="127.0.0.1",.port=bridge->port()});
             {std::lock_guard bridge_lock(ssh_bridges_mutex);ssh_bridges.emplace(ticket,SshBridgeLease{
@@ -811,11 +841,37 @@ int main() {
                 for(const auto& item:ssh_connections) connections.push_back({{"id",item.id},{"name",item.name},
                     {"host",item.hostname},{"port",item.port},{"username",item.username},
                     {"authType",item.private_key.empty()?"password":"key"},{"hasPassword",!item.password.empty()},
-                    {"hasPrivateKey",!item.private_key.empty()}});
+                    {"hasPrivateKey",!item.private_key.empty()},{"hostKeySha256",item.host_key_sha256}});
                 response.body=json{{"connections",std::move(connections)}}.dump();return response;
+            }
+            if(request.method=="GET"&&request.path=="/api/admin/ssh/activity"){
+                json active=json::array(),history=json::array();std::lock_guard lock(ssh_activity_mutex);
+                for(auto item=ssh_activity.rbegin();item!=ssh_activity.rend();++item){json entry={{"id",item->id},{"targetId",item->target_id},{"targetName",item->target_name},{"username",item->username},{"startedAt",item->started_at},{"endedAt",item->ended_at}};(item->active?active:history).push_back(std::move(entry));}
+                response.body=json{{"active",std::move(active)},{"history",std::move(history)}}.dump();return response;
             }
             const auto payload=json::parse(request.body,nullptr,false);
             if(!payload.is_object()){response.status=400;response.body=json{{"error","invalid payload"}}.dump();return response;}
+            if(request.method=="POST"&&request.path=="/api/admin/ssh/test"){
+                SshConnection candidate{payload.value("id",""),"",payload.value("host",""),
+                    static_cast<std::uint16_t>(payload.value("port",22)),payload.value("username",""),
+                    payload.value("password",""),payload.value("privateKey",""),payload.value("passphrase","")};
+                {std::lock_guard lock(ssh_connections_mutex);
+                 const auto found=std::find_if(ssh_connections.begin(),ssh_connections.end(),
+                    [&](const auto& item){return item.id==candidate.id;});
+                 if(found!=ssh_connections.end()){
+                    if(candidate.password.empty())candidate.password=found->password;
+                    if(candidate.private_key.empty())candidate.private_key=found->private_key;
+                    if(candidate.passphrase.empty())candidate.passphrase=found->passphrase;
+                    candidate.host_key_sha256=found->host_key_sha256;
+                 }}
+                if(candidate.hostname.empty()||candidate.username.empty()||candidate.port==0){response.status=400;response.body=json{{"error","SSH 连接配置无效"}}.dump();return response;}
+                std::string error;auto bridge=remote_gateway::SshBridge::create({.hostname=candidate.hostname,
+                    .port=candidate.port,.username=candidate.username,.password=candidate.password,
+                    .private_key=candidate.private_key,.passphrase=candidate.passphrase,
+                    .host_key_sha256=candidate.host_key_sha256},error);
+                response.body=bridge?json{{"reachable",true},{"authenticated",true},{"hostKeySha256",bridge->host_key_sha256()}}.dump():
+                    json{{"reachable",false},{"authenticated",false},{"error",error}}.dump();return response;
+            }
             if(request.method=="POST"&&request.path=="/api/admin/ssh/save"){
                 auto id=payload.value("id","");const auto supplied_id=id;
                 if(id.empty()) id="ssh-"+generate_connection_id();
@@ -838,6 +894,7 @@ int main() {
                     if(auth_type=="key"&&updated.private_key.empty()) updated.private_key=found->private_key;
                     if(auth_type=="key"&&updated.passphrase.empty()) updated.passphrase=found->passphrase;
                     if(auth_type=="password"){updated.private_key.clear();updated.passphrase.clear();}else updated.password.clear();
+                    if(found->hostname==updated.hostname&&found->port==updated.port) updated.host_key_sha256=found->host_key_sha256;
                     *found=std::move(updated);
                 }else{
                     if((auth_type=="password"&&updated.password.empty())||(auth_type=="key"&&updated.private_key.empty())){
@@ -856,6 +913,10 @@ int main() {
                 std::filesystem::remove(ssh_connection_secrets_path/(id+".json"));
                 {std::lock_guard users_lock(users_mutex);for(auto& user:users)std::erase(user.allowed_targets,id);save_users(users_path,users);}
                 response.body=json{{"deleted",true}}.dump();return response;
+            }
+            if(request.method=="POST"&&request.path=="/api/admin/ssh/disconnect"){
+                const auto id=payload.value("id","");std::lock_guard lock(ssh_bridges_mutex);
+                const auto removed=ssh_bridges.erase(id);response.body=json{{"disconnected",removed!=0}}.dump();return response;
             }
             response.status=405;response.body=json{{"error","method not allowed"}}.dump();return response;
         }

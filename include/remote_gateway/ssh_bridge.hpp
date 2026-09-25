@@ -13,6 +13,7 @@ struct SshBridgeOptions {
     std::string password;
     std::string private_key;
     std::string passphrase;
+    std::string host_key_sha256;
 };
 
 class SshBridge {
@@ -22,6 +23,8 @@ public:
     SshBridge(const SshBridge&) = delete;
     SshBridge& operator=(const SshBridge&) = delete;
     [[nodiscard]] std::uint16_t port() const;
+    [[nodiscard]] std::string host_key_sha256() const;
+    bool resize(std::uint32_t columns, std::uint32_t rows);
     void stop();
 
 private:

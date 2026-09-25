@@ -12,6 +12,8 @@
 #include <cerrno>
 #include <cstring>
 #include <mutex>
+#include <iomanip>
+#include <sstream>
 #include <thread>
 
 namespace remote_gateway {
@@ -45,6 +47,8 @@ struct SshBridge::Impl {
     LIBSSH2_SESSION* session = nullptr;
     LIBSSH2_CHANNEL* channel = nullptr;
     std::uint16_t listen_port = 0;
+    std::string host_key_sha256;
+    std::mutex channel_mutex;
     std::atomic_bool stopping = false;
     std::atomic_bool cleaned = false;
     std::jthread worker;
@@ -66,6 +70,7 @@ struct SshBridge::Impl {
                 if (count <= 0) break;
                 std::size_t offset = 0;
                 while (offset < static_cast<std::size_t>(count) && !stopping) {
+                    std::lock_guard channel_lock(channel_mutex);
                     const auto sent = libssh2_channel_write(channel, buffer.data() + offset,
                         static_cast<std::size_t>(count) - offset);
                     if (sent > 0) offset += static_cast<std::size_t>(sent);
@@ -74,6 +79,7 @@ struct SshBridge::Impl {
                 }
             }
             while (!stopping) {
+                std::lock_guard channel_lock(channel_mutex);
                 const auto count = libssh2_channel_read(channel, buffer.data(), buffer.size());
                 if (count > 0) {
                     std::size_t offset = 0;
@@ -117,6 +123,16 @@ std::shared_ptr<SshBridge> SshBridge::create(SshBridgeOptions options, std::stri
         error = impl->session ? session_error(impl->session, "SSH 握手失败") : "无法创建 SSH 会话";
         return {};
     }
+    const auto* fingerprint = reinterpret_cast<const unsigned char*>(
+        libssh2_hostkey_hash(impl->session, LIBSSH2_HOSTKEY_HASH_SHA256));
+    if (!fingerprint) { error = "无法读取 SSH 主机指纹"; return {}; }
+    std::ostringstream fingerprint_stream;
+    fingerprint_stream << "SHA256:" << std::hex << std::setfill('0');
+    for (int index = 0; index < 32; ++index) fingerprint_stream << std::setw(2) << static_cast<int>(fingerprint[index]);
+    impl->host_key_sha256 = fingerprint_stream.str();
+    if (!options.host_key_sha256.empty() && options.host_key_sha256 != impl->host_key_sha256) {
+        error = "SSH 主机指纹已变更，已拒绝连接"; return {};
+    }
     int authenticated = -1;
     if (!options.private_key.empty()) {
         authenticated = libssh2_userauth_publickey_frommemory(impl->session,
@@ -146,6 +162,13 @@ std::shared_ptr<SshBridge> SshBridge::create(SshBridgeOptions options, std::stri
 }
 
 std::uint16_t SshBridge::port() const { return impl_->listen_port; }
+std::string SshBridge::host_key_sha256() const { return impl_->host_key_sha256; }
+bool SshBridge::resize(std::uint32_t columns, std::uint32_t rows) {
+    if (!impl_ || !impl_->channel || columns < 1 || rows < 1 || columns > 1000 || rows > 1000) return false;
+    std::lock_guard lock(impl_->channel_mutex);
+    return libssh2_channel_request_pty_size(impl_->channel, static_cast<int>(columns),
+        static_cast<int>(rows)) == 0;
+}
 void SshBridge::stop() { if (impl_) impl_->shutdown(); }
 
 }  // namespace remote_gateway

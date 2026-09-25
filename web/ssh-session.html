@@ -55,6 +55,8 @@
   <body>
     <header class="bar">
       <strong id="title">SSH 控制台</strong><span id="status">正在连接…</span
+      ><button id="copy">复制</button><button id="paste">粘贴</button
+      ><button id="fullscreen">全屏</button
       ><button id="disconnect">断开连接</button>
     </header>
     <div id="terminal"></div>
@@ -81,6 +83,18 @@
       });
       terminal.open(terminalElement);
       const append = (text) => terminal.write(text);
+      function resizeTerminal() {
+        const columns = Math.max(
+          20,
+          Math.floor(terminalElement.clientWidth / 8.45),
+        );
+        const rows = Math.max(5, Math.floor(terminalElement.clientHeight / 20));
+        terminal.resize(columns, rows);
+        if (socket?.readyState === WebSocket.OPEN)
+          socket.send(JSON.stringify({ type: "resize", columns, rows }));
+      }
+      window.addEventListener("resize", resizeTerminal);
+      resizeTerminal();
       if (!saved?.websocketUrl) {
         status.textContent = "会话已失效";
         append("请返回 SSH 页面重新连接。\n");
@@ -92,6 +106,7 @@
         socket.binaryType = "arraybuffer";
         socket.onopen = () => {
           status.textContent = "已连接";
+          resizeTerminal();
           terminal.focus();
         };
         socket.onmessage = (event) =>
@@ -110,6 +125,24 @@
         if (socket?.readyState === WebSocket.OPEN)
           socket.send(new TextEncoder().encode(value));
       });
+      document.querySelector("#copy").onclick = async () => {
+        const value = terminal.getSelection();
+        if (value) await navigator.clipboard.writeText(value);
+      };
+      document.querySelector("#paste").onclick = async () => {
+        try {
+          const value = await navigator.clipboard.readText();
+          if (value && socket?.readyState === WebSocket.OPEN)
+            socket.send(new TextEncoder().encode(value));
+        } catch {
+          status.textContent = "浏览器未授予剪贴板权限";
+        }
+      };
+      document.querySelector("#fullscreen").onclick = async () => {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await document.documentElement.requestFullscreen();
+        resizeTerminal();
+      };
       document.querySelector("#disconnect").onclick = () => {
         if (socket) socket.close();
         location.href = "/ssh";
