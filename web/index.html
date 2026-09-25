@@ -120,6 +120,19 @@
 <script>
 const status = document.querySelector('#status');
 document.querySelector('.brand h1').textContent='RemoteLink';document.querySelector('.app-icon').textContent='RL';document.querySelector('#login-form strong').textContent='登录 RemoteLink';
+const operationKeys=['正在连接…','远程会话工具栏','粘贴文本','进入全屏','全屏','状态信息','静音','静音 · 滚轮调节音量','文件管理','下载打印文件','打开远程安全界面','远程 Ctrl+Alt+Delete','注销并返回连接页面','注销','收起工具栏','收起','连接状态','视频','网络','声音','网关','正在连接 Windows…','Windows 已连接','Windows 连接失败，正在重试…','会话已停止','连接中断，正在重新连接…','请选择远程主机','正在认证…','信令连接失败','信令断开，正在恢复…','取消静音','展开工具栏','展开','退出全屏','正在连接 {name}…'];
+const operationValues={
+  en:['Connecting…','Remote session toolbar','Paste text','Enter fullscreen','Fullscreen','Statistics','Mute','Mute · scroll to adjust volume','Files','Download print file','Open remote security screen','Remote Ctrl+Alt+Delete','Sign out and return to connections','Sign out','Collapse toolbar','Collapse','Connection status','Video','Network','Audio','Gateway','Connecting to Windows…','Windows connected','Windows connection failed, retrying…','Session stopped','Connection interrupted, reconnecting…','Select a remote host','Authenticating…','Signaling connection failed','Signaling disconnected, recovering…','Unmute','Expand toolbar','Expand','Exit fullscreen','Connecting to {name}…'],
+  'zh-TW':['正在連線…','遠端工作階段工具列','貼上文字','進入全螢幕','全螢幕','狀態資訊','靜音','靜音 · 滾輪調整音量','檔案管理','下載列印檔案','開啟遠端安全畫面','遠端 Ctrl+Alt+Delete','登出並返回連線頁面','登出','收合工具列','收合','連線狀態','視訊','網路','聲音','閘道','正在連線 Windows…','Windows 已連線','Windows 連線失敗，正在重試…','工作階段已停止','連線中斷，正在重新連線…','請選擇遠端主機','正在驗證…','信令連線失敗','信令中斷，正在恢復…','取消靜音','展開工具列','展開','退出全螢幕','正在連線 {name}…'],
+  ja:['接続中…','リモートセッションツールバー','テキストを貼り付け','全画面表示','全画面','接続情報','ミュート','ミュート · ホイールで音量調整','ファイル管理','印刷ファイルをダウンロード','リモートセキュリティ画面を開く','リモート Ctrl+Alt+Delete','ログアウトして接続画面に戻る','ログアウト','ツールバーを折りたたむ','折りたたむ','接続状態','映像','ネットワーク','音声','ゲートウェイ','Windows に接続中…','Windows に接続しました','Windows 接続に失敗、再試行中…','セッションが停止しました','接続が中断されました。再接続中…','リモートホストを選択','認証中…','シグナリング接続に失敗','シグナリング切断、復旧中…','ミュート解除','ツールバーを展開','展開','全画面を終了','{name} に接続中…'],
+  ko:['연결 중…','원격 세션 도구 모음','텍스트 붙여넣기','전체 화면 시작','전체 화면','상태 정보','음소거','음소거 · 휠로 볼륨 조절','파일 관리','인쇄 파일 다운로드','원격 보안 화면 열기','원격 Ctrl+Alt+Delete','로그아웃하고 연결 화면으로 돌아가기','로그아웃','도구 모음 접기','접기','연결 상태','비디오','네트워크','오디오','게이트웨이','Windows에 연결 중…','Windows 연결됨','Windows 연결 실패, 다시 시도 중…','세션이 중지됨','연결이 끊어져 다시 연결 중…','원격 호스트 선택','인증 중…','시그널링 연결 실패','시그널링 연결 끊김, 복구 중…','음소거 해제','도구 모음 펼치기','펼치기','전체 화면 종료','{name}에 연결 중…']};
+const operationDictionary=Object.fromEntries(operationKeys.map((key,index)=>[key,operationValues[window.RemoteLinkI18n.language]?.[index]||key]));
+const operationExtraKeys=['解码帧率','接收码率','网络往返','分辨率','编解码器','已解码帧','浏览器丢帧','接收包','丢包','抖动','传输协议','音频轨道','播放状态','服务','打印机','捕获帧','编码帧','管线丢帧','累计发送','打印任务','全部删除','删除所选','上级','新建文件夹','上传文件'];
+const operationExtraValues={en:['Decoded FPS','Bitrate','Round trip','Resolution','Codec','Decoded frames','Browser drops','Packets received','Packets lost','Jitter','Transport','Audio track','Playback','Service','Printer','Captured frames','Encoded frames','Pipeline drops','Total sent','Print jobs','Delete all','Delete selected','Up','New folder','Upload file'],'zh-TW':['解碼幀率','接收位元率','網路往返','解析度','編解碼器','已解碼幀','瀏覽器丟幀','接收封包','遺失封包','抖動','傳輸協定','音訊軌道','播放狀態','服務','印表機','擷取幀','編碼幀','管線丟幀','累計傳送','列印工作','全部刪除','刪除所選','上一層','新增資料夾','上傳檔案'],ja:['デコード FPS','受信ビットレート','往復時間','解像度','コーデック','デコード済みフレーム','ブラウザードロップ','受信パケット','パケット損失','ジッター','転送プロトコル','音声トラック','再生状態','サービス','プリンター','キャプチャフレーム','エンコード済みフレーム','パイプラインドロップ','累計送信','印刷ジョブ','すべて削除','選択項目を削除','上へ','新しいフォルダー','ファイルをアップロード'],ko:['디코딩 FPS','수신 비트레이트','왕복 시간','해상도','코덱','디코딩된 프레임','브라우저 드롭','수신 패킷','손실 패킷','지터','전송 프로토콜','오디오 트랙','재생 상태','서비스','프린터','캡처 프레임','인코딩된 프레임','파이프라인 드롭','누적 전송','인쇄 작업','모두 삭제','선택 항목 삭제','상위','새 폴더','파일 업로드']};
+Object.assign(operationDictionary,Object.fromEntries(operationExtraKeys.map((key,index)=>[key,operationExtraValues[window.RemoteLinkI18n.language]?.[index]||key])));
+const opT=value=>operationDictionary[value]||value;
+function translateOperation(root=document){const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);for(const node of nodes){if(node.parentElement?.closest('script,style'))continue;const raw=node.nodeValue,trimmed=raw.trim();if(operationDictionary[trimmed])node.nodeValue=raw.replace(trimmed,operationDictionary[trimmed])}for(const element of root.querySelectorAll?.('[title],[aria-label]')||[])for(const attribute of ['title','aria-label']){const value=element.getAttribute(attribute);if(operationDictionary[value])element.setAttribute(attribute,operationDictionary[value])}}
+translateOperation();new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1||node.nodeType===3)translateOperation(node.nodeType===1?node:node.parentElement)}).observe(document.body,{childList:true,subtree:true});
 const video = document.querySelector('#desktop');
 const sessionLoading = document.querySelector('#session-loading');
 const sessionLoadingText = document.querySelector('#session-loading-text');
@@ -379,7 +392,7 @@ function createPeerConnection() {
   pc.onconnectionstatechange = () => {
     status.textContent = pc.connectionState === 'connected' && rdpState
       ? `远程会话：${rdpState}` : `WebRTC: ${pc.connectionState}`;
-    if (pc.connectionState === 'failed')setSessionLoading('连接中断，正在重新连接…');
+    if (pc.connectionState === 'failed')setSessionLoading(opT('连接中断，正在重新连接…'));
     if (pc.connectionState === 'failed' && ws?.readyState < WebSocket.CLOSING) ws.close();
   };
   pc.onicecandidate = event => {
@@ -418,7 +431,7 @@ function startTarget(target) {
   const width = sessionOptions.width || target.width || 1920;
   const height = sessionOptions.height || target.height || 1080;
   selectedTarget = target.id;
-  rdpState = '正在连接 Windows…';
+  rdpState = opT('正在连接 Windows…');
   chooser.hidden = true;
   video.hidden = false;
   remoteToolbar.hidden = false;
@@ -431,8 +444,8 @@ function startTarget(target) {
   pasteText.disabled = true;
   video.style.aspectRatio = `${width} / ${height}`;
   streamInfo.textContent = `远程桌面：H.264 / WebRTC / ${width}×${height} / 30 FPS。点击画面后可使用键盘、鼠标和滚轮。`;
-  status.textContent = `正在连接 ${target.name}…`;
-  setSessionLoading(`正在连接 ${target.name}…`);
+  const connectingText=opT('正在连接 {name}…').replace('{name}',target.name);status.textContent=connectingText;
+  setSessionLoading(connectingText);
   createPeerConnection();
   ws.send(JSON.stringify({
     type: 'start', target: target.id || '', host: target.host || selectedHost,
@@ -458,7 +471,7 @@ socket.onmessage = async event => {
   const message = JSON.parse(event.data);
   if (message.type === 'authenticated') {
     if (login.open) login.close();
-    status.textContent = '请选择远程主机';
+    status.textContent = opT('请选择远程主机');
     const targets = message.targets || [];
     window.remoteGatewayTargets = targets;
     const remembered = targets.find(target => target.id === selectedTarget) ||
@@ -482,8 +495,8 @@ socket.onmessage = async event => {
   }
   if (message.type === 'session-status') {
     const labels = {
-      connecting: '正在连接 Windows…', connected: 'Windows 已连接',
-      retrying: 'Windows 连接失败，正在重试…', stopped: '会话已停止'
+      connecting: opT('正在连接 Windows…'), connected: opT('Windows 已连接'),
+      retrying: opT('Windows 连接失败，正在重试…'), stopped: opT('会话已停止')
     };
     rdpState = labels[message.state] || message.state;
     status.textContent = `远程会话：${rdpState}`;
@@ -529,11 +542,11 @@ socket.onmessage = async event => {
     await pc.addIceCandidate({ candidate: message.candidate, sdpMid: message.mid });
   }
 };
-socket.onerror = () => status.textContent = '信令连接失败';
+socket.onerror = () => status.textContent = opT('信令连接失败');
 socket.onclose = () => {
   if (ws !== socket) return;
   if (accessToken) {
-    status.textContent = '信令断开，正在恢复…';
+    status.textContent = opT('信令断开，正在恢复…');
     reconnectTimer = setTimeout(connectSignaling, 1000);
   }
 };
@@ -547,7 +560,7 @@ loginForm.addEventListener('submit', async event => {
   accessToken=(await response.json()).token;
   sessionStorage.setItem('remote-gateway-access-token', accessToken);
   loginPassword.value='';
-  status.textContent = '正在认证…';
+  status.textContent = opT('正在认证…');
   if (ws && ws.readyState < WebSocket.CLOSING) {
     ws.onclose = null;
     ws.close();
@@ -587,7 +600,7 @@ if ((pendingSession?.target || pendingSession?.host) && pendingSession?.accessTo
   };
   showFiles.hidden = !sessionOptions.files;
   printSessionStartedMs = Number(pendingSession.startedAt) || 0;
-  status.textContent = '正在连接…';
+  status.textContent = opT('正在连接…');
   connectSignaling();
 }
 const fragment = new URLSearchParams(location.hash.slice(1));
@@ -599,7 +612,7 @@ if ((pendingSession?.target || pendingSession?.host) && pendingSession?.accessTo
 } else if (localhostBootstrap && (location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
   accessToken = localhostBootstrap;
   history.replaceState(null, '', `${location.pathname}${location.search}`);
-  status.textContent = '正在认证…';
+  status.textContent = opT('正在认证…');
   connectSignaling();
 } else {
   location.replace('/');
@@ -617,7 +630,7 @@ let remoteVolume = Math.max(0, Math.min(1, Number(localStorage.getItem('remote-g
 remoteAudio.volume = remoteVolume;
 function updateAudioControl() {
   const silent = remoteAudio.muted || remoteVolume === 0;
-  toggleAudio.setAttribute('aria-label', silent ? '取消静音' : '静音');
+  toggleAudio.setAttribute('aria-label', opT(silent ? '取消静音' : '静音'));
   toggleAudio.querySelector('.toolbar-tooltip').textContent = silent
     ? '取消静音 · 滚轮调节音量' : `音量 ${Math.round(remoteVolume * 100)}% · 点击静音`;
   toggleAudio.classList.toggle('print-ready', !silent && remoteAudio.srcObject !== null);
@@ -778,8 +791,8 @@ function setImmersive(immersive) {
 }
 function updateFullscreenButton() {
   const active = document.fullscreenElement !== null;
-  fullscreen.setAttribute('aria-label', active ? '退出全屏' : '进入全屏');
-  fullscreen.querySelector('.toolbar-tooltip').textContent = active ? '退出全屏' : '全屏';
+  fullscreen.setAttribute('aria-label', opT(active ? '退出全屏' : '进入全屏'));
+  fullscreen.querySelector('.toolbar-tooltip').textContent = opT(active ? '退出全屏' : '全屏');
 }
 document.addEventListener('fullscreenchange', updateFullscreenButton);
 fullscreen.addEventListener('click', async () => {
@@ -800,8 +813,8 @@ fullscreen.addEventListener('click', async () => {
 updateFullscreenButton();
 toolbarToggle.addEventListener('click', () => {
   const collapsed = remoteToolbar.classList.toggle('collapsed');
-  toolbarToggle.setAttribute('aria-label', collapsed ? '展开工具栏' : '收起工具栏');
-  toolbarToggle.querySelector('.toolbar-tooltip').textContent = collapsed ? '展开' : '收起';
+  toolbarToggle.setAttribute('aria-label', opT(collapsed ? '展开工具栏' : '收起工具栏'));
+  toolbarToggle.querySelector('.toolbar-tooltip').textContent = opT(collapsed ? '展开' : '收起');
 });
 secureAttention.addEventListener('click', () => {
   const keys = [['ControlLeft', 'Control'], ['AltLeft', 'Alt'], ['End', 'End']];
