@@ -166,9 +166,7 @@ test("VNC administrators add connections from management only", async ({
   await expect(page.locator(".titlebar > .protocol-nav")).toBeHidden();
   await expect(page.locator(".titlebar > .title-actions")).toBeHidden();
   await expect(page.locator("#admin-nav")).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "VNC 连接管理" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "连接管理" })).toBeVisible();
   await expect(page.getByRole("link", { name: "连接管理" })).toHaveAttribute(
     "href",
     "#connections",
@@ -194,12 +192,10 @@ test("VNC administrators add connections from management only", async ({
   await expect(page.getByRole("link", { name: "用户授权" })).toHaveCount(0);
   await page.getByRole("link", { name: /活动会话|Active sessions/ }).click();
   await expect(page.getByText("Live Desktop")).toBeVisible();
-  await page.getByRole("link", { name: "连接历史" }).click();
+  await page.getByRole("link", { name: /最近活动|Recent activity/ }).click();
   await expect(page.getByText("Old Desktop")).toBeVisible();
   await page.goto("/vnc.html?admin=1");
-  await expect(
-    page.getByRole("heading", { name: "VNC 连接管理" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "连接管理" })).toBeVisible();
 });
 
 test("SSH page exposes password and key connection management", async ({
@@ -251,6 +247,9 @@ test("SSH page exposes password and key connection management", async ({
   await page.evaluate(() => document.querySelector("#manager").showModal());
   await expect(page.locator(".settings-title a svg")).toBeVisible();
   await expect(page.locator(".settings-title a")).toHaveCSS("width", "34px");
+  await expect(page.getByRole("link", { name: "连接管理" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "最近活动" })).toBeVisible();
+  await expect(page.getByText("连接历史")).toHaveCount(0);
   await page.getByRole("button", { name: "添加连接" }).click();
   await expect(page.locator("#key-fields")).toBeHidden();
   await expect(page.locator("#password")).toBeVisible();

@@ -1272,7 +1272,7 @@
               <span class="secondary">最多保留 200 条</span>
             </div>
             <div id="events" class="event-list">
-              <div class="empty">暂无活动记录。</div>
+              <div class="empty">暂无最近活动。</div>
             </div>
           </section>
         </section>
@@ -1499,8 +1499,7 @@
           `更新于 ${new Date().toLocaleTimeString("zh-CN", { hour12: false })}`;
         targets.replaceChildren();
         if (!data.targets.length)
-          targets.innerHTML =
-            '<div class="empty">尚未配置目标主机。请添加连接后重试。</div>';
+          targets.innerHTML = '<div class="empty">尚未添加连接。</div>';
         for (const target of data.targets) {
           const row = document.createElement("article");
           row.className = `target ${target.busy ? "busy" : ""}`;
@@ -1538,7 +1537,7 @@
         const eventList = document.querySelector("#events");
         eventList.replaceChildren();
         if (!items.length) {
-          eventList.innerHTML = '<div class="empty">暂无活动记录。</div>';
+          eventList.innerHTML = '<div class="empty">暂无最近活动。</div>';
           return;
         }
         const labels = {

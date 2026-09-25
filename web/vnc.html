@@ -602,7 +602,7 @@
             >连接管理</a
           ><a href="/vnc/permissions">用户授权</a
           ><a href="#sessions" data-view="sessions">活动会话</a
-          ><a href="#history" data-view="history">连接历史</a>
+          ><a href="#history" data-view="history">最近活动</a>
         </aside>
         <main>
           <section id="connection-card">
@@ -644,7 +644,7 @@
           <section class="admin-panel" id="admin-panel" hidden>
             <div class="admin-view" data-panel="connections">
               <div class="admin-head">
-                <h1>VNC 连接管理</h1>
+                <h1>连接管理</h1>
                 <button class="primary" id="admin-add" type="button">
                   添加连接
                 </button>
@@ -656,7 +656,7 @@
               <div id="active-list" class="connection-list"></div>
             </div>
             <div class="admin-view" data-panel="history" hidden>
-              <div class="admin-head"><h1>连接历史</h1></div>
+              <div class="admin-head"><h1>最近活动</h1></div>
               <div id="history-list" class="connection-list"></div>
             </div>
           </section>
@@ -814,8 +814,7 @@
           connectionList.append(row);
         }
         if (!adminConnections.length)
-          connectionList.innerHTML =
-            '<div class="empty">尚未配置 VNC 连接。</div>';
+          connectionList.innerHTML = '<div class="empty">尚未添加连接。</div>';
       }
       function openConnectionEditor(item = null) {
         editingConnection = item;
@@ -928,7 +927,7 @@
             root.append(row);
           }
           if (!items.length)
-            root.innerHTML = `<div class="empty">${active ? "暂无活动会话。" : "暂无连接历史。"}</div>`;
+            root.innerHTML = `<div class="empty">${active ? "暂无活动会话。" : "暂无最近活动。"}</div>`;
         };
         render(document.querySelector("#active-list"), data.active || [], true);
         render(

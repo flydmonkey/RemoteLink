@@ -533,15 +533,15 @@
         <h1>管理</h1>
       </header>
       <div class="settings-layout">
-        <nav class="settings-nav" aria-label="SSH 设置">
-          <a href="#connections" data-settings-view="connections">SSH 连接</a
+        <nav class="settings-nav" aria-label="管理导航">
+          <a href="#connections" data-settings-view="connections">连接管理</a
           ><a href="#sessions" data-settings-view="sessions">活动会话</a
-          ><a href="#history" data-settings-view="history">连接历史</a>
+          ><a href="#history" data-settings-view="history">最近活动</a>
         </nav>
         <main class="settings-content">
           <section class="settings-view" data-settings-panel="connections">
             <div class="dialog-head">
-              <h2>SSH 连接</h2>
+              <h2>连接管理</h2>
               <button id="add" class="primary">添加连接</button>
             </div>
             <div id="list" class="list"></div>
@@ -551,7 +551,7 @@
             <div id="active" class="list"></div>
           </section>
           <section class="settings-view" data-settings-panel="history" hidden>
-            <h2>连接历史</h2>
+            <h2>最近活动</h2>
             <div id="history" class="list"></div>
           </section>
         </main>
@@ -692,7 +692,7 @@
           list.append(row);
         }
         if (!connections.length)
-          list.innerHTML = '<div class="muted">尚无 SSH 连接。</div>';
+          list.innerHTML = '<div class="muted">尚未添加连接。</div>';
       }
       function renderActivity(data) {
         for (const [key, items] of [
@@ -727,7 +727,7 @@
             root.append(row);
           }
           if (!items.length)
-            root.innerHTML = '<div class="muted">暂无记录。</div>';
+            root.innerHTML = `<div class="muted">${key === "active" ? "暂无活动会话。" : "暂无最近活动。"}</div>`;
         }
       }
       function button(text, handler, style = "secondary") {
