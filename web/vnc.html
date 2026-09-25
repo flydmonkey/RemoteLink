@@ -138,6 +138,9 @@
       .protocol-nav a[aria-current="page"] {
         color: var(--text);
       }
+      .protocol-nav a[hidden] {
+        display: none !important;
+      }
       .protocol-nav a[aria-current="page"]:after {
         content: "";
         position: absolute;
@@ -853,6 +856,7 @@
             : name;
         document.querySelector("#users-link").hidden = !account.admin;
         manageToggle.hidden = !account.admin;
+        updateProtocolTabs(account, targets);
         target.replaceChildren();
         for (const item of targets) {
           const option = new Option(
@@ -864,6 +868,23 @@
         }
         if (!targets.length) target.add(new Option("尚未分配 VNC 设备", ""));
         else target.selectedIndex = 0;
+      }
+      async function updateProtocolTabs(account, vncTargets) {
+        if (account.admin) return;
+        const checks = await Promise.all([
+          api("/api/rdp/targets").then((data) => (data.targets || []).length > 0).catch(() => null),
+          Promise.resolve(vncTargets.length > 0),
+          api("/api/ssh/targets").then((data) => (data.targets || []).length > 0).catch(() => null),
+        ]);
+        const links = [...document.querySelectorAll(".protocol-nav a")];
+        links.forEach((link, index) => {
+          if (checks[index] !== null) link.hidden = !checks[index];
+        });
+        if (!checks[1]) {
+          const destinations = ["/", "/vnc", "/ssh"];
+          const next = checks.findIndex(Boolean);
+          if (next >= 0 && next !== 1) location.replace(destinations[next]);
+        }
       }
       async function openManagement() {
         const opening = adminPanel.hidden;

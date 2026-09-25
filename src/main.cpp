@@ -748,6 +748,21 @@ int main() {
                 {"username", users[*user_identity].username}, {"admin", *user_identity == 0}}.dump();
             return response;
         }
+        if (request.method == "GET" && request.path == "/api/rdp/targets") {
+            std::vector<std::string> allowed;
+            bool administrator = false;
+            { std::lock_guard lock(users_mutex);
+              administrator = *user_identity == 0;
+              allowed = users[*user_identity].allowed_targets; }
+            json targets = json::array();
+            for (const auto& target : target_catalog) {
+                if (!administrator &&
+                    std::find(allowed.begin(), allowed.end(), target.id) == allowed.end()) continue;
+                targets.push_back({{"id", target.id}, {"name", target.name}});
+            }
+            response.body = json{{"targets", std::move(targets)}}.dump();
+            return response;
+        }
         if (request.method == "GET" && request.path == "/api/ssh/targets") {
             std::vector<std::string> allowed; bool administrator = false;
             { std::lock_guard lock(users_mutex); administrator = *user_identity == 0;

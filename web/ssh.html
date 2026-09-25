@@ -80,6 +80,9 @@
       .nav a[aria-current="page"] {
         color: var(--text);
       }
+      .nav a[hidden] {
+        display: none !important;
+      }
       .nav a[aria-current="page"]:after {
         content: "";
         position: absolute;
@@ -747,6 +750,7 @@
             : me.name;
         const data = await api("/api/ssh/targets");
         const availableTargets = data.targets || [];
+        updateProtocolTabs(me, availableTargets);
         target.replaceChildren();
         if (availableTargets.length) {
           for (const item of availableTargets)
@@ -758,6 +762,23 @@
           const activity = await api("/api/admin/ssh/activity");
           renderActivity(activity);
           renderList();
+        }
+      }
+      async function updateProtocolTabs(account, sshTargets) {
+        if (account.admin) return;
+        const checks = await Promise.all([
+          api("/api/rdp/targets").then((data) => (data.targets || []).length > 0).catch(() => null),
+          api("/api/vnc/targets").then((data) => (data.targets || []).length > 0).catch(() => null),
+          Promise.resolve(sshTargets.length > 0),
+        ]);
+        const links = [...document.querySelectorAll(".nav a")];
+        links.forEach((link, index) => {
+          if (checks[index] !== null) link.hidden = !checks[index];
+        });
+        if (!checks[2]) {
+          const destinations = ["/", "/vnc", "/ssh"];
+          const next = checks.findIndex(Boolean);
+          if (next >= 0 && next !== 2) location.replace(destinations[next]);
         }
       }
       function renderList() {

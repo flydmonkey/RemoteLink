@@ -119,6 +119,30 @@ test("VNC page follows the existing RemoteLink shell", async ({ page }) => {
   await expect(page.locator(".app")).toHaveCSS("height", "270px");
 });
 
+test("regular users only see protocols with authorized connections", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    sessionStorage.setItem("remote-gateway-access-token", "test"),
+  );
+  await page.route("**/api/auth/me", (route) =>
+    route.fulfill({ json: { name: "Test User", username: "test", admin: false } }),
+  );
+  await page.route("**/api/rdp/targets", (route) =>
+    route.fulfill({ json: { targets: [] } }),
+  );
+  await page.route("**/api/vnc/targets", (route) =>
+    route.fulfill({ json: { targets: [{ id: "vnc-1", name: "Desktop" }] } }),
+  );
+  await page.route("**/api/ssh/targets", (route) =>
+    route.fulfill({ json: { targets: [{ id: "ssh-1", name: "Server" }] } }),
+  );
+  await page.goto("/vnc.html");
+  await expect(page.locator('.protocol-nav a[href="/"]')).toBeHidden();
+  await expect(page.locator('.protocol-nav a[href="/vnc"]')).toBeVisible();
+  await expect(page.locator('.protocol-nav a[href="/ssh"]')).toBeVisible();
+});
+
 test("VNC administrators add connections from management only", async ({
   page,
 }) => {
