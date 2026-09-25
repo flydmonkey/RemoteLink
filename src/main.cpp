@@ -1062,6 +1062,10 @@ int main() {
                   save_users(users_path, users); }
                 response.body=json{{"deleted",true}}.dump(); return response;
             }
+            if(request.method=="POST"&&request.path=="/api/admin/vnc/disconnect"){
+                const auto id=payload.value("id","");std::lock_guard lock(vnc_bridges_mutex);
+                const auto removed=vnc_bridges.erase(id);response.body=json{{"disconnected",removed!=0}}.dump();return response;
+            }
             response.status=405; response.body=json{{"error","method not allowed"}}.dump(); return response;
         }
         if (*user_identity != 0 &&

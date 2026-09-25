@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "test:browser": "playwright test",
-    "test:release": "powershell -ExecutionPolicy Bypass -File scripts/test-release.ps1"
+    "test:release": "powershell -ExecutionPolicy Bypass -File scripts/test-release.ps1",
+    "test:e2e": "powershell -ExecutionPolicy Bypass -File scripts/test-e2e.ps1"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"

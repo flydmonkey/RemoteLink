@@ -53,6 +53,8 @@ SSH 同样使用 30 秒有效的一次性 WSS 票据。密码、私钥和私钥�
 
 从 0.1 升级到 0.2 不需要手工迁移数据。首次 SSH 连接会记录主机指纹；目标设备重装后，
 管理员需要在 SSH 连接管理中执行“重置信任”。发布前可运行 `npm run test:release` 完成一键回归。
+运行 `npm run test:e2e` 会启动隔离的 RDP、VNC、SSH 测试容器并执行回归；设置
+`REMOTELINK_KEEP_TEST_STACK=1` 可在测试后保留容器用于人工检查。
 
 ```text
 浏览器

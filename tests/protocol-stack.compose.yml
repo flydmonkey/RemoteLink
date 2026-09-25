@@ -1,0 +1,19 @@
+services:
+  rdp:
+    image: danielguerra/ubuntu-xrdp:latest
+    ports: ["127.0.0.1:13389:3389"]
+  vnc:
+    image: dorowu/ubuntu-desktop-lxde-vnc:latest
+    environment:
+      VNC_PASSWORD: remotelink
+      RESOLUTION: 1920x1080
+    ports: ["127.0.0.1:15900:5900"]
+  ssh:
+    image: lscr.io/linuxserver/openssh-server:latest
+    environment:
+      PUID: 1000
+      PGID: 1000
+      USER_NAME: test
+      USER_PASSWORD: remotelink
+      PASSWORD_ACCESS: "true"
+    ports: ["127.0.0.1:12222:2222"]
