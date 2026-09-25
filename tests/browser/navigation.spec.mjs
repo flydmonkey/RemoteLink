@@ -210,6 +210,7 @@ test("SSH page exposes password and key connection management", async ({
     route.fulfill({ json: { active: [], history: [] } }),
   );
   await page.goto("/ssh.html");
+  await expect(page.locator(".brand")).toHaveText("RemoteLink");
   await expect(page.locator('.nav a[aria-current="page"]')).toHaveText("SSH");
   await expect(page.getByRole("heading", { name: "SSH 连接" })).toBeVisible();
   await expect(page.locator("#target")).toHaveValue("ssh-1");
@@ -217,6 +218,8 @@ test("SSH page exposes password and key connection management", async ({
     "href",
     "/ssh/settings",
   );
+  await expect(page.locator("#manage")).toHaveCSS("width", "34px");
+  await expect(page.locator("#account-trigger")).toHaveCSS("width", "34px");
   await page.locator("#account-trigger").click();
   await expect(page.locator("#account-menu")).toBeVisible();
   await expect(page.locator("#logout")).toHaveText("退出登录");

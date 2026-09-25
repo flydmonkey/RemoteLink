@@ -42,7 +42,7 @@
         width: min(560px, 100%);
         min-height: 270px;
         margin: auto;
-        padding: 0 20px 20px;
+        padding: 0;
         border: 1px solid var(--line);
         border-radius: 8px;
         background: var(--panel);
@@ -52,9 +52,11 @@
         display: flex;
         align-items: center;
         gap: 18px;
+        padding: 0 14px;
       }
       .brand {
         font-weight: 650;
+        font-size: 14px;
       }
       .nav {
         align-self: stretch;
@@ -84,7 +86,8 @@
       .tools {
         margin-left: auto;
         display: flex;
-        gap: 7px;
+        align-items: center;
+        gap: 2px;
       }
       .account {
         position: relative;
@@ -126,7 +129,30 @@
       .account-menu button:hover {
         background: #ffffff0d;
       }
-      .avatar svg,
+      .account-trigger {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        border: 0;
+        border-radius: 4px;
+        background: transparent;
+        cursor: pointer;
+      }
+      .account-trigger:hover {
+        background: #ffffff0d;
+      }
+      .account-avatar {
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        color: #b3b3b3;
+        background: #363636;
+      }
+      .account-avatar svg,
       .settings-link svg {
         width: 18px;
         height: 18px;
@@ -151,6 +177,9 @@
         color: #ddd;
         background: #353535;
         cursor: pointer;
+      }
+      .app > main {
+        padding: 0 20px 20px;
       }
       .hero {
         display: flex;
@@ -425,19 +454,20 @@
           <div class="account">
             <button
               id="account-trigger"
-              class="icon avatar"
+              class="account-trigger"
               aria-label="用户账户"
               aria-expanded="false"
             >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.8"
-              >
-                <circle cx="12" cy="8" r="3.5" />
-                <path d="M5 20c.8-4 3.1-6 7-6s6.2 2 7 6" />
-              </svg>
+              <span class="account-avatar"
+                ><svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                >
+                  <circle cx="12" cy="8" r="3.5" />
+                  <path d="M5 20c.8-4 3.1-6 7-6s6.2 2 7 6" /></svg
+              ></span>
             </button>
             <div id="account-menu" class="account-menu" hidden>
               <div id="account-summary" class="account-summary">当前账户</div>
