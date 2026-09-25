@@ -52,7 +52,7 @@ const loginPassword=document.querySelector('#login-password');
 const authError=document.querySelector('#auth-error');
 const logoutAccount=document.querySelector('#logout-account');
 document.querySelector('.brand h1').textContent='RemoteLink';document.querySelector('.app-icon').textContent='RL';document.querySelector('#login-form strong').textContent='登录 RemoteLink';
-document.querySelector('.status-nav')?.remove();
+const statusNav=document.querySelector('.status-nav');statusNav.hidden=true;statusNav.title='管理控制台';statusNav.setAttribute('aria-label','管理控制台');
 logoutAccount.title='退出登录';logoutAccount.setAttribute('aria-label','退出登录');logoutAccount.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M14 8l4 4-4 4M9 12h9"/></svg>';
 let accessToken='';
 let socket;
@@ -91,7 +91,7 @@ function connectGateway(){
   };
   socket.onerror=()=>{status.textContent='无法连接网关';error.textContent='请确认网关服务已启动。'};
 }
-loginForm.addEventListener('submit',async event=>{event.preventDefault();authError.textContent='';try{const response=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:loginUsername.value,password:loginPassword.value})});if(!response.ok){authError.textContent='用户名或密码不正确';loginPassword.value='';return}const account=await response.json();accessToken=account.token;sessionStorage.setItem('remote-gateway-access-token',accessToken);loginPassword.value='';if(account.admin){location.href='/admin';return}connectGateway()}catch(error){authError.textContent='无法连接登录服务'}});
+loginForm.addEventListener('submit',async event=>{event.preventDefault();authError.textContent='';try{const response=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:loginUsername.value,password:loginPassword.value})});if(!response.ok){authError.textContent='用户名或密码不正确';loginPassword.value='';return}const account=await response.json();accessToken=account.token;sessionStorage.setItem('remote-gateway-access-token',accessToken);loginPassword.value='';statusNav.hidden=!account.admin;connectGateway()}catch(error){authError.textContent='无法连接登录服务'}});
 targetSelect.addEventListener('change',applyProfile);
 forgetButton.addEventListener('click',()=>{const profiles=savedProfiles();delete profiles[targetSelect.value.trim().toLowerCase()];localStorage.setItem('remote-gateway-profiles',JSON.stringify(profiles));password.value='';remember.checked=false;forgetButton.disabled=true});
 document.querySelector('#connection-form').addEventListener('submit',event=>{
@@ -117,7 +117,7 @@ document.querySelector('#connection-form').addEventListener('submit',event=>{
 accessToken=sessionStorage.getItem('remote-gateway-access-token')||'';
 const returnedError=sessionStorage.getItem('remote-gateway-error');
 if(returnedError){error.textContent=returnedError;sessionStorage.removeItem('remote-gateway-error')}
-async function resumeAccount(){if(!accessToken){login.showModal();return}try{const response=await fetch('/api/auth/me',{headers:{Authorization:`Bearer ${accessToken}`},cache:'no-store'});if(!response.ok)throw new Error();const account=await response.json();if(account.admin){location.href='/admin';return}connectGateway()}catch{accessToken='';sessionStorage.removeItem('remote-gateway-access-token');login.showModal()}}
+async function resumeAccount(){if(!accessToken){login.showModal();return}try{const response=await fetch('/api/auth/me',{headers:{Authorization:`Bearer ${accessToken}`},cache:'no-store'});if(!response.ok)throw new Error();const account=await response.json();statusNav.hidden=!account.admin;connectGateway()}catch{accessToken='';sessionStorage.removeItem('remote-gateway-access-token');login.showModal()}}
 logoutAccount.addEventListener('click',()=>{if(socket&&socket.readyState<WebSocket.CLOSING){socket.onclose=null;socket.close()}sessionStorage.removeItem('remote-gateway-access-token');sessionStorage.removeItem('remote-gateway-session');location.reload()});
 resumeAccount();
 </script></body></html>
