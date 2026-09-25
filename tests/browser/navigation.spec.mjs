@@ -160,6 +160,7 @@ test("VNC administrators add connections from management only", async ({
   await page.getByRole("link", { name: "管理", exact: true }).click();
   await expect(page.locator(".admin-title")).toBeVisible();
   await expect(page.locator(".app")).toHaveCSS("height", "532px");
+  await expect(page.locator(".app")).toHaveCSS("width", "980px");
   await expect(page.locator(".admin-title")).toContainText("管理");
   await expect(page.locator(".admin-title a")).toHaveAttribute("href", "/vnc");
   await expect(page.locator(".admin-title a svg")).toBeVisible();
@@ -352,6 +353,7 @@ test("VNC legacy management UI is no longer duplicated", async ({ page }) => {
 test("RDP connection editor does not expose grouping", async ({ page }) => {
   await page.goto("/admin.html");
   await expect(page.locator(".admin-shell")).toHaveCSS("height", "532px");
+  await expect(page.locator(".admin-shell")).toHaveCSS("width", "980px");
   await expect(page.locator(".section-nav a")).toHaveCount(3);
   await expect(page.locator(".section-nav a").nth(0)).toHaveText("连接管理");
   await expect(page.locator(".section-nav a").nth(1)).toHaveText(
