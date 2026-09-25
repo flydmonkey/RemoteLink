@@ -41,6 +41,7 @@ struct GatewayUser {
     std::string username;
     std::string password_salt;
     std::string password_hash;
+    std::vector<std::string> allowed_targets;
 };
 
 std::string hex_encode(const unsigned char* bytes, std::size_t size) {
@@ -90,10 +91,49 @@ void save_users(const std::filesystem::path& path, const std::vector<GatewayUser
     for (const auto& user : users)
         data.push_back({{"name", user.name}, {"token", user.token}, {"enabled", user.enabled},
             {"username", user.username}, {"passwordSalt", user.password_salt},
-            {"passwordHash", user.password_hash}});
+            {"passwordHash", user.password_hash}, {"allowedTargets", user.allowed_targets}});
     const auto temporary = path.string() + ".tmp";
     { std::ofstream output(temporary, std::ios::trunc); output << data.dump(2) << '\n';
       if (!output) throw std::runtime_error("cannot save user registry"); }
+    std::filesystem::permissions(temporary, std::filesystem::perms::owner_read |
+        std::filesystem::perms::owner_write, std::filesystem::perm_options::replace);
+    std::filesystem::rename(temporary, path);
+}
+
+std::vector<remote_gateway::TargetConfig> load_managed_connections(
+    const std::filesystem::path& path, const std::string& allowed_hosts) {
+    std::vector<remote_gateway::TargetConfig> result;
+    if (!std::filesystem::is_regular_file(path)) return result;
+    std::ifstream input(path);
+    const auto data = nlohmann::json::parse(input, nullptr, false);
+    if (!data.is_array()) throw std::runtime_error("invalid managed connection registry");
+    for (const auto& item : data) {
+        remote_gateway::TargetConfig target;
+        target.id = item.value("id", ""); target.name = item.value("name", "");
+        target.rdp.hostname = item.value("host", "");
+        target.rdp.port = static_cast<std::uint16_t>(item.value("port", 3389));
+        target.rdp.username = item.value("username", ""); target.rdp.domain = item.value("domain", "");
+        target.rdp.width = item.value("width", 1920U); target.rdp.height = item.value("height", 1080U);
+        target.rdp.ignore_certificate = item.value("ignoreCertificate", true);
+        if (target.id.empty() || target.name.empty() || target.rdp.hostname.empty() ||
+            !remote_gateway::host_is_allowed(target.rdp.hostname, allowed_hosts))
+            throw std::runtime_error("invalid managed connection: " + target.id);
+        result.push_back(std::move(target));
+    }
+    return result;
+}
+
+void save_managed_connections(const std::filesystem::path& path,
+                              const std::vector<remote_gateway::TargetConfig>& targets) {
+    nlohmann::json data = nlohmann::json::array();
+    for (const auto& target : targets) data.push_back({
+        {"id", target.id}, {"name", target.name}, {"host", target.rdp.hostname},
+        {"port", target.rdp.port}, {"username", target.rdp.username},
+        {"domain", target.rdp.domain}, {"width", target.rdp.width},
+        {"height", target.rdp.height}, {"ignoreCertificate", target.rdp.ignore_certificate}});
+    const auto temporary = path.string() + ".tmp";
+    { std::ofstream output(temporary, std::ios::trunc); output << data.dump(2) << '\n';
+      if (!output) throw std::runtime_error("cannot save managed connections"); }
     std::filesystem::permissions(temporary, std::filesystem::perms::owner_read |
         std::filesystem::perms::owner_write, std::filesystem::perm_options::replace);
     std::filesystem::rename(temporary, path);
@@ -198,12 +238,12 @@ int main() {
         for (const auto& item : data) users.push_back({item.value("name", ""),
             item.value("token", ""), item.value("enabled", true),
             item.value("username", ""), item.value("passwordSalt", ""),
-            item.value("passwordHash", "")});
+            item.value("passwordHash", ""), item.value("allowedTargets", std::vector<std::string>{})});
     }
     if (users.empty()) {
         for (std::size_t index = 0; index < access_tokens.size(); ++index)
             users.push_back({index == 0 ? "主管理员" : "用户 " + std::to_string(index),
-                             access_tokens[index], true, index == 0 ? "admin" : "", "", ""});
+                             access_tokens[index], true, index == 0 ? "admin" : "", "", "", {}});
     }
     // The primary administrator credential remains controlled by the protected
     // secret file so a lost registry can always be recovered after a restart.
@@ -231,18 +271,31 @@ int main() {
     for (const auto& user : users) access_tokens.push_back(user.enabled ? user.token : "");
     save_users(users_path, users);
     std::mutex users_mutex;
-    auto targets = remote_gateway::load_targets(targets_file, allowed_hosts);
+    const auto connections_path = state_root / "connections.json";
+    const auto configured_targets = remote_gateway::load_targets(targets_file, allowed_hosts);
+    auto managed_targets = load_managed_connections(connections_path, allowed_hosts);
+    auto target_catalog = configured_targets;
+    for (const auto& target : managed_targets) {
+        const bool duplicate = std::any_of(target_catalog.begin(), target_catalog.end(),
+            [&](const auto& existing) { return existing.id == target.id; });
+        if (!duplicate) target_catalog.push_back(target);
+    }
     remote_gateway::HttpServer http(
         "0.0.0.0", 18080, certificate ? certificate : "", private_key ? private_key : "");
     // Signaling remains an in-process backend on loopback. HttpServer exposes
     // it publicly as /ws on the same HTTPS port as the UI and REST API.
     remote_gateway::WebRtcServer webrtc(18081, access_tokens);
     std::vector<remote_gateway::WebRtcServer::PublicTarget> public_targets;
-    for (const auto& target : targets) public_targets.push_back({
+    for (const auto& target : target_catalog) public_targets.push_back({
         target.id, target.name, target.rdp.hostname, target.rdp.username,
         target.rdp.width, target.rdp.height});
     webrtc.set_targets(std::move(public_targets));
-    remote_gateway::SessionManager sessions(webrtc, std::move(targets), allowed_hosts);
+    {
+        std::vector<std::vector<std::string>> permissions;
+        for (const auto& user : users) permissions.push_back(user.allowed_targets);
+        webrtc.set_user_target_permissions(std::move(permissions));
+    }
+    remote_gateway::SessionManager sessions(webrtc, target_catalog, allowed_hosts);
     webrtc.set_start_handler([&sessions](const std::string& peer, const std::string& target,
                                          const std::string& host, const std::string& username,
                                          const std::string& password,
@@ -262,7 +315,8 @@ int main() {
     // authenticated admin API below.
     http.set_health_handler([] { return std::string("{\"status\":\"ok\"}\n"); });
     http.set_api_handler([&sessions, &webrtc, &access_tokens, &users, &users_mutex,
-                          &users_path, tls_enabled](
+                          &users_path, &target_catalog, &managed_targets, &connections_path,
+                          &allowed_hosts, tls_enabled](
                              const remote_gateway::HttpRequest& request) {
         using json = nlohmann::json;
         remote_gateway::HttpResponse response;
@@ -305,6 +359,50 @@ int main() {
             response.body = json{{"error", "administrator required"}}.dump();
             return response;
         }
+        if (request.path.starts_with("/api/admin/connections")) {
+            if (*user_identity != 0) {
+                response.status = 403; response.body = json{{"error", "primary administrator required"}}.dump(); return response;
+            }
+            if (request.method == "POST" && request.path == "/api/admin/connections/create") {
+                const auto payload = json::parse(request.body, nullptr, false);
+                const std::string id = payload.is_object() ? payload.value("id", "") : "";
+                const std::string name = payload.is_object() ? payload.value("name", "") : "";
+                const std::string host = payload.is_object() ? payload.value("host", "") : "";
+                const std::string username = payload.is_object() ? payload.value("username", "") : "";
+                const std::string domain = payload.is_object() ? payload.value("domain", "") : "";
+                const int port = payload.is_object() ? payload.value("port", 3389) : 0;
+                const bool valid_id = !id.empty() && id.size() <= 64 &&
+                    std::all_of(id.begin(), id.end(), [](unsigned char c) {
+                        return std::isalnum(c) || c == '_' || c == '-';
+                    });
+                const bool duplicate = std::any_of(target_catalog.begin(), target_catalog.end(),
+                    [&](const auto& target) { return target.id == id; });
+                if (!valid_id || name.empty() || name.size() > 128 || host.empty() || host.size() > 255 ||
+                    port < 1 || port > 65535 || duplicate || !remote_gateway::host_is_allowed(host, allowed_hosts)) {
+                    response.status = 400; response.body = json{{"error", "invalid or duplicate connection"}}.dump(); return response;
+                }
+                remote_gateway::TargetConfig target;
+                target.id = id; target.name = name; target.rdp.hostname = host;
+                target.rdp.port = static_cast<std::uint16_t>(port);
+                target.rdp.username = username; target.rdp.domain = domain;
+                target.rdp.width = payload.value("width", 1920U);
+                target.rdp.height = payload.value("height", 1080U);
+                target.rdp.ignore_certificate = payload.value("ignoreCertificate", true);
+                if (target.rdp.width < 640 || target.rdp.width > 7680 ||
+                    target.rdp.height < 480 || target.rdp.height > 4320) {
+                    response.status = 400; response.body = json{{"error", "invalid dimensions"}}.dump(); return response;
+                }
+                managed_targets.push_back(target); target_catalog.push_back(target);
+                save_managed_connections(connections_path, managed_targets);
+                sessions.set_targets(target_catalog);
+                std::vector<remote_gateway::WebRtcServer::PublicTarget> published;
+                for (const auto& item : target_catalog) published.push_back({item.id, item.name,
+                    item.rdp.hostname, item.rdp.username, item.rdp.width, item.rdp.height});
+                webrtc.set_targets(std::move(published));
+                response.body = json{{"id", id}, {"name", name}}.dump(); return response;
+            }
+            response.status = 404; response.body = json{{"error", "not found"}}.dump(); return response;
+        }
         if (request.path.starts_with("/api/admin/users")) {
             if (*user_identity != 0) {
                 response.status = 403;
@@ -313,10 +411,13 @@ int main() {
             }
             auto publish_users = [&] {
                 access_tokens.clear();
+                std::vector<std::vector<std::string>> permissions;
                 for (const auto& user : users)
-                    access_tokens.push_back(user.enabled ? user.token : "");
+                    { access_tokens.push_back(user.enabled ? user.token : "");
+                      permissions.push_back(user.allowed_targets); }
                 save_users(users_path, users);
                 webrtc.set_access_tokens(access_tokens);
+                webrtc.set_user_target_permissions(std::move(permissions));
             };
             std::lock_guard lock(users_mutex);
             if (request.method == "GET" && request.path == "/api/admin/users") {
@@ -324,7 +425,7 @@ int main() {
                 for (std::size_t id = 0; id < users.size(); ++id)
                     items.push_back({{"id", id}, {"name", users[id].name},
                         {"username", users[id].username}, {"enabled", users[id].enabled},
-                        {"admin", id == 0}});
+                        {"admin", id == 0}, {"allowedTargets", users[id].allowed_targets}});
                 response.body = json{{"items", std::move(items)}}.dump();
                 return response;
             }
@@ -347,7 +448,7 @@ int main() {
                 }
                 const std::string token = generate_access_token();
                 const auto [salt, hash] = hash_password(password);
-                users.push_back({name, token, true, username, salt, hash});
+                users.push_back({name, token, true, username, salt, hash, {}});
                 publish_users();
                 response.body = json{{"id", users.size() - 1}, {"name", name}}.dump();
                 return response;
@@ -376,6 +477,24 @@ int main() {
                 users[id].enabled = true;
                 publish_users();
                 response.body = json{{"id", id}, {"name", users[id].name}}.dump(); return response;
+            }
+            if (request.method == "POST" && request.path == "/api/admin/users/permissions") {
+                if (id == 0 || !payload.contains("targetIds") || !payload["targetIds"].is_array()) {
+                    response.status = 400; response.body = json{{"error", "invalid permissions"}}.dump(); return response;
+                }
+                std::vector<std::string> allowed;
+                const auto snapshots = sessions.target_snapshots();
+                for (const auto& value : payload["targetIds"]) {
+                    if (!value.is_string()) continue;
+                    const auto target_id = value.get<std::string>();
+                    if (std::any_of(snapshots.begin(), snapshots.end(), [&](const auto& target) {
+                        return target.id == target_id;
+                    }) && std::find(allowed.begin(), allowed.end(), target_id) == allowed.end())
+                        allowed.push_back(target_id);
+                }
+                users[id].allowed_targets = std::move(allowed);
+                publish_users();
+                response.body = json{{"id", id}, {"allowedTargets", users[id].allowed_targets}}.dump(); return response;
             }
             response.status = 404; response.body = json{{"error", "not found"}}.dump(); return response;
         }

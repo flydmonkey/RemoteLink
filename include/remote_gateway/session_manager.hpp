@@ -64,6 +64,7 @@ public:
     [[nodiscard]] std::vector<TargetSnapshot> target_snapshots() const;
     [[nodiscard]] std::vector<AdminEvent> recent_events() const;
     void record_admin_disconnect(const std::string& peer_id);
+    void set_targets(std::vector<TargetConfig> targets);
 
 private:
     struct ManagedSession;

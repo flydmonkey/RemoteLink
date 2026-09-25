@@ -13,6 +13,8 @@ The gateway runs as a single Linux service. Users only need a modern browser—n
 - Multiple configured RDP targets protected by an explicit host allow-list
 - Username/password accounts with administrator and standard-user roles
 - User creation, enable/disable, and password reset in the administration console
+- Administrator-managed connections with per-user authorization
+- Standard users see only authorized connections and configure only session parameters
 - Per-user file manager with folders, chunked uploads, downloads, rename, delete, quotas, and audit logs
 - RDP drive redirection through **Gateway Files**
 - Printer redirection with downloadable PDF print jobs

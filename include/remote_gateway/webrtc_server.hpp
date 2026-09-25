@@ -49,6 +49,7 @@ public:
     void send_session_status(const std::string& peer_id, const std::string& state);
     void send_control(const std::string& peer_id, const std::string& message);
     void set_targets(std::vector<PublicTarget> targets);
+    void set_user_target_permissions(std::vector<std::vector<std::string>> permissions);
     void set_access_tokens(std::vector<std::string> access_tokens);
     void set_start_handler(StartHandler handler);
     void set_input_handler(InputHandler handler);
@@ -67,6 +68,7 @@ private:
     mutable std::mutex mutex_;
     std::vector<std::shared_ptr<Peer>> peers_;
     std::vector<PublicTarget> targets_;
+    std::vector<std::vector<std::string>> user_target_permissions_;
     StartHandler start_handler_;
     InputHandler input_handler_;
     PeerHandler key_frame_handler_;

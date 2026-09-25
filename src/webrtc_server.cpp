@@ -122,6 +122,10 @@ WebRtcServer::~WebRtcServer() {
 void WebRtcServer::set_targets(std::vector<PublicTarget> targets) {
     std::lock_guard lock(mutex_); targets_ = std::move(targets);
 }
+void WebRtcServer::set_user_target_permissions(
+    std::vector<std::vector<std::string>> permissions) {
+    std::lock_guard lock(mutex_); user_target_permissions_ = std::move(permissions);
+}
 void WebRtcServer::set_access_tokens(std::vector<std::string> access_tokens) {
     std::lock_guard lock(mutex_); access_tokens_ = std::move(access_tokens);
 }
@@ -206,7 +210,13 @@ void WebRtcServer::handle_message(const std::shared_ptr<Peer>& peer,
         json targets = json::array();
         {
             std::lock_guard lock(mutex_);
-            for (const auto& target : targets_) targets.push_back({
+            const auto permitted = [&](const std::string& target_id) {
+                if (*identity == 0) return true;
+                if (*identity >= user_target_permissions_.size()) return false;
+                const auto& ids = user_target_permissions_[*identity];
+                return std::find(ids.begin(), ids.end(), target_id) != ids.end();
+            };
+            for (const auto& target : targets_) if (permitted(target.id)) targets.push_back({
                 {"id", target.id}, {"name", target.name},
                 {"host", target.host}, {"username", target.username},
                 {"width", target.width}, {"height", target.height}});
@@ -221,6 +231,18 @@ void WebRtcServer::handle_message(const std::shared_ptr<Peer>& peer,
             return;
         }
         const std::string target = payload.value("target", "");
+        {
+            std::lock_guard lock(mutex_);
+            const bool permitted = peer->user_identity == 0 ||
+                (peer->user_identity < user_target_permissions_.size() &&
+                 std::find(user_target_permissions_[peer->user_identity].begin(),
+                           user_target_permissions_[peer->user_identity].end(), target) !=
+                     user_target_permissions_[peer->user_identity].end());
+            if (!permitted) {
+                peer->socket->send(json{{"type", "error"}, {"message", "target-not-authorized"}}.dump());
+                return;
+            }
+        }
         const std::string host = payload.value("host", "");
         const std::string username = payload.value("username", "");
         const std::string password = payload.value("password", "");

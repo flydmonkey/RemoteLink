@@ -18,7 +18,7 @@
   <main><section class="connection-card" aria-labelledby="connection-title">
     <div class="hero"><span class="hero-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4M8 10h8M13 7l3 3-3 3"/></svg></span><div><h2 id="connection-title">远程桌面连接</h2><p id="connection-status">正在连接网关…</p></div></div>
     <form id="connection-form">
-      <label for="target">计算机</label><div><input id="target" list="target-list" placeholder="输入 IP、主机名或从列表选择" autocomplete="off" required disabled><datalist id="target-list"></datalist></div>
+      <label for="target">我的连接</label><div><select id="target" required disabled><option value="">请选择已授权连接</option></select><datalist id="target-list"></datalist></div>
       <label for="username">用户名</label><input id="username" autocomplete="username" required disabled>
       <label for="password">密码</label><input id="password" type="password" autocomplete="current-password" required disabled>
       <label class="remember"><input id="remember" type="checkbox">在此浏览器保存这台主机的用户名和密码</label>
@@ -59,8 +59,8 @@ let socket;
 let targets=[];
 function savedProfiles(){try{return JSON.parse(localStorage.getItem('remote-gateway-profiles')||'{}')}catch{return {}}}
 function applyProfile(){
-  const key=targetSelect.value.trim().toLowerCase();
-  const target=targets.find(item=>item.host.toLowerCase()===key);
+  const key=targetSelect.value;
+  const target=targets.find(item=>item.id===key);
   const saved=savedProfiles()[key];
   username.value=saved?.username||target?.username||'';
   password.value=saved?.password||'';
@@ -81,10 +81,9 @@ function connectGateway(){
     if(login.open)login.close();
     targets=message.targets||[];
     targetList.replaceChildren();
-    for(const target of targets){const option=document.createElement('option');option.value=target.host;option.label=target.name;targetList.append(option)}
+    targetSelect.replaceChildren();for(const target of targets){const option=document.createElement('option');option.value=target.id;option.textContent=`${target.name} · ${target.host}`;targetSelect.append(option)}
     const preferred=localStorage.getItem('remote-gateway-last-target');
-    const migrated=targets.find(item=>item.id===preferred)?.host;
-    targetSelect.value=migrated||preferred||targets[0]?.host||'';
+    targetSelect.value=targets.some(item=>item.id===preferred)?preferred:targets[0]?.id||'';
     const enabled=targets.length>0;
     targetSelect.disabled=!enabled; username.disabled=!enabled; password.disabled=!enabled; connectButton.disabled=!enabled;
     status.textContent=enabled?'选择计算机并输入登录信息':'没有可用的远程主机';
@@ -97,14 +96,14 @@ targetSelect.addEventListener('change',applyProfile);
 forgetButton.addEventListener('click',()=>{const profiles=savedProfiles();delete profiles[targetSelect.value.trim().toLowerCase()];localStorage.setItem('remote-gateway-profiles',JSON.stringify(profiles));password.value='';remember.checked=false;forgetButton.disabled=true});
 document.querySelector('#connection-form').addEventListener('submit',event=>{
   event.preventDefault(); error.textContent='';
-  const host=targetSelect.value.trim();
-  if(!host||!username.value||!password.value){error.textContent='请输入主机并填写用户名和密码。';return}
-  const selected=targets.find(item=>item.host.toLowerCase()===host.toLowerCase());
-  const key=host.toLowerCase();
+  const selected=targets.find(item=>item.id===targetSelect.value);
+  if(!selected||!username.value||!password.value){error.textContent='请选择已授权连接并填写用户名和密码。';return}
+  const host=selected.host;
+  const key=selected.id;
   const profiles=savedProfiles();
   if(remember.checked)profiles[key]={username:username.value,password:password.value};else delete profiles[key];
   localStorage.setItem('remote-gateway-profiles',JSON.stringify(profiles));
-  localStorage.setItem('remote-gateway-last-target',host);
+  localStorage.setItem('remote-gateway-last-target',selected.id);
   let settings={};try{settings=JSON.parse(localStorage.getItem('remote-gateway-settings')||'{}')}catch{}
   if(!(Number(settings.width)>0&&Number(settings.height)>0)){
     settings.width=1920;

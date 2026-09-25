@@ -38,20 +38,14 @@ bool SessionManager::start(const std::string& peer_id, const std::string& target
                            std::uint32_t bitrate, bool audio_playback,
                            bool redirect_printers, std::size_t user_identity,
                            std::string& error) {
-    auto target = std::find_if(targets_.begin(), targets_.end(),
+    std::vector<TargetConfig> targets;
+    { std::lock_guard lock(mutex_); targets = targets_; }
+    auto target = std::find_if(targets.begin(), targets.end(),
         [&](const TargetConfig& item) { return item.id == target_id; });
-    if (target == targets_.end()) {
-        target = std::find_if(targets_.begin(), targets_.end(),
-            [&](const TargetConfig& item) { return item.rdp.hostname == host; });
-    }
-    if (target == targets_.end() && host.empty()) { error = "unknown target"; return false; }
-    if (!host.empty() && !host_is_allowed(host, allowed_hosts_)) {
-        error = "host-not-allowed";
-        return false;
-    }
-    const auto& template_target = target == targets_.end() ? targets_.front() : *target;
+    if (target == targets.end()) { error = "unknown target"; return false; }
+    const auto& template_target = *target;
     auto rdp = template_target.rdp;
-    if (!host.empty()) rdp.hostname = host;
+    (void)host;
     if (!username.empty()) rdp.username = username;
     if (!password.empty()) rdp.password = password;
     if (width >= 640 && width <= 7680 && height >= 480 && height <= 4320 &&
@@ -200,6 +194,11 @@ void SessionManager::update_status(const std::string& peer_id,
         found->second->state = state;
         add_event_locked("state", found->second->target_id, peer_id, state);
     }
+}
+
+void SessionManager::set_targets(std::vector<TargetConfig> targets) {
+    std::lock_guard lock(mutex_);
+    targets_ = std::move(targets);
 }
 
 void SessionManager::add_event_locked(std::string type, std::string target_id,
