@@ -7,6 +7,10 @@ Push-Location $project
 try {
   npx playwright test --project=chromium --project=webkit
   if ($LASTEXITCODE -ne 0) { throw 'Browser tests failed' }
+  if ($env:REMOTELINK_TEST_URL -and $env:REMOTELINK_TEST_TOKEN -and $env:REMOTELINK_TEST_RDP_HOST) {
+    node tests/rdp_proxy_integration.mjs
+    if ($LASTEXITCODE -ne 0) { throw 'RDP integration failed' }
+  }
   if ($env:REMOTELINK_TEST_URL -and $env:REMOTELINK_TEST_TOKEN -and $env:REMOTELINK_TEST_VNC_HOST) {
     node tests/vnc_proxy_integration.mjs
     if ($LASTEXITCODE -ne 0) { throw 'VNC integration failed' }

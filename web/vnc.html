@@ -835,14 +835,16 @@
           const row = document.createElement("div");
           row.className = "connection-row";
           row.innerHTML =
-            '<strong></strong><span class="muted address"></span><span class="muted mode"></span><div class="row-actions"><button class="secondary edit">编辑</button><button class="secondary remove">删除</button></div>';
+            '<strong></strong><span class="muted address"></span><span class="muted mode"></span><div class="row-actions"><button class="secondary edit">编辑</button><button class="secondary clear">清除凭据</button><button class="secondary remove">删除</button></div>';
           row.querySelector("strong").textContent = item.name;
           row.querySelector(".address").textContent =
             `${item.host}:${item.port}`;
-          row.querySelector(".mode").textContent = item.viewOnly
-            ? "只读"
-            : "控制";
+          row.querySelector(".mode").textContent =
+            `${item.viewOnly ? "只读" : "控制"} · ${item.hasPassword || item.hasCaCertificate ? "凭据已配置（不回显）" : "未配置凭据"}`;
           row.querySelector(".edit").onclick = () => openConnectionEditor(item);
+          row.querySelector(".clear").disabled =
+            !item.hasPassword && !item.hasCaCertificate;
+          row.querySelector(".clear").onclick = () => clearCredentials(item);
           row.querySelector(".remove").onclick = () => removeConnection(item);
           connectionList.append(row);
         }
@@ -924,6 +926,15 @@
         adminConnections = (await api("/api/admin/vnc")).connections || [];
         renderConnections();
         await refresh();
+      }
+      async function clearCredentials(item) {
+        if (!confirm(`清除“${item.name}”保存的 VNC 凭据？`)) return;
+        await api("/api/admin/vnc/credentials/clear", {
+          method: "POST",
+          body: JSON.stringify({ id: item.id }),
+        });
+        adminConnections = (await api("/api/admin/vnc")).connections || [];
+        renderConnections();
       }
       document.querySelector("#admin-add").onclick = () =>
         openConnectionEditor();

@@ -28,6 +28,9 @@ The gateway runs as a single Linux service. Users only need a modern browser—n
 - Responsive desktop and mobile browser interface
 - Standalone VNC support using noVNC Core and a one-time-ticket WSS-to-RFB proxy
 - Native RemoteLink VNC device, session toolbar, administration, and user-permission UI
+- Native SSH terminal with password or private-key credentials and administrator-confirmed host fingerprints
+- Unified RDP, VNC, and SSH active-session and recent-activity audit views
+- Non-revealing credential status with replace and clear operations for every protocol
 
 ## Architecture
 
@@ -173,6 +176,15 @@ sudo ./scripts/deploy-linux.sh
 sudo ./scripts/rollback-linux.sh
 ./scripts/package-linux.sh
 ```
+
+See [the 0.3 upgrade guide](docs/upgrade-0.3.md) before upgrading an existing
+0.2 installation. Release changes are recorded in [CHANGELOG.md](CHANGELOG.md).
+
+Run `npm run test:e2e` against a local installed service to start the RDP, VNC,
+and SSH containers and execute the full regression. It uses the bootstrap
+`admin` / `admin` account only when no token is supplied; set
+`REMOTELINK_TEST_TOKEN`, or `REMOTELINK_TEST_ADMIN_USERNAME` and
+`REMOTELINK_TEST_ADMIN_PASSWORD`, after changing that credential.
 
 The deployment retains the internal `remote-gateway` service identifier for compatibility, while the product and browser interface use **RemoteLink**.
 

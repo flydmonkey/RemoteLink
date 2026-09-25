@@ -11,12 +11,15 @@
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <nlohmann/json.hpp>
 
 namespace remote_gateway {
 
 struct SessionManager::ManagedSession {
     std::string identity;
     std::string target_id;
+    std::string account_username;
     std::chrono::steady_clock::time_point started_at;
     std::string state = "connecting";
     RdpFrameSource* source = nullptr;
@@ -25,9 +28,22 @@ struct SessionManager::ManagedSession {
 };
 
 SessionManager::SessionManager(WebRtcServer& server, std::vector<TargetConfig> targets,
-                               std::string allowed_hosts)
+                               std::string allowed_hosts, std::filesystem::path audit_path)
     : server_(server), targets_(std::move(targets)),
-      allowed_hosts_(std::move(allowed_hosts)) {}
+      allowed_hosts_(std::move(allowed_hosts)), audit_path_(std::move(audit_path)) {
+    if (audit_path_.empty()) return;
+    std::ifstream input(audit_path_);
+    const auto data = input ? nlohmann::json::parse(input, nullptr, false)
+                            : nlohmann::json{};
+    if (!data.is_array()) return;
+    for (const auto& item : data) {
+        events_.push_back({item.value("timestampMs", 0ULL), item.value("type", ""),
+            item.value("targetId", ""), item.value("peerId", ""),
+            item.value("message", ""), item.value("username", ""),
+            item.value("reason", "")});
+        if (events_.size() >= 200) break;
+    }
+}
 
 SessionManager::~SessionManager() { stop_all(); }
 
@@ -37,7 +53,7 @@ bool SessionManager::start(const std::string& peer_id, const std::string& target
                            std::uint32_t width, std::uint32_t height,
                            std::uint32_t bitrate, bool audio_playback,
                            bool redirect_printers, bool redirect_files, std::size_t user_identity,
-                           std::string& error) {
+                           std::string account_username, std::string& error) {
     std::vector<TargetConfig> targets;
     { std::lock_guard lock(mutex_); targets = targets_; }
     auto target = std::find_if(targets.begin(), targets.end(),
@@ -86,6 +102,7 @@ bool SessionManager::start(const std::string& peer_id, const std::string& target
         auto managed = std::make_unique<ManagedSession>();
         managed->identity = identity;
         managed->target_id = template_target.id;
+        managed->account_username = std::move(account_username);
         managed->started_at = std::chrono::steady_clock::now();
         auto source = std::make_unique<RdpFrameSource>(rdp);
         source->set_status_handler([this, peer_id](const std::string& state) {
@@ -111,7 +128,8 @@ bool SessionManager::start(const std::string& peer_id, const std::string& target
         if (!inserted) throw std::logic_error("reserved peer session disappeared");
         try {
             position->second->session->start();
-            add_event_locked("started", template_target.id, peer_id, "远程会话已创建");
+            add_event_locked("started", template_target.id, peer_id, "远程会话已创建",
+                             position->second->account_username);
         }
         catch (...) {
             sessions_.erase(position);
@@ -150,7 +168,8 @@ void SessionManager::stop(const std::string& peer_id) {
         std::lock_guard lock(mutex_);
         if (auto it = sessions_.find(peer_id); it != sessions_.end()) {
             add_event_locked("stopped", it->second->target_id, peer_id,
-                             "远程会话已结束");
+                             "远程会话已结束", it->second->account_username,
+                             "客户端断开或网络中断");
             removed = std::move(it->second);
             sessions_.erase(it);
             active_identities_.erase(removed->identity);
@@ -203,7 +222,8 @@ void SessionManager::update_status(const std::string& peer_id,
     if (const auto found = sessions_.find(peer_id); found != sessions_.end()) {
         if (found->second->state == state) return;
         found->second->state = state;
-        add_event_locked("state", found->second->target_id, peer_id, state);
+        add_event_locked("state", found->second->target_id, peer_id, state,
+                         found->second->account_username);
     }
 }
 
@@ -213,7 +233,8 @@ void SessionManager::set_targets(std::vector<TargetConfig> targets) {
 }
 
 void SessionManager::add_event_locked(std::string type, std::string target_id,
-                                      std::string peer_id, std::string message) {
+                                      std::string peer_id, std::string message,
+                                      std::string username, std::string reason) {
     const auto now = std::chrono::system_clock::now().time_since_epoch();
     events_.push_front(AdminEvent {
         .timestamp_ms = static_cast<std::uint64_t>(
@@ -222,9 +243,29 @@ void SessionManager::add_event_locked(std::string type, std::string target_id,
         .target_id = std::move(target_id),
         .peer_id = std::move(peer_id),
         .message = std::move(message),
+        .username = std::move(username),
+        .reason = std::move(reason),
     });
     constexpr std::size_t maximum_events = 200;
     if (events_.size() > maximum_events) events_.resize(maximum_events);
+    save_events_locked();
+}
+
+void SessionManager::save_events_locked() const {
+    if (audit_path_.empty()) return;
+    nlohmann::json data = nlohmann::json::array();
+    for (const auto& event : events_) data.push_back({
+        {"timestampMs",event.timestamp_ms},{"type",event.type},
+        {"targetId",event.target_id},{"peerId",event.peer_id},
+        {"message",event.message},{"username",event.username},{"reason",event.reason}});
+    std::filesystem::create_directories(audit_path_.parent_path());
+    const auto temporary = audit_path_.string() + ".tmp";
+    { std::ofstream output(temporary, std::ios::trunc); output << data.dump(2) << '\n';
+      if (!output) return; }
+    std::error_code error;
+    std::filesystem::permissions(temporary, std::filesystem::perms::owner_read |
+        std::filesystem::perms::owner_write, std::filesystem::perm_options::replace, error);
+    std::filesystem::rename(temporary, audit_path_, error);
 }
 
 std::vector<SessionManager::AdminEvent> SessionManager::recent_events() const {
@@ -236,7 +277,8 @@ void SessionManager::record_admin_disconnect(const std::string& peer_id) {
     std::lock_guard lock(mutex_);
     if (const auto found = sessions_.find(peer_id); found != sessions_.end()) {
         add_event_locked("admin-disconnect", found->second->target_id, peer_id,
-                         "管理员请求断开会话");
+                         "管理员请求断开会话", found->second->account_username,
+                         "管理员断开");
     }
 }
 
@@ -255,6 +297,7 @@ std::vector<SessionManager::TargetSnapshot> SessionManager::target_snapshots() c
             .port = target.rdp.port,
             .width = target.rdp.width,
             .height = target.rdp.height,
+            .has_password = !target.rdp.password.empty(),
         };
         const auto active = std::find_if(sessions_.begin(), sessions_.end(),
             [&](const auto& entry) { return entry.second->target_id == target.id; });
@@ -262,6 +305,7 @@ std::vector<SessionManager::TargetSnapshot> SessionManager::target_snapshots() c
             const auto& managed = *active->second;
             snapshot.busy = true;
             snapshot.peer_id = active->first;
+            snapshot.account_username = managed.account_username;
             snapshot.state = managed.state;
             snapshot.connected_seconds = static_cast<std::uint64_t>(
                 std::chrono::duration_cast<std::chrono::seconds>(now - managed.started_at).count());

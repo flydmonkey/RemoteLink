@@ -49,6 +49,27 @@ try {
     },
     { headers, host, port, username, password, privateKey, passphrase },
   );
+  const fingerprint = await page.evaluate(
+    async ({ headers, targetId, host, port, username }) => {
+      const tested = await fetch("/api/admin/ssh/test", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ id: targetId, host, port, username }),
+      });
+      if (!tested.ok) throw new Error(await tested.text());
+      const hostKeySha256 = (await tested.json()).hostKeySha256;
+      const confirmed = await fetch("/api/admin/ssh/trust/confirm", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ id: targetId, fingerprint: hostKeySha256 }),
+      });
+      if (!confirmed.ok) throw new Error(await confirmed.text());
+      return hostKeySha256;
+    },
+    { headers, targetId, host, port, username },
+  );
+  if (!fingerprint.startsWith("SHA256:"))
+    throw new Error("SSH host fingerprint was not confirmed");
   const session = await page.evaluate(
     async ({ headers, targetId }) => {
       const response = await fetch("/api/ssh/sessions", {
@@ -93,7 +114,7 @@ try {
   );
   if (!output.includes("REMOTELINK_SSH_OK"))
     throw new Error("SSH command output missing");
-  const fingerprint = await page.evaluate(
+  const trustedFingerprint = await page.evaluate(
     async ({ headers, targetId }) => {
       const response = await fetch("/api/admin/ssh", { headers });
       const item = (await response.json()).connections.find(
@@ -103,7 +124,7 @@ try {
     },
     { headers, targetId },
   );
-  if (!fingerprint.startsWith("SHA256:"))
+  if (trustedFingerprint !== fingerprint)
     throw new Error("SSH host fingerprint was not pinned");
   console.log(`SSH ${privateKey ? "key" : "password"} integration passed`);
 } finally {

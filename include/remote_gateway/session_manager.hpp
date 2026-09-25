@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -25,9 +26,11 @@ public:
         std::string group;
         std::string host;
         std::string username;
+        std::string account_username;
         std::uint16_t port = 3389;
         std::uint32_t width = 0;
         std::uint32_t height = 0;
+        bool has_password = false;
         bool busy = false;
         std::string peer_id;
         std::string state;
@@ -43,16 +46,18 @@ public:
         std::string target_id;
         std::string peer_id;
         std::string message;
+        std::string username;
+        std::string reason;
     };
     SessionManager(WebRtcServer& server, std::vector<TargetConfig> targets,
-                   std::string allowed_hosts);
+                   std::string allowed_hosts, std::filesystem::path audit_path = {});
     ~SessionManager();
     bool start(const std::string& peer_id, const std::string& target_id,
                const std::string& host, const std::string& username,
                const std::string& password, std::uint32_t width,
                std::uint32_t height, std::uint32_t bitrate,
                bool audio_playback, bool redirect_printers, bool redirect_files,
-               std::size_t user_identity,
+               std::size_t user_identity, std::string account_username,
                std::string& error);
     void input(const std::string& peer_id, const std::string& data);
     void request_key_frame(const std::string& peer_id);
@@ -79,8 +84,11 @@ private:
     std::unordered_map<std::string, std::unique_ptr<ManagedSession>> sessions_;
     std::unordered_set<std::string> active_identities_;
     std::deque<AdminEvent> events_;
+    std::filesystem::path audit_path_;
     void update_status(const std::string& peer_id, const std::string& state);
     void add_event_locked(std::string type, std::string target_id,
-                          std::string peer_id, std::string message);
+                          std::string peer_id, std::string message,
+                          std::string username = {}, std::string reason = {});
+    void save_events_locked() const;
 };
 }  // namespace remote_gateway

@@ -614,6 +614,13 @@
         <div class="dialog-actions">
           <button id="cancel" type="button" class="secondary">取消</button
           ><button id="test" type="button" class="secondary">测试连接</button
+          ><button
+            id="confirm-fingerprint"
+            type="button"
+            class="secondary"
+            hidden
+          >
+            确认并信任指纹</button
           ><button class="primary">保存</button>
         </div>
       </form>
@@ -625,7 +632,8 @@
         manager = document.querySelector("#manager"),
         editor = document.querySelector("#editor");
       let connections = [],
-        editing = null;
+        editing = null,
+        pendingFingerprint = "";
       const settingsMode = location.pathname === "/ssh/settings";
       if (settingsMode) {
         document.body.classList.add("settings-mode");
@@ -703,7 +711,7 @@
           main.className = "row-main";
           main.innerHTML = '<strong></strong><div class="muted"></div>';
           main.children[0].textContent = item.name;
-          main.children[1].textContent = `${item.username}@${item.host}:${item.port} · ${item.authType === "key" ? "私钥" : "密码"}${item.hostKeySha256 ? " · 指纹已信任" : ""}`;
+          main.children[1].textContent = `${item.username}@${item.host}:${item.port} · ${item.authType === "key" ? "私钥" : "密码"} · ${item.hasPassword || item.hasPrivateKey ? "凭据已配置（不回显）" : "未配置凭据"}${item.hostKeySha256 ? " · 指纹已信任" : " · 指纹待确认"}`;
           actions.className = "row-actions";
           actions.append(
             button("编辑", () => openEditor(item)),
@@ -768,6 +776,7 @@
       }
       function openEditor(item = null) {
         editing = item;
+        pendingFingerprint = item?.pendingHostKeySha256 || "";
         document.querySelector("#form").reset();
         document.querySelector("#editor-title").textContent = item
           ? "编辑 SSH 连接"
@@ -777,6 +786,11 @@
             item?.[key] || (key === "port" ? 22 : "");
         document.querySelector("#auth").value = item?.authType || "password";
         toggleAuth();
+        document.querySelector("#editor-notice").textContent =
+          item?.hasPassword || item?.hasPrivateKey
+            ? "凭据已配置（不回显）；留空将保留当前凭据。"
+            : "";
+        document.querySelector("#confirm-fingerprint").hidden = true;
         editor.showModal();
       }
       async function removeConnection(item) {
@@ -869,8 +883,32 @@
             body: JSON.stringify(formPayload()),
           });
           output.textContent = result.authenticated
-            ? `连接成功 · ${result.hostKeySha256}`
+            ? `连接成功 · 主机指纹 ${result.hostKeySha256}${result.trusted ? " · 已信任" : " · 请核对后确认"}`
             : result.error || "连接失败";
+          pendingFingerprint = result.hostKeySha256 || "";
+          document.querySelector("#confirm-fingerprint").hidden =
+            result.trusted || !pendingFingerprint;
+        } catch (error) {
+          output.textContent = error.message;
+        }
+      };
+      document.querySelector("#confirm-fingerprint").onclick = async () => {
+        const output = document.querySelector("#editor-notice");
+        if (!editing?.id) {
+          output.textContent = "请先保存连接，再测试并确认主机指纹。";
+          return;
+        }
+        try {
+          await api("/api/admin/ssh/trust/confirm", {
+            method: "POST",
+            body: JSON.stringify({
+              id: editing.id,
+              fingerprint: pendingFingerprint,
+            }),
+          });
+          output.textContent = `主机指纹已确认 · ${pendingFingerprint}`;
+          document.querySelector("#confirm-fingerprint").hidden = true;
+          await refresh();
         } catch (error) {
           output.textContent = error.message;
         }

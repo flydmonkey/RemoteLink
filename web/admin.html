@@ -1489,6 +1489,7 @@
         for (const target of data.targets) {
           const row = document.createElement("article");
           row.className = `target ${target.busy ? "busy" : ""}`;
+          row.dataset.targetId = target.id;
           const identity = document.createElement("div");
           identity.innerHTML =
             '<div class="target-name"></div><div class="secondary"></div>';
@@ -1497,7 +1498,7 @@
           const address = document.createElement("div");
           address.innerHTML = '<div></div><div class="secondary"></div>';
           address.children[0].textContent = target.host;
-          address.children[1].textContent = target.username;
+          address.children[1].textContent = `${target.username || "未配置用户名"}${target.hasPassword ? " · 凭据已配置（不回显）" : " · 未配置密码"}`;
           const state = document.createElement("div");
           state.className = "state";
           state.innerHTML = `<span class="dot"></span><span>${target.busy ? stateLabels[target.state] || target.state || "占用" : "空闲"}</span>`;
@@ -1516,15 +1517,29 @@
           }
           row.append(identity, address, state, metrics, action);
           targets.append(row);
-          if (target.busy) {
-            const activeRow = row.cloneNode(true);
-            activeRow
-              .querySelector(".disconnect")
-              ?.addEventListener("click", (event) =>
-                disconnect(target, event.currentTarget),
-              );
-            activeSessions.append(activeRow);
-          }
+        }
+        for (const session of data.activeSessions ||
+          data.targets.filter((item) => item.busy)) {
+          const source = targets.querySelector(
+            `.target[data-target-id="${CSS.escape(session.id)}"]`,
+          );
+          if (!source) continue;
+          const activeRow = source.cloneNode(true);
+          activeRow.querySelector(".target-name").textContent =
+            `${session.protocol || "RDP"} · ${session.name}`;
+          const address = activeRow.children[1];
+          address.children[0].textContent = `${session.host}:${session.port}`;
+          address.children[1].textContent = `用户：${session.accountUsername || "—"}`;
+          activeRow.querySelector(".state span:last-child").textContent =
+            stateLabels[session.state] || session.state || "已连接";
+          activeRow.querySelector(".metric-line").textContent =
+            `${duration(session.connectedSeconds || 0)} · ${session.peerId || "—"}`;
+          activeRow
+            .querySelector(".disconnect")
+            ?.addEventListener("click", (event) =>
+              disconnect(session, event.currentTarget),
+            );
+          activeSessions.append(activeRow);
         }
         if (!activeSessions.children.length)
           activeSessions.innerHTML = '<div class="empty">暂无活动会话。</div>';
@@ -1558,10 +1573,10 @@
           type.textContent = labels[item.type] || item.type;
           const peer = document.createElement("div");
           peer.className = "event-peer";
-          peer.textContent = `${item.targetId || "—"} / ${item.peerId || "—"}`;
+          peer.textContent = `${item.protocol || "RDP"} · ${item.targetName || item.targetId || "—"}${item.username ? ` · ${item.username}` : ""}`;
           const message = document.createElement("div");
           message.className = "event-message";
-          message.textContent = stateLabels[item.message] || item.message;
+          message.textContent = `${item.host || item.targetId || "—"} · ${stateLabels[item.message] || item.message}${item.reason ? ` · ${item.reason}` : ""}`;
           row.append(time, type, peer, message);
           eventList.append(row);
         }
@@ -1612,7 +1627,9 @@
           ? "编辑连接"
           : "添加连接";
         connectionForm.querySelector("p").textContent = target
-          ? "修改连接信息。默认密码留空将保留当前密码。"
+          ? target.hasPassword
+            ? "凭据已配置（不回显）。密码留空将保留当前密码。"
+            : "尚未配置密码；保存新密码后只显示配置状态。"
           : "添加由管理员维护的 RDP 连接。用户连接时可以覆盖默认凭据。";
         connectionForm.querySelector('button[type="submit"]').textContent =
           target ? "保存修改" : "添加连接";
@@ -1643,6 +1660,20 @@
         };
         confirmDialog.showModal();
       }
+      function clearConnectionCredentials(target) {
+        document.querySelector("#confirm-title").textContent = "清除凭据";
+        document.querySelector("#confirm-message").textContent =
+          `确定清除“${target.name}”保存的 RDP 密码？清除后需要重新配置才能连接。`;
+        confirmAction = async () => {
+          await api("/api/admin/connections/credentials/clear", {
+            method: "POST",
+            body: JSON.stringify({ id: target.id }),
+          });
+          await refresh();
+          notice.textContent = `已清除 ${target.name} 的保存凭据`;
+        };
+        confirmDialog.showModal();
+      }
       new MutationObserver(() => {
         [...targets.querySelectorAll(".target")].forEach((row, index) => {
           const target = adminTargets[index],
@@ -1660,7 +1691,14 @@
           remove.disabled = target.busy;
           remove.title = target.busy ? "请先断开当前会话" : "";
           remove.addEventListener("click", () => deleteConnection(target));
-          actions.prepend(edit, remove);
+          const clear = document.createElement("button");
+          clear.className = "small-button";
+          clear.textContent = "清除凭据";
+          clear.disabled = !target.hasPassword;
+          clear.addEventListener("click", () =>
+            clearConnectionCredentials(target),
+          );
+          actions.prepend(edit, clear, remove);
         });
       }).observe(targets, { childList: true });
       const connectionToolbar =
@@ -2049,14 +2087,13 @@
           api("/api/admin/vnc/activity"),
           api("/api/admin/ssh/activity"),
         ]);
-        const activityTargets = new Map(
-          [...vncActivity.active, ...sshActivity.active].map((item) => [
-            item.targetId,
-            item,
-          ]),
-        );
+        const activeSessions = state.targets
+          .filter((item) => item.busy)
+          .map((item) => ({ ...item, protocol: "RDP" }));
         for (const item of vnc.connections) {
-          const active = activityTargets.get(item.id);
+          const active = vncActivity.active.find(
+            (entry) => entry.targetId === item.id,
+          );
           state.targets.push({
             id: item.id,
             name: item.name,
@@ -2074,9 +2111,25 @@
               ? Math.max(0, Math.floor(Date.now() / 1000) - active.startedAt)
               : 0,
           });
+          for (const session of vncActivity.active.filter(
+            (entry) => entry.targetId === item.id,
+          ))
+            activeSessions.push({
+              ...state.targets.at(-1),
+              busy: true,
+              peerId: session.id,
+              accountUsername: session.username,
+              state: "connected",
+              connectedSeconds: Math.max(
+                0,
+                Math.floor(Date.now() / 1000) - session.startedAt,
+              ),
+            });
         }
         for (const item of ssh.connections) {
-          const active = activityTargets.get(item.id);
+          const active = sshActivity.active.find(
+            (entry) => entry.targetId === item.id,
+          );
           state.targets.push({
             id: item.id,
             name: item.name,
@@ -2094,6 +2147,20 @@
               ? Math.max(0, Math.floor(Date.now() / 1000) - active.startedAt)
               : 0,
           });
+          for (const session of sshActivity.active.filter(
+            (entry) => entry.targetId === item.id,
+          ))
+            activeSessions.push({
+              ...state.targets.at(-1),
+              busy: true,
+              peerId: session.id,
+              accountUsername: session.username,
+              state: "connected",
+              connectedSeconds: Math.max(
+                0,
+                Math.floor(Date.now() / 1000) - session.startedAt,
+              ),
+            });
         }
         for (const target of state.targets)
           target.protocol = target.protocol || "RDP";
@@ -2107,13 +2174,31 @@
               timestampMs: (item.endedAt || item.startedAt) * 1000,
               type: item.endedAt ? "stopped" : "started",
               targetId: item.targetId,
+              targetName: item.targetName,
               peerId: item.id,
-              message: `${protocol} · ${item.targetName}${item.username ? " · " + item.username : ""}`,
+              protocol,
+              username: item.username,
+              host:
+                (protocol === "VNC" ? vnc.connections : ssh.connections).find(
+                  (target) => target.id === item.targetId,
+                )?.host || "",
+              message: item.endedAt ? "会话已结束" : "远程会话已创建",
+              reason: item.reason || "",
             });
+        const targetsById = new Map(
+          state.targets.map((target) => [target.id, target]),
+        );
+        for (const event of state.events || []) {
+          const target = targetsById.get(event.targetId);
+          event.protocol = event.protocol || "RDP";
+          event.targetName = event.targetName || target?.name || event.targetId;
+          event.host = event.host || target?.host || "";
+        }
         state.events = [...(state.events || []), ...extraEvents].sort(
           (a, b) => b.timestampMs - a.timestampMs,
         );
-        state.sessions += vncActivity.active.length + sshActivity.active.length;
+        state.activeSessions = activeSessions;
+        state.sessions = activeSessions.length;
         return state;
       }
       refresh = async function () {

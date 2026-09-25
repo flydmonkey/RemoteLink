@@ -41,6 +41,14 @@ The LAN release is verified with the following gates:
 17. `/admin` rejects a wrong token, refreshes target/session counters every two
     seconds, and never displays target passwords. Its disconnect action removes
     the selected session; an open remote page can then reconnect cleanly.
+18. The unified activity view identifies RDP, VNC, and SSH sessions by
+    RemoteLink user, target, address, timestamp, and disconnect reason.
+19. RDP, VNC, and SSH management APIs expose only `has*` credential status;
+    clearing a credential removes its protected secret file.
+20. A new or reset SSH target rejects user sessions until an administrator
+    tests and explicitly confirms the observed SHA-256 host fingerprint.
+21. `npm run test:e2e` starts the three protocol containers and runs the RDP
+    reachability/credential, VNC proxy, and SSH trust/terminal integrations.
 
 Do not put access tokens or RDP passwords into this file, command history,
 screenshots, source files, or test fixtures.

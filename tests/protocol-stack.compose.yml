@@ -1,14 +1,17 @@
 services:
   rdp:
+    container_name: remotelink-rdp-test
     image: danielguerra/ubuntu-xrdp:latest
     ports: ["127.0.0.1:13389:3389"]
   vnc:
+    container_name: remotelink-vnc-test
     image: dorowu/ubuntu-desktop-lxde-vnc:latest
     environment:
       VNC_PASSWORD: remotelink
       RESOLUTION: 1920x1080
     ports: ["127.0.0.1:15900:5900"]
   ssh:
+    container_name: remotelink-ssh-test
     image: lscr.io/linuxserver/openssh-server:latest
     environment:
       PUID: 1000

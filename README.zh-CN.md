@@ -29,6 +29,9 @@ RemoteLink 是一款可自行部署、通过浏览器使用的远程连接工具
 - 独立 VNC 支持：使用 noVNC Core，通过一次性票据建立 WSS 到 RFB 的代理连接
 - RemoteLink 自有 VNC 设备页、会话工具栏、连接管理和用户授权界面
 - 独立 SSH 终端，支持用户名密码和 PEM/OpenSSH 私钥认证
+- 统一查看 RDP、VNC、SSH 活动会话、最近活动和断开原因
+- 三种协议均支持替换、清除凭据，并只显示“已配置”而不回显内容
+- SSH 主机指纹必须经过管理员测试、核对并明确确认后才允许连接
 
 ## 架构
 
@@ -51,10 +54,14 @@ RemoteLink VNC 页面（noVNC Core，不含 noVNC UI）
 SSH 同样使用 30 秒有效的一次性 WSS 票据。密码、私钥和私钥口令仅保存在服务端的
 属主可读凭据文件中，浏览器不会收到这些凭据。
 
-从 0.1 升级到 0.2 不需要手工迁移数据。首次 SSH 连接会记录主机指纹；目标设备重装后，
-管理员需要在 SSH 连接管理中执行“重置信任”。发布前可运行 `npm run test:release` 完成一键回归。
+从 0.2 升级到 0.3 不需要手工迁移数据，具体兼容行为和 SSH 指纹确认流程见
+[`docs/upgrade-0.3.md`](docs/upgrade-0.3.md)。目标设备重装后，管理员需要在 SSH 连接管理中
+执行“重置信任”，重新测试并确认新指纹。发布前可运行 `npm run test:release` 完成一键回归。
 运行 `npm run test:e2e` 会启动隔离的 RDP、VNC、SSH 测试容器并执行回归；设置
 `REMOTELINK_KEEP_TEST_STACK=1` 可在测试后保留容器用于人工检查。
+脚本仅在未提供令牌时尝试测试环境的初始 `admin` / `admin` 账号；修改初始密码后，
+请设置 `REMOTELINK_TEST_TOKEN`，或设置 `REMOTELINK_TEST_ADMIN_USERNAME` 和
+`REMOTELINK_TEST_ADMIN_PASSWORD`。
 
 ```text
 浏览器

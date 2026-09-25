@@ -4,7 +4,7 @@ set -euo pipefail
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 build_dir="${BUILD_DIR:-${project_root}/build}"
 output_dir="${project_root}/dist"
-version="${PACKAGE_VERSION:-$(date -u +%Y%m%d%H%M%S)}"
+version="${PACKAGE_VERSION:-$(tr -d '[:space:]' < "${project_root}/VERSION")}"
 version="${version#v}"
 version="${version//\//-}"
 stage="$(mktemp -d)"
@@ -34,7 +34,9 @@ install -m 0644 "${project_root}/config/remote-gateway.env.example" \
   "${project_root}/config/targets.example.json" \
   "${project_root}/config/targets.systemd.example.json" "${package_root}/config/"
 cp -a "${project_root}/scripts" "${package_root}/scripts"
-install -m 0644 "${project_root}/README.md" "${project_root}/README.zh-CN.md" "${package_root}/"
+install -m 0644 "${project_root}/README.md" "${project_root}/README.zh-CN.md" \
+  "${project_root}/VERSION" "${project_root}/CHANGELOG.md" "${package_root}/"
+cp -a "${project_root}/docs" "${package_root}/docs"
 mkdir -p "${output_dir}"
 archive="${output_dir}/RemoteLink-linux-x86_64-${version}.tar.gz"
 tar -C "${stage}" -czf "${archive}" RemoteLink

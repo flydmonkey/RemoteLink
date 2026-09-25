@@ -75,6 +75,7 @@ struct SshConnection {
     std::string private_key;
     std::string passphrase;
     std::string host_key_sha256;
+    std::string pending_host_key_sha256;
 };
 
 struct VncActivity {
@@ -85,6 +86,7 @@ struct VncActivity {
     std::int64_t started_at = 0;
     std::int64_t ended_at = 0;
     bool active = true;
+    std::string reason;
 };
 
 struct VncBridgeLease {
@@ -105,7 +107,8 @@ std::vector<VncActivity> load_vnc_activity(const std::filesystem::path& path) {
     for (const auto& item : data) activity.push_back({item.value("id", ""),
         item.value("targetId", ""), item.value("targetName", ""),
         item.value("username", ""), item.value("startedAt", 0LL),
-        item.value("endedAt", 0LL), item.value("active", false)});
+        item.value("endedAt", 0LL), item.value("active", false),
+        item.value("reason", "")});
     return activity;
 }
 
@@ -115,7 +118,7 @@ void save_vnc_activity(const std::filesystem::path& path,
     for (const auto& item : activity) data.push_back({{"id",item.id},
         {"targetId",item.target_id},{"targetName",item.target_name},
         {"username",item.username},{"startedAt",item.started_at},
-        {"endedAt",item.ended_at},{"active",item.active}});
+        {"endedAt",item.ended_at},{"active",item.active},{"reason",item.reason}});
     const auto temporary = path.string() + ".tmp";
     { std::ofstream output(temporary, std::ios::trunc); output << data.dump(2);
       if (!output) throw std::runtime_error("cannot save VNC activity"); }
@@ -343,6 +346,7 @@ std::vector<SshConnection> load_ssh_connections(const std::filesystem::path& pat
             item.value("host", ""), static_cast<std::uint16_t>(item.value("port", 22)),
             item.value("username", "")};
         connection.host_key_sha256 = item.value("hostKeySha256", "");
+        connection.pending_host_key_sha256 = item.value("pendingHostKeySha256", "");
         const auto credential_file = item.value("credentialFile", "");
         if (!credential_file.empty()) {
             std::ifstream secret(credential_file);
@@ -378,6 +382,7 @@ void save_ssh_connections(const std::filesystem::path& path,
         data.push_back({{"id",connection.id},{"name",connection.name},{"host",connection.hostname},
             {"port",connection.port},{"username",connection.username},
             {"hostKeySha256",connection.host_key_sha256},
+            {"pendingHostKeySha256",connection.pending_host_key_sha256},
             {"credentialFile",secret_path.string()}});
     }
     const auto temporary = path.string() + ".tmp";
@@ -541,7 +546,7 @@ int main() {
     auto ssh_activity=load_vnc_activity(ssh_activity_path);
     const auto ssh_startup_time=std::chrono::duration_cast<std::chrono::seconds>(
         std::chrono::system_clock::now().time_since_epoch()).count();
-    for(auto& item:ssh_activity)if(item.active){item.active=false;item.ended_at=ssh_startup_time;}
+    for(auto& item:ssh_activity)if(item.active){item.active=false;item.ended_at=ssh_startup_time;item.reason="服务重启";}
     if(!ssh_activity.empty())save_vnc_activity(ssh_activity_path,ssh_activity);
     remote_gateway::VncTicketStore vnc_tickets;
     std::mutex vnc_bridges_mutex;
@@ -570,7 +575,7 @@ int main() {
     const auto startup_time = std::chrono::duration_cast<std::chrono::seconds>(
         std::chrono::system_clock::now().time_since_epoch()).count();
     for (auto& item : vnc_activity) if (item.active) {
-        item.active = false; item.ended_at = startup_time;
+        item.active = false; item.ended_at = startup_time; item.reason = "服务重启";
     }
     if (!vnc_activity.empty()) save_vnc_activity(vnc_activity_path, vnc_activity);
     const auto connections_migration_marker = state_root / "connections.migrated";
@@ -608,8 +613,9 @@ int main() {
         for (const auto& user : users) permissions.push_back(user.allowed_targets);
         webrtc.set_user_target_permissions(std::move(permissions));
     }
-    remote_gateway::SessionManager sessions(webrtc, target_catalog, allowed_hosts);
-    webrtc.set_start_handler([&sessions](const std::string& peer, const std::string& target,
+    remote_gateway::SessionManager sessions(webrtc, target_catalog, allowed_hosts,
+                                             state_root / "rdp-activity.json");
+    webrtc.set_start_handler([&sessions, &users, &users_mutex](const std::string& peer, const std::string& target,
                                          const std::string& host, const std::string& username,
                                          const std::string& password,
                                          std::uint32_t width, std::uint32_t height,
@@ -617,9 +623,12 @@ int main() {
                                          bool redirect_printers, bool redirect_files,
                                          std::size_t user_identity,
                                          std::string& error) {
+        std::string account_username;
+        { std::lock_guard lock(users_mutex);
+          if (user_identity < users.size()) account_username = users[user_identity].username; }
         return sessions.start(peer, target, host, username, password, width, height,
                               bitrate, audio_playback, redirect_printers, redirect_files,
-                              user_identity, error);
+                              user_identity, std::move(account_username), error);
     });
     webrtc.set_input_handler([&sessions](const std::string& peer, const std::string& input) { sessions.input(peer, input); });
     webrtc.set_bitrate_handler([&sessions](const std::string& peer, std::uint32_t bitrate) { return sessions.set_bitrate(peer, bitrate); });
@@ -643,7 +652,7 @@ int main() {
         {std::lock_guard activity_lock(ssh_activity_mutex);
          const auto entry=std::find_if(ssh_activity.begin(),ssh_activity.end(),[&](const auto& item){return item.id==destination.session_id;});
          if(connected&&entry==ssh_activity.end()){ssh_activity.push_back({destination.session_id,destination.target_id,destination.target_name,destination.username,now,0,true});if(ssh_activity.size()>200)ssh_activity.erase(ssh_activity.begin());}
-         else if(!connected&&entry!=ssh_activity.end()){entry->active=false;entry->ended_at=now;}
+         else if(!connected&&entry!=ssh_activity.end()){entry->active=false;entry->ended_at=now;if(entry->reason.empty())entry->reason="客户端断开或网络中断";}
          try{save_vnc_activity(ssh_activity_path,ssh_activity);}catch(const std::exception& error){std::cerr<<"cannot persist SSH activity: "<<error.what()<<'\n';}}
         {std::lock_guard lock(ssh_bridges_mutex);const auto found=ssh_bridges.find(destination.session_id);
          if(connected&&found!=ssh_bridges.end())found->second.expires_at=std::chrono::steady_clock::time_point::max();
@@ -674,6 +683,7 @@ int main() {
         } else if (!connected && found != vnc_activity.end()) {
             found->active = false;
             found->ended_at = now;
+            if (found->reason.empty()) found->reason = "客户端断开或网络中断";
         }
         try {
             save_vnc_activity(vnc_activity_path, vnc_activity);
@@ -763,16 +773,15 @@ int main() {
             const auto connection=std::find_if(ssh_connections.begin(),ssh_connections.end(),
                 [&](const auto& item){return item.id==target_id;});
             if(connection==ssh_connections.end()){response.status=404;response.body=json{{"error","SSH target not found"}}.dump();return response;}
+            if(connection->host_key_sha256.empty()){
+                response.status=409;response.body=json{{"error","SSH 主机指纹尚未由管理员确认"}}.dump();return response;
+            }
             std::string error;
             auto bridge=remote_gateway::SshBridge::create({.hostname=connection->hostname,
                 .port=connection->port,.username=connection->username,.password=connection->password,
                 .private_key=connection->private_key,.passphrase=connection->passphrase,
                 .host_key_sha256=connection->host_key_sha256},error);
             if(!bridge){response.status=502;response.body=json{{"error",error}}.dump();return response;}
-            if(connection->host_key_sha256.empty()){
-                connection->host_key_sha256=bridge->host_key_sha256();
-                save_ssh_connections(ssh_connections_path,ssh_connection_secrets_path,ssh_connections);
-            }
             const auto ticket=ssh_tickets.issue({.target_id=connection->id,.target_name=connection->name,
                 .username=gateway_username,.hostname="127.0.0.1",.port=bridge->port()});
             {std::lock_guard bridge_lock(ssh_bridges_mutex);ssh_bridges.emplace(ticket,SshBridgeLease{
@@ -841,12 +850,13 @@ int main() {
                 for(const auto& item:ssh_connections) connections.push_back({{"id",item.id},{"name",item.name},
                     {"host",item.hostname},{"port",item.port},{"username",item.username},
                     {"authType",item.private_key.empty()?"password":"key"},{"hasPassword",!item.password.empty()},
-                    {"hasPrivateKey",!item.private_key.empty()},{"hostKeySha256",item.host_key_sha256}});
+                    {"hasPrivateKey",!item.private_key.empty()},{"hostKeySha256",item.host_key_sha256},
+                    {"pendingHostKeySha256",item.pending_host_key_sha256}});
                 response.body=json{{"connections",std::move(connections)}}.dump();return response;
             }
             if(request.method=="GET"&&request.path=="/api/admin/ssh/activity"){
                 json active=json::array(),history=json::array();std::lock_guard lock(ssh_activity_mutex);
-                for(auto item=ssh_activity.rbegin();item!=ssh_activity.rend();++item){json entry={{"id",item->id},{"targetId",item->target_id},{"targetName",item->target_name},{"username",item->username},{"startedAt",item->started_at},{"endedAt",item->ended_at}};(item->active?active:history).push_back(std::move(entry));}
+                for(auto item=ssh_activity.rbegin();item!=ssh_activity.rend();++item){json entry={{"id",item->id},{"targetId",item->target_id},{"targetName",item->target_name},{"username",item->username},{"startedAt",item->started_at},{"endedAt",item->ended_at},{"reason",item->reason}};(item->active?active:history).push_back(std::move(entry));}
                 response.body=json{{"active",std::move(active)},{"history",std::move(history)}}.dump();return response;
             }
             const auto payload=json::parse(request.body,nullptr,false);
@@ -869,8 +879,19 @@ int main() {
                     .port=candidate.port,.username=candidate.username,.password=candidate.password,
                     .private_key=candidate.private_key,.passphrase=candidate.passphrase,
                     .host_key_sha256=candidate.host_key_sha256},error);
-                response.body=bridge?json{{"reachable",true},{"authenticated",true},{"hostKeySha256",bridge->host_key_sha256()}}.dump():
-                    json{{"reachable",false},{"authenticated",false},{"error",error}}.dump();return response;
+                if(bridge){
+                    const auto fingerprint=bridge->host_key_sha256();
+                    if(!candidate.id.empty()){
+                        std::lock_guard lock(ssh_connections_mutex);
+                        const auto found=std::find_if(ssh_connections.begin(),ssh_connections.end(),[&](const auto& item){return item.id==candidate.id;});
+                        if(found!=ssh_connections.end()&&found->host_key_sha256.empty()){
+                            found->pending_host_key_sha256=fingerprint;
+                            save_ssh_connections(ssh_connections_path,ssh_connection_secrets_path,ssh_connections);
+                        }
+                    }
+                    response.body=json{{"reachable",true},{"authenticated",true},{"hostKeySha256",fingerprint},
+                        {"trusted",!candidate.host_key_sha256.empty()}}.dump();
+                }else response.body=json{{"reachable",false},{"authenticated",false},{"error",error}}.dump();return response;
             }
             if(request.method=="POST"&&request.path=="/api/admin/ssh/save"){
                 auto id=payload.value("id","");const auto supplied_id=id;
@@ -894,7 +915,7 @@ int main() {
                     if(auth_type=="key"&&updated.private_key.empty()) updated.private_key=found->private_key;
                     if(auth_type=="key"&&updated.passphrase.empty()) updated.passphrase=found->passphrase;
                     if(auth_type=="password"){updated.private_key.clear();updated.passphrase.clear();}else updated.password.clear();
-                    if(found->hostname==updated.hostname&&found->port==updated.port) updated.host_key_sha256=found->host_key_sha256;
+                    if(found->hostname==updated.hostname&&found->port==updated.port){updated.host_key_sha256=found->host_key_sha256;updated.pending_host_key_sha256=found->pending_host_key_sha256;}
                     *found=std::move(updated);
                 }else{
                     if((auth_type=="password"&&updated.password.empty())||(auth_type=="key"&&updated.private_key.empty())){
@@ -915,14 +936,25 @@ int main() {
                 response.body=json{{"deleted",true}}.dump();return response;
             }
             if(request.method=="POST"&&request.path=="/api/admin/ssh/disconnect"){
-                const auto id=payload.value("id","");std::lock_guard lock(ssh_bridges_mutex);
-                const auto removed=ssh_bridges.erase(id);response.body=json{{"disconnected",removed!=0}}.dump();return response;
+                const auto id=payload.value("id","");
+                {std::lock_guard activity_lock(ssh_activity_mutex);const auto entry=std::find_if(ssh_activity.begin(),ssh_activity.end(),[&](const auto& item){return item.id==id&&item.active;});if(entry!=ssh_activity.end())entry->reason="管理员断开";}
+                std::lock_guard lock(ssh_bridges_mutex);const auto removed=ssh_bridges.erase(id);response.body=json{{"disconnected",removed!=0}}.dump();return response;
+            }
+            if(request.method=="POST"&&request.path=="/api/admin/ssh/trust/confirm"){
+                const auto id=payload.value("id","");const auto fingerprint=payload.value("fingerprint","");std::lock_guard lock(ssh_connections_mutex);
+                const auto found=std::find_if(ssh_connections.begin(),ssh_connections.end(),[&](const auto& item){return item.id==id;});
+                if(found==ssh_connections.end()){response.status=404;response.body=json{{"error","SSH connection not found"}}.dump();return response;}
+                if(fingerprint.empty()||fingerprint!=found->pending_host_key_sha256){response.status=409;response.body=json{{"error","请先重新测试并核对主机指纹"}}.dump();return response;}
+                std::string error;auto bridge=remote_gateway::SshBridge::create({.hostname=found->hostname,.port=found->port,.username=found->username,.password=found->password,.private_key=found->private_key,.passphrase=found->passphrase,.host_key_sha256=fingerprint},error);
+                if(!bridge){response.status=409;response.body=json{{"error",error}}.dump();return response;}
+                found->host_key_sha256=fingerprint;found->pending_host_key_sha256.clear();save_ssh_connections(ssh_connections_path,ssh_connection_secrets_path,ssh_connections);
+                response.body=json{{"trusted",true},{"hostKeySha256",fingerprint}}.dump();return response;
             }
             if(request.method=="POST"&&(request.path=="/api/admin/ssh/trust/reset"||request.path=="/api/admin/ssh/credentials/clear")){
                 const auto id=payload.value("id","");std::lock_guard lock(ssh_connections_mutex);
                 const auto found=std::find_if(ssh_connections.begin(),ssh_connections.end(),[&](const auto& item){return item.id==id;});
                 if(found==ssh_connections.end()){response.status=404;response.body=json{{"error","SSH connection not found"}}.dump();return response;}
-                if(request.path.ends_with("trust/reset"))found->host_key_sha256.clear();
+                if(request.path.ends_with("trust/reset")){found->host_key_sha256.clear();found->pending_host_key_sha256.clear();}
                 else{found->password.clear();found->private_key.clear();found->passphrase.clear();}
                 save_ssh_connections(ssh_connections_path,ssh_connection_secrets_path,ssh_connections);
                 response.body=json{{"updated",true}}.dump();return response;
@@ -950,7 +982,8 @@ int main() {
                 for (auto item = vnc_activity.rbegin(); item != vnc_activity.rend(); ++item) {
                     json entry={{"id",item->id},{"targetId",item->target_id},
                         {"targetName",item->target_name},{"username",item->username},
-                        {"startedAt",item->started_at},{"endedAt",item->ended_at}};
+                        {"startedAt",item->started_at},{"endedAt",item->ended_at},
+                        {"reason",item->reason}};
                     (item->active ? active : history).push_back(std::move(entry));
                 }
                 response.body=json{{"active",std::move(active)},{"history",std::move(history)}}.dump(); return response;
@@ -1103,8 +1136,18 @@ int main() {
                 response.body=json{{"deleted",true}}.dump(); return response;
             }
             if(request.method=="POST"&&request.path=="/api/admin/vnc/disconnect"){
-                const auto id=payload.value("id","");std::lock_guard lock(vnc_bridges_mutex);
-                const auto removed=vnc_bridges.erase(id);response.body=json{{"disconnected",removed!=0}}.dump();return response;
+                const auto id=payload.value("id","");
+                {std::lock_guard activity_lock(vnc_activity_mutex);const auto entry=std::find_if(vnc_activity.begin(),vnc_activity.end(),[&](const auto& item){return item.id==id&&item.active;});if(entry!=vnc_activity.end())entry->reason="管理员断开";}
+                std::lock_guard lock(vnc_bridges_mutex);const auto removed=vnc_bridges.erase(id);response.body=json{{"disconnected",removed!=0}}.dump();return response;
+            }
+            if(request.method=="POST"&&request.path=="/api/admin/vnc/credentials/clear"){
+                const auto id=payload.value("id","");std::lock_guard lock(vnc_connections_mutex);
+                const auto found=std::find_if(vnc_connections.begin(),vnc_connections.end(),[&](const auto& item){return item.id==id;});
+                if(found==vnc_connections.end()){response.status=404;response.body=json{{"error","VNC connection not found"}}.dump();return response;}
+                found->username.clear();found->password.clear();found->ca_file.clear();
+                std::filesystem::remove(vnc_ca_path/(id+".pem"));
+                save_vnc_connections(vnc_connections_path,vnc_connection_secrets_path,vnc_connections);
+                response.body=json{{"updated",true}}.dump();return response;
             }
             response.status=405; response.body=json{{"error","method not allowed"}}.dump(); return response;
         }
@@ -1233,6 +1276,21 @@ int main() {
                     webrtc.set_user_target_permissions(std::move(permissions));
                 }
                 response.body = json{{"id", id}, {"status", "deleted"}}.dump(); return response;
+            }
+            if (request.method == "POST" && request.path == "/api/admin/connections/credentials/clear") {
+                const auto payload = json::parse(request.body, nullptr, false);
+                const std::string id = payload.is_object() ? payload.value("id", "") : "";
+                auto managed = std::find_if(managed_targets.begin(), managed_targets.end(),
+                    [&](const auto& target) { return target.id == id; });
+                auto catalog = std::find_if(target_catalog.begin(), target_catalog.end(),
+                    [&](const auto& target) { return target.id == id; });
+                if (managed == managed_targets.end() || catalog == target_catalog.end()) {
+                    response.status = 404; response.body = json{{"error", "connection not found"}}.dump(); return response;
+                }
+                managed->rdp.password.clear(); catalog->rdp.password.clear();
+                save_managed_connections(connections_path, connection_secrets_path, managed_targets);
+                sessions.set_targets(target_catalog);
+                response.body = json{{"updated", true}}.dump(); return response;
             }
             response.status = 404; response.body = json{{"error", "not found"}}.dump(); return response;
         }
@@ -1605,9 +1663,11 @@ int main() {
                 targets_json.push_back({
                     {"id", target.id}, {"name", target.name}, {"group", target.group},
                     {"host", target.host}, {"username", target.username}, {"port", target.port},
+                    {"accountUsername", target.account_username},
                     {"managed", std::any_of(managed_targets.begin(), managed_targets.end(),
                         [&](const auto& item) { return item.id == target.id; })},
                     {"width", target.width}, {"height", target.height},
+                    {"hasPassword", target.has_password},
                     {"busy", target.busy}, {"peerId", target.peer_id},
                     {"state", target.state},
                     {"connectedSeconds", target.connected_seconds},
@@ -1622,7 +1682,8 @@ int main() {
                 events_json.push_back({
                     {"timestampMs", event.timestamp_ms}, {"type", event.type},
                     {"targetId", event.target_id}, {"peerId", event.peer_id},
-                    {"message", event.message}
+                    {"message", event.message}, {"username", event.username},
+                    {"reason", event.reason}
                 });
             }
             response.body = json{
