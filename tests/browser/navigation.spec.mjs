@@ -159,6 +159,7 @@ test("VNC administrators add connections from management only", async ({
   ).toHaveAttribute("href", "/vnc.html?admin=1");
   await page.getByRole("link", { name: "管理", exact: true }).click();
   await expect(page.locator(".admin-title")).toBeVisible();
+  await expect(page.locator(".app")).toHaveCSS("height", "532px");
   await expect(page.locator(".admin-title")).toContainText("管理");
   await expect(page.locator(".admin-title a")).toHaveAttribute("href", "/vnc");
   await expect(page.locator(".admin-title a svg")).toBeVisible();
@@ -245,6 +246,7 @@ test("SSH page exposes password and key connection management", async ({
   await expect(page.locator("#account-menu")).toBeVisible();
   await expect(page.locator("#logout")).toHaveText("退出登录");
   await page.evaluate(() => document.querySelector("#manager").showModal());
+  await expect(page.locator(".settings-layout")).toHaveCSS("height", "480px");
   await expect(page.locator(".settings-title a svg")).toBeVisible();
   await expect(page.locator(".settings-title a")).toHaveCSS("width", "34px");
   await expect(page.getByRole("link", { name: "连接管理" })).toBeVisible();
@@ -349,6 +351,7 @@ test("VNC legacy management UI is no longer duplicated", async ({ page }) => {
 
 test("RDP connection editor does not expose grouping", async ({ page }) => {
   await page.goto("/admin.html");
+  await expect(page.locator(".admin-shell")).toHaveCSS("height", "532px");
   await expect(page.locator(".section-nav a")).toHaveCount(3);
   await expect(page.locator(".section-nav a").nth(0)).toHaveText("连接管理");
   await expect(page.locator(".section-nav a").nth(1)).toHaveText(
