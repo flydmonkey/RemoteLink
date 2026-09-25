@@ -490,6 +490,9 @@
       "已配置密码；留空将保留现有密码。": "已設定密碼；留空將保留現有密碼。",
       "已托管 CA 证书；不选择新文件将保留现有证书。":
         "已託管 CA 憑證；不選擇新檔案將保留現有憑證。",
+      "VNC 连接失败，正在重试…": "VNC 連線失敗，正在重試…",
+      "连接中断，正在重新连接…": "連線中斷，正在重新連線…",
+      "将在 {seconds} 秒后自动重试。": "將在 {seconds} 秒後自動重試。",
       私钥: "私鑰",
       "私钥口令（可选）": "私鑰密碼（選填）",
       密码登录: "密碼登入",
@@ -545,6 +548,10 @@
         "A password is configured; leave blank to keep it.",
       "已托管 CA 证书；不选择新文件将保留现有证书。":
         "A CA certificate is stored; choose no file to keep it.",
+      "VNC 连接失败，正在重试…": "VNC connection failed, retrying…",
+      "连接中断，正在重新连接…": "Connection interrupted, reconnecting…",
+      "将在 {seconds} 秒后自动重试。":
+        "Retrying automatically in {seconds} seconds.",
       私钥: "Private key",
       "私钥口令（可选）": "Key passphrase (optional)",
       密码登录: "Password",
@@ -600,6 +607,9 @@
         "パスワードは設定済みです。空欄のままにすると保持されます。",
       "已托管 CA 证书；不选择新文件将保留现有证书。":
         "CA 証明書は保存済みです。新しいファイルを選択しなければ保持されます。",
+      "VNC 连接失败，正在重试…": "VNC 接続に失敗しました。再試行中…",
+      "连接中断，正在重新连接…": "接続が中断されました。再接続中…",
+      "将在 {seconds} 秒后自动重试。": "{seconds} 秒後に自動的に再試行します。",
       私钥: "秘密鍵",
       "私钥口令（可选）": "秘密鍵パスフレーズ（任意）",
       密码登录: "パスワード",
@@ -655,6 +665,10 @@
         "비밀번호가 설정되어 있습니다. 비워 두면 기존 비밀번호가 유지됩니다.",
       "已托管 CA 证书；不选择新文件将保留现有证书。":
         "CA 인증서가 저장되어 있습니다. 새 파일을 선택하지 않으면 기존 인증서가 유지됩니다.",
+      "VNC 连接失败，正在重试…": "VNC 연결에 실패했습니다. 재시도 중…",
+      "连接中断，正在重新连接…": "연결이 중단되었습니다. 다시 연결 중…",
+      "将在 {seconds} 秒后自动重试。":
+        "{seconds}초 후 자동으로 다시 시도합니다.",
       私钥: "개인 키",
       "私钥口令（可选）": "키 암호(선택 사항)",
       密码登录: "비밀번호",
@@ -858,6 +872,9 @@
     language,
     preference,
     supported,
+    t(value) {
+      return dictionaries[language]?.[value] || value;
+    },
     setLanguage(value) {
       localStorage.setItem("remotelink-language", value);
       location.reload();

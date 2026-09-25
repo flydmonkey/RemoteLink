@@ -350,79 +350,130 @@
       const token = sessionStorage.getItem("remote-gateway-access-token") || "";
       const parameters = new URLSearchParams(location.search);
       const targetId = parameters.get("target") || "";
-      document.querySelector("#disconnect").onclick = () =>
+      let rfb = null,
+        reconnectTimer = null,
+        consecutiveFailures = 0,
+        connectedAt = 0,
+        connectionGeneration = 0,
+        leaving = false;
+      document.querySelector("#disconnect").onclick = () => {
+        leaving = true;
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        rfb?.disconnect();
         location.replace("/vnc");
+      };
       if (!token || !targetId) {
         location.replace("/vnc");
         throw new Error("VNC target missing");
       }
-      const response = await fetch("/api/vnc/sessions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ targetId }),
-      });
-      if (!response.ok) {
-        document.querySelector("#status-title").textContent =
-          "无法创建 VNC 会话";
-        document.querySelector("#status-detail").textContent =
-          response.status === 403
-            ? "当前账户无权访问此设备。"
-            : "目标设备不可用。";
-        throw new Error(`VNC session failed: ${response.status}`);
-      }
-      const session = await response.json();
       const screen = document.querySelector("#screen"),
         status = document.querySelector("#status"),
-        statusActions = document.querySelector("#status-actions");
-      const scheme = location.protocol === "https:" ? "wss" : "ws";
-      const wsUrl = new URL(
-        session.websocketUrl,
-        `${scheme}://${location.host}`,
-      ).toString();
-      const rfb = new RFB(screen, wsUrl, {
-        credentials: { password: session.password || "" },
-        shared: true,
-      });
-      rfb.scaleViewport = true;
-      rfb.resizeSession = true;
-      rfb.viewOnly = !!session.viewOnly;
-      const viewButton = document.querySelector("#view-only");
+        statusActions = document.querySelector("#status-actions"),
+        statusTitle = document.querySelector("#status-title"),
+        statusDetail = document.querySelector("#status-detail"),
+        viewButton = document.querySelector("#view-only");
       function setToggleState(button, enabled, label) {
         button.classList.toggle("active", enabled);
         button.querySelector(".toolbar-tooltip").textContent =
           `${label}：${enabled ? "开" : "关"}`;
       }
-      setToggleState(viewButton, rfb.viewOnly, "只读");
-      if (session.viewOnly) {
-        viewButton.disabled = true;
-        viewButton.title = "管理员已强制启用只读模式";
+      function reconnectDelay(failures) {
+        return Math.min(2 ** Math.min(failures, 5), 30);
       }
-      rfb.addEventListener("connect", () => {
-        status.hidden = true;
-        statusActions.hidden = true;
-      });
-      rfb.addEventListener("disconnect", (event) => {
+      function sessionText(value) {
+        return window.RemoteLinkI18n?.t(value) || value;
+      }
+      function scheduleReconnect(title) {
+        if (leaving || reconnectTimer) return;
+        const delay = reconnectDelay(++consecutiveFailures);
         status.hidden = false;
         statusActions.hidden = false;
-        document.querySelector("#status-title").textContent = event.detail.clean
-          ? "连接已断开"
-          : "连接意外中断";
-        document.querySelector("#status-detail").textContent = event.detail
-          .clean
-          ? "可以返回设备列表重新连接。"
-          : "请检查目标 VNC 服务和网络。";
-      });
-      rfb.addEventListener("securityfailure", (event) => {
-        document.querySelector("#status-title").textContent =
-          "VNC 身份验证失败";
-        document.querySelector("#status-detail").textContent =
-          event.detail.reason || "请检查设备密码。";
-      });
-      document.querySelector("#cad").onclick = () => rfb.sendCtrlAltDel();
+        statusTitle.textContent = sessionText(title);
+        statusDetail.textContent = sessionText(
+          "将在 {seconds} 秒后自动重试。",
+        ).replace("{seconds}", delay);
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          connectVnc();
+        }, delay * 1000);
+      }
+      async function connectVnc() {
+        const generation = ++connectionGeneration;
+        status.hidden = false;
+        statusActions.hidden = true;
+        statusTitle.textContent = "正在建立安全连接";
+        statusDetail.textContent = "正在申请一次性连接票据…";
+        try {
+          const response = await fetch("/api/vnc/sessions", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ targetId }),
+          });
+          if (generation !== connectionGeneration || leaving) return;
+          if (response.status === 401 || response.status === 403) {
+            statusActions.hidden = false;
+            statusTitle.textContent = "无法创建 VNC 会话";
+            statusDetail.textContent =
+              response.status === 403
+                ? "当前账户无权访问此设备。"
+                : "登录状态已失效，请重新登录。";
+            return;
+          }
+          if (!response.ok) {
+            scheduleReconnect("VNC 连接失败，正在重试…");
+            return;
+          }
+          const session = await response.json();
+          const scheme = location.protocol === "https:" ? "wss" : "ws";
+          const wsUrl = new URL(
+            session.websocketUrl,
+            `${scheme}://${location.host}`,
+          ).toString();
+          const previousConnection = rfb;
+          rfb = null;
+          previousConnection?.disconnect();
+          const connection = new RFB(screen, wsUrl, {
+            credentials: { password: session.password || "" },
+            shared: true,
+          });
+          rfb = connection;
+          connection.scaleViewport = true;
+          connection.resizeSession = true;
+          connection.viewOnly = !!session.viewOnly;
+          setToggleState(viewButton, connection.viewOnly, "只读");
+          viewButton.disabled = !!session.viewOnly;
+          viewButton.title = session.viewOnly ? "管理员已强制启用只读模式" : "";
+          connection.addEventListener("connect", () => {
+            if (rfb !== connection || leaving) return;
+            connectedAt = Date.now();
+            status.hidden = true;
+            statusActions.hidden = true;
+          });
+          connection.addEventListener("disconnect", () => {
+            if (rfb !== connection || leaving) return;
+            if (connectedAt && Date.now() - connectedAt >= 30000)
+              consecutiveFailures = 0;
+            connectedAt = 0;
+            scheduleReconnect("连接中断，正在重新连接…");
+          });
+          connection.addEventListener("securityfailure", (event) => {
+            if (rfb !== connection || leaving) return;
+            status.hidden = false;
+            statusTitle.textContent = "VNC 身份验证失败";
+            statusDetail.textContent =
+              event.detail.reason || "请检查设备密码。";
+          });
+        } catch {
+          if (generation === connectionGeneration && !leaving)
+            scheduleReconnect("VNC 连接失败，正在重试…");
+        }
+      }
+      document.querySelector("#cad").onclick = () => rfb?.sendCtrlAltDel();
       viewButton.onclick = () => {
+        if (!rfb) return;
         rfb.viewOnly = !rfb.viewOnly;
         setToggleState(viewButton, rfb.viewOnly, "只读");
       };
@@ -430,7 +481,11 @@
         document.fullscreenElement
           ? document.exitFullscreen()
           : document.documentElement.requestFullscreen();
-      document.querySelector("#reconnect").onclick = () => location.reload();
+      document.querySelector("#reconnect").onclick = () => {
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+        connectVnc();
+      };
       const toolbar = document.querySelector("#remote-toolbar"),
         toolbarToggle = document.querySelector("#toolbar-toggle");
       toolbarToggle.onclick = () => {
@@ -449,10 +504,15 @@
       document.querySelector("#clipboard-cancel").onclick = () =>
         dialog.close();
       document.querySelector("#clipboard-send").onclick = () => {
-        rfb.clipboardPasteFrom(text.value);
+        rfb?.clipboardPasteFrom(text.value);
         dialog.close();
       };
-      window.addEventListener("beforeunload", () => rfb.disconnect());
+      window.addEventListener("beforeunload", () => {
+        leaving = true;
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        rfb?.disconnect();
+      });
+      connectVnc();
     </script>
   </body>
 </html>

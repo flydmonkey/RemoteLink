@@ -416,18 +416,20 @@ test("SSH and user management use the shared English interface vocabulary", asyn
 test("VNC session uses noVNC Core with RemoteLink controls", async ({
   page,
 }) => {
+  let sessionRequests = 0;
   await page.addInitScript(() =>
     sessionStorage.setItem("remote-gateway-access-token", "test"),
   );
-  await page.route("**/api/vnc/sessions", (route) =>
-    route.fulfill({
+  await page.route("**/api/vnc/sessions", (route) => {
+    sessionRequests++;
+    return route.fulfill({
       json: {
         websocketUrl: "/vnc/ws?ticket=test",
         password: "",
         viewOnly: false,
       },
-    }),
-  );
+    });
+  });
   await page.route("**/vendor/novnc/core/rfb.js", (route) =>
     route.fulfill({
       contentType: "application/javascript",
@@ -456,10 +458,17 @@ test("VNC session uses noVNC Core with RemoteLink controls", async ({
       new CustomEvent("disconnect", { detail: { clean: false } }),
     ),
   );
+  await expect(page.locator("#status-title")).toHaveText(
+    "连接中断，正在重新连接…",
+  );
+  await expect(page.locator("#status-detail")).toHaveText(
+    "将在 2 秒后自动重试。",
+  );
   await expect(page.getByRole("button", { name: "重新连接" })).toBeVisible();
   await expect(
     page.getByRole("link", { name: "返回连接列表" }),
   ).toHaveAttribute("href", "/vnc");
+  await expect.poll(() => sessionRequests, { timeout: 3500 }).toBe(2);
   await page.locator("#disconnect").evaluate((button) => button.click());
   await expect(page).toHaveURL(/\/vnc$/);
 });
@@ -474,7 +483,8 @@ test("VNC disconnect returns even when the target is unavailable", async ({
     route.fulfill({ status: 502, json: { error: "unavailable" } }),
   );
   await page.goto("/vnc-session.html?target=offline").catch(() => {});
-  await expect(page.getByText("无法创建 VNC 会话")).toBeVisible();
+  await expect(page.getByText("VNC 连接失败，正在重试…")).toBeVisible();
+  await expect(page.getByText("将在 2 秒后自动重试。")).toBeVisible();
   await page.locator("#disconnect").evaluate((button) => button.click());
   await expect(page).toHaveURL(/\/vnc$/);
 });
