@@ -231,6 +231,7 @@ test("SSH page exposes password and key connection management", async ({
   await expect(page.locator("#target")).toHaveValue("ssh-1");
   await expect(page.locator("#target option")).toHaveCount(1);
   await expect(page.locator("#target option")).toHaveText("Linux");
+  await expect(page.locator("#notice")).not.toContainText("正在连接");
   await expect(page.locator("#manage")).toHaveAttribute(
     "href",
     "/ssh/settings",

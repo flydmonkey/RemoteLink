@@ -794,7 +794,7 @@
           return;
         }
         try {
-          notice.textContent = "正在连接…";
+          notice.textContent = "";
           const session = await api("/api/ssh/sessions", {
             method: "POST",
             body: JSON.stringify({ targetId: target.value }),
