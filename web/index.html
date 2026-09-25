@@ -27,7 +27,8 @@
     @media(forced-colors:active){body,.titlebar,.workspace,.host,dialog,input,textarea,.remote-toolbar,.toolbar-tooltip{background:Canvas;color:CanvasText;border-color:ButtonBorder}button,.tool{background:ButtonFace;color:ButtonText;border-color:ButtonBorder}#status:before{background:Highlight;box-shadow:none}:where(button,a,input,textarea,video):focus-visible{outline-color:Highlight}.toolbar-divider{background:ButtonBorder}}
   </style>
   <style>#file-center{width:min(760px,calc(100% - 32px))}#file-center .print-job{grid-template-columns:auto 1fr auto}</style>
-  <style>dialog[open]{position:fixed;inset-block-start:45%;inset-block-end:auto;max-height:80vh;overflow:auto;transform:translateY(-50%)}</style>
+  <style>dialog[open]{position:fixed;inset-block-start:45%;inset-block-end:auto;max-height:80vh;overflow:auto;transform:translateY(-50%)}body{background:#000}.session-loading{position:absolute;z-index:4;inset:0;display:grid;place-items:center;background:#000;color:#d8d8d8}.session-loading-content{display:grid;justify-items:center;gap:14px}.session-loading-spinner{width:30px;height:30px;border:2px solid #ffffff2b;border-top-color:var(--accent);border-radius:50%;animation:session-spin .8s linear infinite}.session-loading-text{font-size:14px;letter-spacing:.02em}@keyframes session-spin{to{transform:rotate(360deg)}}</style>
+  <style>.session-loading{pointer-events:none}</style>
 </head>
 <body><div class="app-shell">
 <header class="titlebar"><div class="brand"><span class="app-icon">RG</span><h1>Remote Gateway</h1></div><div class="connection"><a class="nav-link" href="/admin">状态</a><a class="nav-link" href="/settings">设置</a><button id="theme-toggle" class="tool theme-toggle" type="button">主题：系统</button><span id="status">正在连接…</span></div></header>
@@ -46,6 +47,7 @@
     <div class="toolbar-divider" role="separator"></div>
     <button id="toolbar-toggle" class="toolbar-toggle" type="button" aria-label="收起工具栏"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span class="toolbar-tooltip">收起</span></button>
   </aside>
+  <div id="session-loading" class="session-loading" role="status" aria-live="polite"><div class="session-loading-content"><span class="session-loading-spinner" aria-hidden="true"></span><span id="session-loading-text" class="session-loading-text">正在连接…</span></div></div>
   <video id="desktop" autoplay muted playsinline disablepictureinpicture controlslist="nodownload noplaybackrate noremoteplayback" tabindex="0" hidden></video>
   <audio id="remote-audio" autoplay></audio>
   <img id="remote-cursor" class="remote-cursor" alt="" aria-hidden="true">
@@ -116,6 +118,10 @@
 const status = document.querySelector('#status');
 document.querySelector('.brand h1').textContent='RemoteLink';document.querySelector('.app-icon').textContent='RL';document.querySelector('#login-form strong').textContent='登录 RemoteLink';
 const video = document.querySelector('#desktop');
+const sessionLoading = document.querySelector('#session-loading');
+const sessionLoadingText = document.querySelector('#session-loading-text');
+function setSessionLoading(text, visible=true){sessionLoadingText.textContent=text;sessionLoading.hidden=!visible}
+video.addEventListener('playing',()=>setSessionLoading('',false));
 const remoteAudio = document.querySelector('#remote-audio');
 const remoteCursor = document.querySelector('#remote-cursor');
 let pc = null;
@@ -357,6 +363,7 @@ function createPeerConnection() {
   pc.onconnectionstatechange = () => {
     status.textContent = pc.connectionState === 'connected' && rdpState
       ? `远程会话：${rdpState}` : `WebRTC: ${pc.connectionState}`;
+    if (pc.connectionState === 'failed')setSessionLoading('连接中断，正在重新连接…');
     if (pc.connectionState === 'failed' && ws?.readyState < WebSocket.CLOSING) ws.close();
   };
   pc.onicecandidate = event => {
@@ -409,6 +416,7 @@ function startTarget(target) {
   video.style.aspectRatio = `${width} / ${height}`;
   streamInfo.textContent = `远程桌面：H.264 / WebRTC / ${width}×${height} / 30 FPS。点击画面后可使用键盘、鼠标和滚轮。`;
   status.textContent = `正在连接 ${target.name}…`;
+  setSessionLoading(`正在连接 ${target.name}…`);
   createPeerConnection();
   ws.send(JSON.stringify({
     type: 'start', target: target.id || '', host: target.host || selectedHost,
@@ -463,6 +471,7 @@ socket.onmessage = async event => {
     };
     rdpState = labels[message.state] || message.state;
     status.textContent = `远程会话：${rdpState}`;
+    if(message.state!=='connected')setSessionLoading(rdpState);
     return;
   }
   if (message.type === 'stopped') {
