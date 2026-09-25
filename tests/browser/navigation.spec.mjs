@@ -34,6 +34,26 @@ test("RDP page exposes the protocol navigation", async ({ page }) => {
     "background-color",
     "rgb(54, 54, 54)",
   );
+  await expect(page.locator("#account-trigger")).toHaveCSS("width", "34px");
+  await expect(page.locator("#account-trigger")).toHaveCSS("height", "34px");
+  await expect(page.locator("#account-avatar")).toHaveCSS("width", "24px");
+  await expect(page.locator("#account-avatar svg")).toHaveCSS("width", "16px");
+  await expect(page.locator(".actions .primary")).toHaveCSS(
+    "min-width",
+    "124px",
+  );
+  await expect(page.locator(".actions .primary")).toHaveCSS(
+    "min-height",
+    "34px",
+  );
+  await expect(page.locator(".actions .primary")).toHaveCSS(
+    "font-size",
+    "14px",
+  );
+  await expect(page.locator(".actions .primary")).toHaveCSS(
+    "font-weight",
+    "600",
+  );
   await expect(page.locator("#connection-form #username")).toHaveCount(0);
   await expect(page.locator("#connection-form #password")).toHaveCount(0);
   await expect(page.locator("#connection-form #remember")).toHaveCount(0);
@@ -157,6 +177,25 @@ test("VNC administrators add connections from management only", async ({
     "background-color",
     "rgb(54, 54, 54)",
   );
+  await expect(page.locator("#account-trigger")).toHaveCSS("width", "34px");
+  await expect(page.locator("#account-trigger")).toHaveCSS("height", "34px");
+  await expect(page.locator("#account-trigger .avatar-icon")).toHaveCSS(
+    "width",
+    "24px",
+  );
+  await expect(page.locator("#account-trigger svg")).toHaveCSS("width", "16px");
+  await expect(page.locator("#connect-form .primary")).toHaveCSS(
+    "min-height",
+    "34px",
+  );
+  await expect(page.locator("#connect-form .primary")).toHaveCSS(
+    "font-size",
+    "14px",
+  );
+  await expect(page.locator("#connect-form .primary")).toHaveCSS(
+    "font-weight",
+    "600",
+  );
   await expect(page.locator("#account-name")).toHaveText(
     "Administrator · admin",
   );
@@ -250,6 +289,13 @@ test("SSH page exposes password and key connection management", async ({
   await expect(page.locator("#manage circle")).toHaveCount(0);
   await expect(page.locator("#manage")).toHaveCSS("width", "34px");
   await expect(page.locator("#account-trigger")).toHaveCSS("width", "34px");
+  await expect(page.locator("#account-trigger")).toHaveCSS("height", "34px");
+  await expect(page.locator(".account-avatar")).toHaveCSS("width", "24px");
+  await expect(page.locator(".account-avatar svg")).toHaveCSS("width", "16px");
+  await expect(page.locator("#connect")).toHaveCSS("min-width", "124px");
+  await expect(page.locator("#connect")).toHaveCSS("min-height", "34px");
+  await expect(page.locator("#connect")).toHaveCSS("font-size", "14px");
+  await expect(page.locator("#connect")).toHaveCSS("font-weight", "600");
   await page.locator("#account-trigger").click();
   await expect(page.locator("#account-menu")).toBeVisible();
   await expect(page.locator("#logout")).toHaveText("退出登录");

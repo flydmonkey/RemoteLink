@@ -355,11 +355,12 @@
         position: relative;
       }
       .account-trigger {
-        display: flex !important;
-        width: auto !important;
+        display: grid !important;
+        place-items: center;
+        width: 34px !important;
+        height: 34px;
         min-width: 34px !important;
-        gap: 8px;
-        padding: 0 8px !important;
+        padding: 0 !important;
         border: 0 !important;
         background: transparent !important;
       }
@@ -373,6 +374,10 @@
         background: var(--accent);
         font-size: 11px;
         font-weight: 700;
+      }
+      .account-avatar svg {
+        width: 16px;
+        height: 16px;
       }
       .account-name {
         max-width: 110px;
@@ -722,6 +727,10 @@
       }
       .actions .primary {
         min-width: 124px;
+        min-height: 34px;
+        padding: 6px 14px;
+        font-size: 14px;
+        font-weight: 600;
       }
       .connection-card button {
         border-color: #ffffff20;
@@ -790,8 +799,7 @@
       const accountAvatar = document.querySelector("#account-avatar");
       accountAvatar.innerHTML =
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-4 3.1-6 7-6s6.2 2 7 6"/></svg>';
-      accountAvatar.style.cssText =
-        "padding:4px;color:#b3b3b3;background:#363636";
+      accountAvatar.style.cssText = "color:#b3b3b3;background:#363636";
       accountAvatar.querySelector("svg").style.cssText =
         "width:16px;height:16px";
       accountName.hidden = true;
