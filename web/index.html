@@ -95,6 +95,21 @@
     <div class="dialog-actions"><button type="button" id="paste-cancel" class="tool">取消</button><button type="submit">发送</button></div>
   </form>
 </dialog>
+<dialog id="text-dialog">
+  <form id="text-dialog-form">
+    <strong id="text-dialog-title">请输入</strong>
+    <label id="text-dialog-label" for="text-dialog-value"></label>
+    <input id="text-dialog-value" autocomplete="off" required>
+    <div class="dialog-actions"><button type="button" id="text-dialog-cancel" class="tool">取消</button><button type="submit">确定</button></div>
+  </form>
+</dialog>
+<dialog id="conflict-dialog">
+  <form method="dialog">
+    <strong>文件已存在</strong>
+    <p id="conflict-message" class="section-copy"></p>
+    <div class="dialog-actions"><button type="button" id="conflict-cancel" class="tool">取消</button><button type="button" id="conflict-keep" class="tool">保留两者</button><button type="button" id="conflict-overwrite" class="primary">覆盖</button></div>
+  </form>
+</dialog>
 <script src="/i18n.js"></script>
 <script>
 const status = document.querySelector('#status');
@@ -156,11 +171,50 @@ const appShell = document.querySelector('.app-shell');
 const pasteDialog = document.querySelector('#paste-dialog');
 const pasteForm = document.querySelector('#paste-form');
 const pasteValue = document.querySelector('#paste-value');
+const textDialog = document.querySelector('#text-dialog');
+const textDialogForm = document.querySelector('#text-dialog-form');
+const textDialogTitle = document.querySelector('#text-dialog-title');
+const textDialogLabel = document.querySelector('#text-dialog-label');
+const textDialogValue = document.querySelector('#text-dialog-value');
+const conflictDialog = document.querySelector('#conflict-dialog');
+const conflictMessage = document.querySelector('#conflict-message');
 const streamInfo = document.querySelector('#stream-info');
 const pressedKeys = new Map();
 const pressedButtons = new Set();
 let lastVideoSample = null;
 let lastAudioSample = null;
+let textDialogResolve = null;
+let conflictDialogResolve = null;
+function finishTextDialog(value) {
+  if (!textDialogResolve) return;
+  const resolve = textDialogResolve; textDialogResolve = null;
+  textDialog.close(); resolve(value);
+}
+function requestText(title, label, value = '') {
+  if (textDialogResolve) finishTextDialog(null);
+  textDialogTitle.textContent = title; textDialogLabel.textContent = label; textDialogValue.value = value;
+  const promise = new Promise(resolve => { textDialogResolve = resolve; });
+  textDialog.showModal(); requestAnimationFrame(() => { textDialogValue.focus(); textDialogValue.select(); });
+  return promise;
+}
+textDialogForm.addEventListener('submit', event => { event.preventDefault(); finishTextDialog(textDialogValue.value.trim() || null); });
+document.querySelector('#text-dialog-cancel').addEventListener('click', () => finishTextDialog(null));
+textDialog.addEventListener('cancel', event => { event.preventDefault(); finishTextDialog(null); });
+function finishConflictDialog(choice) {
+  if (!conflictDialogResolve) return;
+  const resolve = conflictDialogResolve; conflictDialogResolve = null;
+  conflictDialog.close(); resolve(choice);
+}
+function resolveUploadConflict(name) {
+  if (conflictDialogResolve) finishConflictDialog('cancel');
+  conflictMessage.textContent = `“${name}” 已存在。请选择如何处理这个文件。`;
+  const promise = new Promise(resolve => { conflictDialogResolve = resolve; });
+  conflictDialog.showModal(); return promise;
+}
+document.querySelector('#conflict-cancel').addEventListener('click', () => finishConflictDialog('cancel'));
+document.querySelector('#conflict-keep').addEventListener('click', () => finishConflictDialog('keep'));
+document.querySelector('#conflict-overwrite').addEventListener('click', () => finishConflictDialog('overwrite'));
+conflictDialog.addEventListener('cancel', event => { event.preventDefault(); finishConflictDialog('cancel'); });
 const h264Codecs = RTCRtpReceiver.getCapabilities('video').codecs
   .filter(codec => codec.mimeType.toLowerCase() === 'video/h264');
 const themeToggle = document.querySelector('#theme-toggle');
@@ -577,7 +631,7 @@ async function refreshFiles() {
     const meta=document.createElement('div');meta.className='print-job-meta';meta.textContent=item.directory?'文件夹':`${new Date(item.modifiedMs).toLocaleString()} · ${formatPrintSize(item.size)}`;info.append(name,meta);
     const actions=document.createElement('div');actions.className='print-job-actions';
     if(item.directory){const open=document.createElement('button');open.textContent='打开';open.onclick=()=>{currentFilePath=joinFilePath(item.name);refreshFiles()};actions.append(open)}else{const preview=document.createElement('button');preview.textContent='预览';preview.onclick=async()=>{const r=await fileRequest('/api/admin/files/download',joinFilePath(item.name),'');if(!r.ok)return;const raw=await r.blob();const ext=item.name.split('.').pop().toLowerCase();const types={pdf:'application/pdf',txt:'text/plain',json:'application/json',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',mp3:'audio/mpeg',mp4:'video/mp4',webm:'video/webm'};const url=URL.createObjectURL(new Blob([raw],{type:types[ext]||raw.type}));window.open(url,'_blank','noopener');setTimeout(()=>URL.revokeObjectURL(url),60000)};const download=document.createElement('button');download.textContent='下载';download.onclick=async()=>{const r=await fileRequest('/api/admin/files/download',joinFilePath(item.name),'');if(!r.ok)return;const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download=item.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};actions.append(preview,download)}
-    const rename=document.createElement('button');rename.textContent='重命名';rename.onclick=async()=>{const next=prompt('新名称',item.name);if(next&&next!==item.name&&(await fileRequest('/api/admin/files/move',joinFilePath(item.name),'',joinFilePath(next))).ok)refreshFiles()};
+    const rename=document.createElement('button');rename.textContent='重命名';rename.onclick=async()=>{const next=await requestText('重命名','新名称',item.name);if(next&&next!==item.name&&(await fileRequest('/api/admin/files/move',joinFilePath(item.name),'',joinFilePath(next))).ok)refreshFiles()};
     const remove=document.createElement('button');remove.textContent='删除';remove.onclick=async()=>{if((await fileRequest('/api/admin/files/delete',joinFilePath(item.name),'')).ok)refreshFiles()};
     actions.append(rename,remove);row.append(check,info,actions);fileList.append(row);
   }
@@ -586,8 +640,8 @@ showFiles.addEventListener('click',()=>{refreshFiles();fileCenter.showModal()});
 fileClose.addEventListener('click',()=>fileCenter.close());
 fileUpload.addEventListener('click',()=>filePicker.click());
 fileUp.addEventListener('click',()=>{currentFilePath=currentFilePath.split('/').slice(0,-1).join('/');refreshFiles()});
-fileMkdir.addEventListener('click',async()=>{const name=prompt('文件夹名称');if(name&&(await fileRequest('/api/admin/files/mkdir',joinFilePath(name),'')).ok)refreshFiles()});
-async function uploadManagedFile(file){let targetName=file.name;if(currentFileItems.some(item=>item.name===targetName)){const choice=prompt('存在同名文件：输入 overwrite 覆盖、keep 保留两者，或留空取消','keep');if(!choice)return false;if(choice.toLowerCase()!=='overwrite'){const dot=targetName.lastIndexOf('.'),base=dot>0?targetName.slice(0,dot):targetName,ext=dot>0?targetName.slice(dot):'';let index=1;while(currentFileItems.some(item=>item.name===`${base} (${index})${ext}`))index++;targetName=`${base} (${index})${ext}`}}const chunkSize=4*1024*1024,path=joinFilePath(targetName);for(let offset=0;offset<file.size||offset===0;offset+=chunkSize){const chunk=file.slice(offset,Math.min(file.size,offset+chunkSize));status.textContent=`正在上传 ${targetName} · ${Math.round(Math.min(file.size,offset+chunk.size)/Math.max(1,file.size)*100)}%`;const r=await fetch('/api/admin/files/upload',{method:'POST',headers:{Authorization:`Bearer ${accessToken}`,'X-File-Name':encodeURIComponent(path),'X-Upload-Offset':String(offset),'X-Upload-Total':String(file.size)},body:chunk});if(!r.ok){status.textContent=(await r.json().catch(()=>({}))).error||'文件上传失败';return false}}status.textContent='文件上传完成';return true}
+fileMkdir.addEventListener('click',async()=>{const name=await requestText('新建文件夹','文件夹名称');if(name&&(await fileRequest('/api/admin/files/mkdir',joinFilePath(name),'')).ok)refreshFiles()});
+async function uploadManagedFile(file){let targetName=file.name;if(currentFileItems.some(item=>item.name===targetName)){const choice=await resolveUploadConflict(targetName);if(choice==='cancel')return false;if(choice!=='overwrite'){const dot=targetName.lastIndexOf('.'),base=dot>0?targetName.slice(0,dot):targetName,ext=dot>0?targetName.slice(dot):'';let index=1;while(currentFileItems.some(item=>item.name===`${base} (${index})${ext}`))index++;targetName=`${base} (${index})${ext}`}}const chunkSize=4*1024*1024,path=joinFilePath(targetName);for(let offset=0;offset<file.size||offset===0;offset+=chunkSize){const chunk=file.slice(offset,Math.min(file.size,offset+chunkSize));status.textContent=`正在上传 ${targetName} · ${Math.round(Math.min(file.size,offset+chunk.size)/Math.max(1,file.size)*100)}%`;const r=await fetch('/api/admin/files/upload',{method:'POST',headers:{Authorization:`Bearer ${accessToken}`,'X-File-Name':encodeURIComponent(path),'X-Upload-Offset':String(offset),'X-Upload-Total':String(file.size)},body:chunk});if(!r.ok){status.textContent=(await r.json().catch(()=>({}))).error||'文件上传失败';return false}}status.textContent='文件上传完成';return true}
 filePicker.addEventListener('change',async()=>{for(const file of filePicker.files||[])await uploadManagedFile(file);filePicker.value='';refreshFiles()});
 fileDeleteSelected.addEventListener('click',async()=>{for(const path of selectedFiles)await fileRequest('/api/admin/files/delete',path,'');refreshFiles()});
 fileCenter.addEventListener('dragover',event=>{event.preventDefault()});
