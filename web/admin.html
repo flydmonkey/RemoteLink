@@ -1211,49 +1211,36 @@
         </button>
       </header>
       <main>
-        <aside class="rail" aria-label="管理导航与服务概览">
+        <aside class="rail" aria-label="管理导航">
           <nav class="section-nav" aria-label="管理页面">
-            <a href="#targets">概览</a><a href="#users">用户管理</a
-            ><a href="#events">最近活动</a>
+            <a
+              href="#connections"
+              data-admin-view="connections"
+              aria-current="page"
+              >连接管理</a
+            ><a href="#sessions" data-admin-view="sessions">活动会话</a
+            ><a href="#activity" data-admin-view="activity">最近活动</a>
           </nav>
-          <dl>
-            <div>
-              <dt>服务状态</dt>
-              <dd id="service" class="live">在线</dd>
-            </div>
-            <div>
-              <dt>活动会话</dt>
-              <dd id="sessions">—</dd>
-            </div>
-            <div>
-              <dt>信令连接</dt>
-              <dd id="peers">—</dd>
-            </div>
-            <div>
-              <dt>已编码帧</dt>
-              <dd id="frames">—</dd>
-            </div>
-            <div>
-              <dt>累计流量</dt>
-              <dd id="traffic">—</dd>
-            </div>
-            <div>
-              <dt>累计丢帧</dt>
-              <dd id="drops">—</dd>
-            </div>
-          </dl>
         </aside>
-        <section>
-          <div class="toolbar">
-            <h2>连接管理</h2>
-            <button id="create-connection" class="small-button" type="button">
-              添加连接</button
-            ><span id="updated">等待数据</span>
-          </div>
-          <div id="notice" class="notice" role="status"></div>
-          <div id="targets" class="target-list" aria-busy="true">
-            <div class="empty">正在读取主机状态…</div>
-          </div>
+        <section class="admin-content">
+          <section data-admin-panel="connections">
+            <div class="toolbar">
+              <h2>连接管理</h2>
+              <button id="create-connection" class="small-button" type="button">
+                添加连接</button
+              ><span id="updated">等待数据</span>
+            </div>
+            <div id="notice" class="notice" role="status"></div>
+            <div id="targets" class="target-list" aria-busy="true">
+              <div class="empty">正在读取主机状态…</div>
+            </div>
+          </section>
+          <section data-admin-panel="sessions" hidden>
+            <div class="toolbar"><h2>活动会话</h2></div>
+            <div id="active-sessions" class="target-list">
+              <div class="empty">暂无活动会话。</div>
+            </div>
+          </section>
           <section id="users" class="users">
             <div class="toolbar">
               <h2>用户管理</h2>
@@ -1266,7 +1253,7 @@
               <div class="empty">正在读取用户…</div>
             </div>
           </section>
-          <section class="activity">
+          <section class="activity" data-admin-panel="activity" hidden>
             <div class="toolbar">
               <h2>最近活动</h2>
               <span class="secondary">最多保留 200 条</span>
@@ -1484,20 +1471,11 @@
       function render(data) {
         adminTargets = data.targets || [];
         targets.setAttribute("aria-busy", "false");
-        document.querySelector("#service").textContent =
-          data.status === "ok" ? "在线" : "异常";
-        document.querySelector("#sessions").textContent = number(data.sessions);
-        document.querySelector("#peers").textContent = number(data.peers);
-        document.querySelector("#frames").textContent = number(
-          data.encodedFrames,
-        );
-        document.querySelector("#traffic").textContent = bytes(data.sentBytes);
-        document.querySelector("#drops").textContent = number(
-          data.droppedFrames,
-        );
         document.querySelector("#updated").textContent =
           `更新于 ${new Date().toLocaleTimeString("zh-CN", { hour12: false })}`;
         targets.replaceChildren();
+        const activeSessions = document.querySelector("#active-sessions");
+        activeSessions.replaceChildren();
         if (!data.targets.length)
           targets.innerHTML = '<div class="empty">尚未添加连接。</div>';
         for (const target of data.targets) {
@@ -1530,7 +1508,18 @@
           }
           row.append(identity, address, state, metrics, action);
           targets.append(row);
+          if (target.busy) {
+            const activeRow = row.cloneNode(true);
+            activeRow
+              .querySelector(".disconnect")
+              ?.addEventListener("click", (event) =>
+                disconnect(target, event.currentTarget),
+              );
+            activeSessions.append(activeRow);
+          }
         }
+        if (!activeSessions.children.length)
+          activeSessions.innerHTML = '<div class="empty">暂无活动会话。</div>';
         renderEvents(data.events || []);
       }
       function renderEvents(items) {
@@ -2174,6 +2163,45 @@
       #users {
         display: none !important;
       }
+      main {
+        padding: 0;
+        grid-template-columns: 190px minmax(0, 1fr);
+        gap: 0;
+      }
+      .rail {
+        padding: 12px 8px;
+        border: 0;
+        border-right: 1px solid var(--line);
+        border-radius: 0;
+      }
+      .section-nav {
+        display: block;
+        margin: 0;
+        padding: 0;
+      }
+      .section-nav a {
+        display: block;
+        padding: 9px 10px;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      .section-nav a:first-child {
+        background: transparent;
+        box-shadow: none;
+      }
+      .section-nav a[aria-current="page"] {
+        background: #ffffff0d;
+        box-shadow: inset 2px 0 var(--live);
+      }
+      .admin-content {
+        padding: 20px;
+      }
+      [data-admin-panel][hidden] {
+        display: none !important;
+      }
+      .activity {
+        margin-top: 0;
+      }
       .target .user-actions {
         flex-wrap: nowrap;
         gap: 4px;
@@ -2187,7 +2215,30 @@
       }
     </style>
     <script>
-      document.querySelector('.section-nav a[href="#users"]')?.remove();
+      const selectAdminView = (view) => {
+        const selected = ["connections", "sessions", "activity"].includes(view)
+          ? view
+          : "connections";
+        document.querySelectorAll("[data-admin-panel]").forEach((panel) => {
+          panel.hidden = panel.dataset.adminPanel !== selected;
+        });
+        document.querySelectorAll("[data-admin-view]").forEach((link) => {
+          if (link.dataset.adminView === selected)
+            link.setAttribute("aria-current", "page");
+          else link.removeAttribute("aria-current");
+        });
+      };
+      document
+        .querySelectorAll("[data-admin-view]")
+        .forEach((link) =>
+          link.addEventListener("click", () =>
+            selectAdminView(link.dataset.adminView),
+          ),
+        );
+      addEventListener("hashchange", () =>
+        selectAdminView(location.hash.slice(1)),
+      );
+      selectAdminView(location.hash.slice(1));
     </script>
   </body>
 </html>

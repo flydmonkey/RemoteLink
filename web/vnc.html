@@ -203,7 +203,7 @@
         grid-template-columns: 190px 1fr;
       }
       .side {
-        padding: 14px 10px;
+        padding: 12px 8px;
         border-right: 1px solid var(--line);
         background: #292929;
       }
@@ -217,9 +217,10 @@
       }
       .side a {
         display: block;
-        padding: 8px 10px;
+        padding: 9px 10px;
         border-radius: 4px;
-        color: var(--muted);
+        color: var(--text);
+        font-size: 14px;
         text-decoration: none;
       }
       .side a.active {
@@ -597,7 +598,6 @@
       </header>
       <div class="workspace" id="workspace">
         <aside class="side" id="admin-nav" hidden>
-          <h2>VNC 管理</h2>
           <a class="active" href="#connections" data-view="connections"
             >连接管理</a
           ><a href="/vnc/permissions">用户授权</a

@@ -349,6 +349,15 @@ test("VNC legacy management UI is no longer duplicated", async ({ page }) => {
 
 test("RDP connection editor does not expose grouping", async ({ page }) => {
   await page.goto("/admin.html");
+  await expect(page.locator(".section-nav a")).toHaveCount(3);
+  await expect(page.locator(".section-nav a").nth(0)).toHaveText("连接管理");
+  await expect(page.locator(".section-nav a").nth(1)).toHaveText(
+    /活动会话|Active sessions/,
+  );
+  await expect(page.locator(".section-nav a").nth(2)).toHaveText(
+    /最近活动|Recent activity/,
+  );
+  await expect(page.getByRole("link", { name: "用户管理" })).toHaveCount(0);
   await expect(page.locator("#connection-group")).toHaveCount(0);
   await expect(page.getByText("连接分组")).toHaveCount(0);
 });
