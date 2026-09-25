@@ -355,6 +355,10 @@ test("RDP connection editor does not expose grouping", async ({ page }) => {
   await expect(page.locator(".admin-shell")).toHaveCSS("height", "532px");
   await expect(page.locator(".admin-shell")).toHaveCSS("width", "980px");
   await expect(page.locator(".section-nav a")).toHaveCount(3);
+  await expect(page.locator(".section-nav")).toHaveCSS(
+    "border-bottom-width",
+    "0px",
+  );
   await expect(page.locator(".section-nav a").nth(0)).toHaveText("连接管理");
   await expect(page.locator(".section-nav a").nth(1)).toHaveText(
     /活动会话|Active sessions/,
