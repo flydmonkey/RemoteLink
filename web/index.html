@@ -123,8 +123,21 @@ document.querySelector('.brand h1').textContent='RemoteLink';document.querySelec
 const video = document.querySelector('#desktop');
 const sessionLoading = document.querySelector('#session-loading');
 const sessionLoadingText = document.querySelector('#session-loading-text');
-function setSessionLoading(text, visible=true){sessionLoadingText.textContent=text;sessionLoading.hidden=!visible}
-video.addEventListener('playing',()=>setSessionLoading('',false));
+let loadingGeneration=0;
+function setSessionLoading(text, visible=true){if(visible)loadingGeneration++;sessionLoadingText.textContent=text;sessionLoading.hidden=!visible}
+function revealAfterRealFrame(){
+  const generation=loadingGeneration,start=performance.now(),sample=document.createElement('canvas');sample.width=32;sample.height=18;
+  const context=sample.getContext('2d',{willReadFrequently:true});
+  const inspect=()=>{
+    if(generation!==loadingGeneration||sessionLoading.hidden)return;
+    let whiteRatio=1;
+    try{context.drawImage(video,0,0,sample.width,sample.height);const pixels=context.getImageData(0,0,sample.width,sample.height).data;let white=0;for(let i=0;i<pixels.length;i+=4)if(pixels[i]>245&&pixels[i+1]>245&&pixels[i+2]>245)white++;whiteRatio=white/(pixels.length/4)}catch{}
+    if(whiteRatio<.92||performance.now()-start>3500){setSessionLoading('',false);return}
+    video.requestVideoFrameCallback?video.requestVideoFrameCallback(inspect):setTimeout(inspect,100);
+  };
+  video.requestVideoFrameCallback?video.requestVideoFrameCallback(inspect):setTimeout(()=>setSessionLoading('',false),1200);
+}
+video.addEventListener('playing',revealAfterRealFrame);
 const remoteAudio = document.querySelector('#remote-audio');
 const remoteCursor = document.querySelector('#remote-cursor');
 let pc = null;
