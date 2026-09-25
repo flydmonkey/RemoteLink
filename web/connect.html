@@ -402,6 +402,10 @@
       .account-menu[hidden] {
         display: none;
       }
+      .status-nav[hidden],
+      .account-admin[hidden] {
+        display: none !important;
+      }
       .account-summary {
         padding: 9px 10px 10px;
         border-bottom: 1px solid var(--stroke);
@@ -508,7 +512,7 @@
           ><a class="protocol-link" href="/ssh">SSH</a>
         </nav>
         <nav class="nav-group" aria-label="应用导航">
-          <a class="nav status-nav" href="/admin" aria-label="状态" title="状态"
+          <a class="nav status-nav" href="/admin" aria-label="状态" title="状态" hidden
             ><svg
               viewBox="0 0 24 24"
               fill="none"
