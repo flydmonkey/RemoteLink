@@ -56,6 +56,12 @@ test("VNC page follows the existing RemoteLink shell", async ({ page }) => {
   await page.goto("/vnc.html");
   await expect(page).toHaveTitle("RemoteLink · VNC");
   await expect(page.locator(".brand")).toHaveText("RemoteLink");
+  await expect(page.locator(".brand")).toHaveCSS("font-weight", "600");
+  await expect(page.getByRole("heading", { name: "SSH 连接" })).toHaveCSS(
+    "font-weight",
+    "600",
+  );
+  await expect(page.locator(".app")).toHaveCSS("height", "270px");
   await expect(page.locator(".brand .mark")).toHaveCount(0);
   await expect(page.locator('.protocol-nav a[aria-current="page"]')).toHaveText(
     "VNC",
