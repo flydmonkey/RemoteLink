@@ -19,46 +19,182 @@
           "Cascadia Mono",
           monospace;
       }
-      .bar {
-        height: 44px;
+      .remote-toolbar {
+        position: fixed;
+        z-index: 5;
+        left: 12px;
+        top: 50%;
         display: flex;
+        flex-direction: column;
         align-items: center;
-        gap: 12px;
-        padding: 0 14px;
-        background: #292929;
-        border-bottom: 1px solid #ffffff20;
-        font-family: "Segoe UI", sans-serif;
+        gap: 2px;
+        width: 48px;
+        padding: 6px;
+        border: 1px solid #ffffff2e;
+        border-radius: 8px;
+        background: #292929dd;
+        box-shadow: 0 8px 28px #0008;
+        backdrop-filter: blur(24px);
+        transform: translateY(-50%);
+        transition: transform 0.18s ease;
       }
-      .bar strong {
-        flex: 1;
+      .remote-toolbar.collapsed {
+        transform: translate(calc(-100% - 12px), -50%);
       }
-      .bar button {
-        padding: 6px 12px;
-        border: 1px solid #ffffff25;
+      .remote-toolbar button {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        border: 1px solid transparent;
         border-radius: 4px;
         color: #eee;
-        background: #383838;
+        background: transparent;
         cursor: pointer;
       }
+      .remote-toolbar button:hover {
+        background: #ffffff13;
+      }
+      .remote-toolbar button.danger {
+        color: #ff99a4;
+      }
+      .remote-toolbar svg {
+        width: 20px;
+        height: 20px;
+        pointer-events: none;
+      }
+      .toolbar-divider {
+        width: 24px;
+        height: 1px;
+        margin: 4px 0;
+        background: #ffffff2e;
+      }
+      .toolbar-tooltip {
+        position: absolute;
+        left: calc(100% + 12px);
+        top: 50%;
+        padding: 5px 9px;
+        border: 1px solid #ffffff2e;
+        border-radius: 4px;
+        background: #292929;
+        font:
+          12px/18px "Segoe UI",
+          sans-serif;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-50%);
+      }
+      .remote-toolbar button:hover .toolbar-tooltip {
+        opacity: 1;
+      }
+      .remote-toolbar.collapsed #toolbar-toggle {
+        position: absolute;
+        left: calc(100% + 12px);
+        top: 50%;
+        border: 1px solid #ffffff2e;
+        border-left: 0;
+        border-radius: 0 8px 8px 0;
+        background: #292929;
+        transform: translateY(-50%);
+      }
+      .remote-toolbar.collapsed #toolbar-toggle svg {
+        transform: rotate(180deg);
+      }
       #terminal {
-        height: calc(100vh - 44px);
+        height: 100vh;
         margin: 0;
         padding: 14px;
         overflow: auto;
         outline: 0;
       }
       #status {
+        position: fixed;
+        z-index: 4;
+        right: 12px;
+        top: 10px;
+        padding: 5px 9px;
+        border-radius: 4px;
+        background: #292929cc;
+        font:
+          12px "Segoe UI",
+          sans-serif;
         color: #9d9d9d;
       }
     </style>
   </head>
   <body>
-    <header class="bar">
-      <strong id="title">SSH 控制台</strong><span id="status">正在连接…</span
-      ><button id="copy">复制</button><button id="paste">粘贴</button
-      ><button id="fullscreen">全屏</button
-      ><button id="disconnect">断开连接</button>
-    </header>
+    <span id="status">正在连接…</span>
+    <aside
+      class="remote-toolbar"
+      id="remote-toolbar"
+      aria-label="远程会话工具栏"
+    >
+      <button id="copy" aria-label="复制">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+        >
+          <rect x="8" y="8" width="11" height="12" rx="2" />
+          <path
+            d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h2"
+          /></svg
+        ><span class="toolbar-tooltip">复制</span>
+      </button>
+      <button id="paste" aria-label="粘贴">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+        >
+          <rect x="8" y="3" width="8" height="4" rx="1" />
+          <path
+            d="M16 5h2a2 2 0 0 1 2 2v13H4V7a2 2 0 0 1 2-2h2M8 12h8M8 16h5"
+          /></svg
+        ><span class="toolbar-tooltip">粘贴</span>
+      </button>
+      <button id="fullscreen" aria-label="全屏">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+        >
+          <path
+            d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M3 16v3a2 2 0 0 0 2 2h3M21 16v3a2 2 0 0 1-2 2h-3"
+          /></svg
+        ><span class="toolbar-tooltip">全屏</span>
+      </button>
+      <div class="toolbar-divider"></div>
+      <button id="disconnect" class="danger" aria-label="断开连接">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+        >
+          <path
+            d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M14 8l4 4-4 4M9 12h9"
+          /></svg
+        ><span class="toolbar-tooltip">断开连接</span>
+      </button>
+      <div class="toolbar-divider"></div>
+      <button id="toolbar-toggle" aria-label="收起工具栏">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="m15 18-6-6 6-6" /></svg
+        ><span class="toolbar-tooltip">收起</span>
+      </button>
+    </aside>
     <div id="terminal"></div>
     <script src="/vendor/xterm/xterm.js"></script>
     <script>
@@ -68,7 +204,7 @@
           sessionStorage.getItem("remotelink-ssh-session") || "null",
         ),
         name = new URLSearchParams(location.search).get("name") || "SSH";
-      document.querySelector("#title").textContent = name;
+      document.title = `RemoteLink · ${name}`;
       let socket;
       const terminal = new Terminal({
         cursorBlink: true,
@@ -146,6 +282,18 @@
       document.querySelector("#disconnect").onclick = () => {
         if (socket) socket.close();
         location.href = "/ssh";
+      };
+      const toolbar = document.querySelector("#remote-toolbar"),
+        toolbarToggle = document.querySelector("#toolbar-toggle");
+      toolbarToggle.onclick = () => {
+        const collapsed = toolbar.classList.toggle("collapsed");
+        toolbarToggle.setAttribute(
+          "aria-label",
+          collapsed ? "展开工具栏" : "收起工具栏",
+        );
+        toolbarToggle.querySelector(".toolbar-tooltip").textContent = collapsed
+          ? "展开"
+          : "收起";
       };
     </script>
   </body>

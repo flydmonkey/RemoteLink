@@ -215,6 +215,11 @@ test("SSH page exposes password and key connection management", async ({
   await expect(page.locator("#target")).toHaveValue("ssh-1");
   await page.locator("#manage").click();
   await page.getByRole("button", { name: "添加连接" }).click();
+  await expect(page.locator("#key-fields")).toBeHidden();
+  await expect(page.locator("#password")).toBeVisible();
+  await page.locator("#auth").selectOption("key");
+  await expect(page.locator("#key-fields")).toBeVisible();
+  await expect(page.locator("#password")).toBeHidden();
   await expect(
     page.getByRole("option", { name: "用户名和密码" }),
   ).toBeAttached();

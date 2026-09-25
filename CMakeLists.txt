@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(remote_gateway VERSION 0.1.0 LANGUAGES C CXX)
+project(remote_gateway VERSION 0.2.0 LANGUAGES C CXX)
 
 option(REMOTE_GATEWAY_BUILD_TESTS "Build unit tests" ON)
 option(REMOTE_GATEWAY_ENABLE_STREAMING "Build WebRTC/H.264 streaming support" ON)

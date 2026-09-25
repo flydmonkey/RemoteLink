@@ -1,8 +1,10 @@
 {
   "name": "remotelink-browser-tests",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "test:release": "powershell -ExecutionPolicy Bypass -File scripts/test-release.ps1"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0"

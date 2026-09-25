@@ -918,6 +918,15 @@ int main() {
                 const auto id=payload.value("id","");std::lock_guard lock(ssh_bridges_mutex);
                 const auto removed=ssh_bridges.erase(id);response.body=json{{"disconnected",removed!=0}}.dump();return response;
             }
+            if(request.method=="POST"&&(request.path=="/api/admin/ssh/trust/reset"||request.path=="/api/admin/ssh/credentials/clear")){
+                const auto id=payload.value("id","");std::lock_guard lock(ssh_connections_mutex);
+                const auto found=std::find_if(ssh_connections.begin(),ssh_connections.end(),[&](const auto& item){return item.id==id;});
+                if(found==ssh_connections.end()){response.status=404;response.body=json{{"error","SSH connection not found"}}.dump();return response;}
+                if(request.path.ends_with("trust/reset"))found->host_key_sha256.clear();
+                else{found->password.clear();found->private_key.clear();found->passphrase.clear();}
+                save_ssh_connections(ssh_connections_path,ssh_connection_secrets_path,ssh_connections);
+                response.body=json{{"updated",true}}.dump();return response;
+            }
             response.status=405;response.body=json{{"error","method not allowed"}}.dump();return response;
         }
         if (request.path.starts_with("/api/admin/vnc")) {
