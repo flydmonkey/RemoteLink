@@ -246,11 +246,81 @@
       body.settings-mode #manager {
         display: block;
         position: static;
-        width: min(900px, 100%);
+        width: min(980px, 100%);
         margin: 0 auto;
+        padding: 0;
+        overflow: hidden;
       }
       body.settings-mode #manager-close {
         display: none;
+      }
+      .settings-title {
+        height: 52px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--line);
+      }
+      .settings-title a {
+        color: var(--text);
+        font-size: 22px;
+        text-decoration: none;
+      }
+      .settings-title h1 {
+        margin: 0;
+        font-size: 14px;
+      }
+      .settings-layout {
+        display: grid;
+        grid-template-columns: 190px minmax(0, 1fr);
+        min-height: 480px;
+      }
+      .settings-nav {
+        padding: 12px 8px;
+        border-right: 1px solid var(--line);
+        background: #292929;
+      }
+      .settings-nav a {
+        display: block;
+        padding: 9px 10px;
+        border-radius: 4px;
+        color: var(--text);
+        text-decoration: none;
+      }
+      .settings-nav a:hover,
+      .settings-nav a[aria-current="page"] {
+        background: #ffffff0d;
+      }
+      .settings-nav a[aria-current="page"] {
+        box-shadow: inset 2px 0 var(--accent);
+      }
+      .settings-content {
+        padding: 20px;
+      }
+      .settings-view[hidden] {
+        display: none !important;
+      }
+      .settings-view h2 {
+        margin: 0 0 16px;
+        font-size: 18px;
+      }
+      .settings-content .dialog-head {
+        margin-bottom: 12px;
+      }
+      @media (max-width: 680px) {
+        .settings-layout {
+          grid-template-columns: 1fr;
+        }
+        .settings-nav {
+          display: flex;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+        .settings-nav a {
+          flex: 1;
+          text-align: center;
+        }
       }
       .dialog-head,
       .row,
@@ -398,18 +468,35 @@
       </main>
     </div>
     <dialog id="manager">
-      <div class="dialog-head">
-        <h2>SSH 连接管理</h2>
-        <button id="add" class="primary">添加连接</button>
+      <header class="settings-title">
+        <a href="/ssh" aria-label="返回">‹</a>
+        <h1>SSH 设置</h1>
+      </header>
+      <div class="settings-layout">
+        <nav class="settings-nav" aria-label="SSH 设置">
+          <a href="#connections" data-settings-view="connections">SSH 连接</a
+          ><a href="#sessions" data-settings-view="sessions">活动会话</a
+          ><a href="#history" data-settings-view="history">连接历史</a>
+        </nav>
+        <main class="settings-content">
+          <section class="settings-view" data-settings-panel="connections">
+            <div class="dialog-head">
+              <h2>SSH 连接</h2>
+              <button id="add" class="primary">添加连接</button>
+            </div>
+            <div id="list" class="list"></div>
+          </section>
+          <section class="settings-view" data-settings-panel="sessions" hidden>
+            <h2>活动会话</h2>
+            <div id="active" class="list"></div>
+          </section>
+          <section class="settings-view" data-settings-panel="history" hidden>
+            <h2>连接历史</h2>
+            <div id="history" class="list"></div>
+          </section>
+        </main>
       </div>
-      <div id="list" class="list"></div>
-      <h3>活动会话</h3>
-      <div id="active" class="list"></div>
-      <h3>连接历史</h3>
-      <div id="history" class="list"></div>
-      <div class="dialog-actions">
-        <button id="manager-close" class="secondary">关闭</button>
-      </div>
+      <button id="manager-close" class="secondary" hidden>关闭</button>
     </dialog>
     <dialog id="editor">
       <form id="form" class="editor">
@@ -461,6 +548,27 @@
         document.body.classList.add("settings-mode");
         manager.setAttribute("open", "");
       }
+      function selectSettingsView() {
+        const requested = location.hash.slice(1),
+          view = ["connections", "sessions", "history"].includes(requested)
+            ? requested
+            : "connections";
+        document
+          .querySelectorAll("[data-settings-panel]")
+          .forEach(
+            (panel) => (panel.hidden = panel.dataset.settingsPanel !== view),
+          );
+        document
+          .querySelectorAll("[data-settings-view]")
+          .forEach((link) =>
+            link.setAttribute(
+              "aria-current",
+              link.dataset.settingsView === view ? "page" : "false",
+            ),
+          );
+      }
+      window.addEventListener("hashchange", selectSettingsView);
+      selectSettingsView();
       async function api(path, options = {}) {
         const response = await fetch(path, {
             ...options,
