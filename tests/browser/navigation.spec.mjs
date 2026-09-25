@@ -220,6 +220,8 @@ test("SSH page exposes password and key connection management", async ({
   await expect(page.locator('.nav a[aria-current="page"]')).toHaveText("SSH");
   await expect(page.getByRole("heading", { name: "SSH 连接" })).toBeVisible();
   await expect(page.locator("#target")).toHaveValue("ssh-1");
+  await expect(page.locator("#target option")).toHaveCount(1);
+  await expect(page.locator("#target option")).toHaveText("Linux");
   await expect(page.locator("#manage")).toHaveAttribute(
     "href",
     "/ssh/settings",
@@ -230,6 +232,8 @@ test("SSH page exposes password and key connection management", async ({
   await expect(page.locator("#account-menu")).toBeVisible();
   await expect(page.locator("#logout")).toHaveText("退出登录");
   await page.evaluate(() => document.querySelector("#manager").showModal());
+  await expect(page.locator(".settings-title a svg")).toBeVisible();
+  await expect(page.locator(".settings-title a")).toHaveCSS("width", "34px");
   await page.getByRole("button", { name: "添加连接" }).click();
   await expect(page.locator("#key-fields")).toBeHidden();
   await expect(page.locator("#password")).toBeVisible();

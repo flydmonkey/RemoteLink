@@ -295,9 +295,24 @@
         border-bottom: 1px solid var(--line);
       }
       .settings-title a {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        border-radius: 4px;
         color: var(--text);
-        font-size: 22px;
         text-decoration: none;
+      }
+      .settings-title a:hover {
+        background: #ffffff0d;
+      }
+      .settings-title a:active {
+        background: #ffffff08;
+      }
+      .settings-title a svg {
+        width: 20px;
+        height: 20px;
       }
       .settings-title h1 {
         margin: 0;
@@ -502,7 +517,18 @@
     </div>
     <dialog id="manager">
       <header class="settings-title">
-        <a href="/ssh" aria-label="返回">‹</a>
+        <a href="/ssh" title="返回 SSH 连接" aria-label="返回 SSH 连接"
+          ><svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m15 18-6-6 6-6" /></svg
+        ></a>
         <h1>SSH 设置</h1>
       </header>
       <div class="settings-layout">
@@ -628,10 +654,13 @@
             ? `${me.name} · ${me.username}`
             : me.name;
         const data = await api("/api/ssh/targets");
-        target.innerHTML = '<option value="">请选择 SSH 设备</option>';
-        for (const item of data.targets || [])
-          target.add(new Option(item.name, item.id));
-        if (target.options.length > 1) target.selectedIndex = 1;
+        const availableTargets = data.targets || [];
+        target.replaceChildren();
+        if (availableTargets.length) {
+          for (const item of availableTargets)
+            target.add(new Option(item.name, item.id));
+          target.selectedIndex = 0;
+        } else target.add(new Option("请选择 SSH 设备", ""));
         if (me.admin) {
           connections = (await api("/api/admin/ssh")).connections || [];
           const activity = await api("/api/admin/ssh/activity");
