@@ -54,7 +54,6 @@
         background: var(--panel);
         box-shadow: 0 18px 50px #0006;
         overflow: hidden;
-        transition: width 0.18s;
       }
       .app.admin-open {
         width: min(960px, 100%);
@@ -156,6 +155,7 @@
         color: var(--text);
         background: #363636;
         cursor: pointer;
+        text-decoration: none;
       }
       .manage-toggle[hidden] {
         display: none;
@@ -550,13 +550,12 @@
           ><a href="/ssh">SSH</a>
         </nav>
         <div class="title-actions">
-          <button
+          <a
             class="manage-toggle"
             id="manage-toggle"
-            type="button"
+            href="/vnc.html?admin=1"
             title="管理"
             aria-label="管理"
-            aria-expanded="false"
             hidden
           >
             <svg
@@ -568,7 +567,7 @@
             >
               <path d="M3 12h4l2-6 4 12 2-6h6" />
             </svg>
-          </button>
+          </a>
           <div class="account">
             <button
               class="avatar"
@@ -779,7 +778,6 @@
         connectionCard.hidden = opening;
         app.classList.toggle("admin-open", opening);
         workspace.classList.toggle("admin-open", opening);
-        manageToggle.setAttribute("aria-expanded", String(opening));
         manageToggle.title = opening ? "返回 VNC 连接" : "管理";
         manageToggle.setAttribute("aria-label", manageToggle.title);
         if (opening) {
@@ -792,8 +790,6 @@
           renderActivity(activity);
         }
       }
-      manageToggle.onclick = () =>
-        openManagement().catch((error) => (notice.textContent = error.message));
       document.querySelector("#connect-form").onsubmit = (event) => {
         event.preventDefault();
         if (!target.value) return;

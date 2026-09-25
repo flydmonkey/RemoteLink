@@ -74,7 +74,7 @@ test("VNC page follows the existing RemoteLink shell", async ({ page }) => {
   await expect(page.locator("#target")).toHaveValue("first-vnc");
   await expect(page.locator("#admin-nav")).toBeHidden();
   await expect(
-    page.getByRole("button", { name: "管理", exact: true }),
+    page.getByRole("link", { name: "管理", exact: true }),
   ).toBeHidden();
   await expect(page.locator("#users-link")).toBeHidden();
   await expect(page.locator(".title-actions")).toHaveCSS("gap", "2px");
@@ -154,7 +154,10 @@ test("VNC administrators add connections from management only", async ({
   await expect(page.locator("#account-name")).toHaveText(
     "Administrator · admin",
   );
-  await page.getByRole("button", { name: "管理", exact: true }).click();
+  await expect(
+    page.getByRole("link", { name: "管理", exact: true }),
+  ).toHaveAttribute("href", "/vnc.html?admin=1");
+  await page.getByRole("link", { name: "管理", exact: true }).click();
   await expect(page.locator(".admin-title")).toBeVisible();
   await expect(page.locator(".admin-title")).toContainText("管理");
   await expect(page.locator(".admin-title a")).toHaveAttribute("href", "/vnc");
