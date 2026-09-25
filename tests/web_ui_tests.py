@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
@@ -7,6 +8,8 @@ connect = (web / "connect.html").read_text(encoding="utf-8")
 session = (web / "index.html").read_text(encoding="utf-8")
 settings = (web / "settings.html").read_text(encoding="utf-8")
 i18n = (web / "i18n.js").read_text(encoding="utf-8")
+vnc_session = (web / "vnc-session.html").read_text(encoding="utf-8")
+ssh_session = (web / "ssh-session.html").read_text(encoding="utf-8")
 localized_pages = [
     web / name
     for name in (
@@ -38,6 +41,17 @@ for language in ("zh-TW", "en", "ja", "ko"):
     assert language in session
 assert "requestVideoFrameCallback" in session
 assert "whiteRatio" in session
+for source, button_id in (
+    (session, "logout"),
+    (vnc_session, "disconnect"),
+    (ssh_session, "disconnect"),
+):
+    button = re.search(
+        rf"<button\b(?=[^>]*\bid=\"{button_id}\")[^>]*>", source, re.DOTALL
+    ).group(0)
+    assert 'class="disconnect-action"' in button
+    assert 'aria-label="断开连接"' in button
+    assert 'class="danger"' not in button
 for page in localized_pages:
     source = page.read_text(encoding="utf-8")
     assert "/i18n.js" in source, f"{page.name} is missing shared i18n"
