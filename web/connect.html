@@ -12,6 +12,7 @@
     @media(forced-colors:active){body,.titlebar,.connection-card,.hero,input,select{background:Canvas;color:CanvasText;border-color:ButtonBorder}button{background:ButtonFace;color:ButtonText;border-color:ButtonBorder}.primary{background:Highlight;color:HighlightText}}
   </style>
   <style>.logout-nav{width:34px!important;min-width:34px!important;padding:0!important;border:0!important;background:transparent!important}.logout-nav svg{width:18px;height:18px}.logout-nav:hover{background:var(--control)!important}</style>
+<style>dialog[open]{position:fixed;inset-block-start:45%;inset-block-end:auto;max-height:80vh;overflow:auto;transform:translateY(-50%)}</style>
 </head>
 <body><div class="app">
   <header class="titlebar"><div class="brand"><span class="app-icon">RG</span><h1>Remote Gateway</h1></div><nav class="nav-group" aria-label="应用导航"><a class="nav status-nav" href="/admin" aria-label="状态" title="状态"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg></a><a class="nav settings-nav" href="/settings" aria-label="设置" title="设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.1A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.1A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.1A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.12.38.33.72.6 1 .3.28.68.42 1.1.4h.1v4h-.1a1.7 1.7 0 0 0-1.7.6Z"/></svg></a><button class="nav logout-nav" id="logout-account" type="button">退出</button></nav></header>
@@ -58,6 +59,7 @@ let accessToken='';
 let socket;
 let targets=[];
 function savedProfiles(){try{return JSON.parse(localStorage.getItem('remote-gateway-profiles')||'{}')}catch{return {}}}
+function automaticResolution(){const scale=Math.max(1,window.devicePixelRatio||1);return {width:Math.min(7680,Math.max(640,Math.round(screen.width*scale/2)*2)),height:Math.min(4320,Math.max(480,Math.round(screen.height*scale/2)*2))}}
 function applyProfile(){
   const key=targetSelect.value;
   const target=targets.find(item=>item.id===key);
@@ -105,10 +107,7 @@ document.querySelector('#connection-form').addEventListener('submit',event=>{
   localStorage.setItem('remote-gateway-profiles',JSON.stringify(profiles));
   localStorage.setItem('remote-gateway-last-target',selected.id);
   let settings={};try{settings=JSON.parse(localStorage.getItem('remote-gateway-settings')||'{}')}catch{}
-  if(!(Number(settings.width)>0&&Number(settings.height)>0)){
-    settings.width=1920;
-    settings.height=1080;
-  }
+  if(!(Number(settings.width)>0&&Number(settings.height)>0))Object.assign(settings,automaticResolution());
   settings.bitrate=Number(settings.bitrate)||4000000;
   sessionStorage.setItem('remote-gateway-session',JSON.stringify({target:selected?.id||'',host,username:username.value,password:password.value,accessToken,startedAt:Date.now(),...settings}));
   if(socket&&socket.readyState<WebSocket.CLOSING){socket.onclose=null;socket.close()}

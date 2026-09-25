@@ -27,6 +27,7 @@
     @media(forced-colors:active){body,.titlebar,.workspace,.host,dialog,input,textarea,.remote-toolbar,.toolbar-tooltip{background:Canvas;color:CanvasText;border-color:ButtonBorder}button,.tool{background:ButtonFace;color:ButtonText;border-color:ButtonBorder}#status:before{background:Highlight;box-shadow:none}:where(button,a,input,textarea,video):focus-visible{outline-color:Highlight}.toolbar-divider{background:ButtonBorder}}
   </style>
   <style>#file-center{width:min(760px,calc(100% - 32px))}#file-center .print-job{grid-template-columns:auto 1fr auto}</style>
+  <style>dialog[open]{position:fixed;inset-block-start:45%;inset-block-end:auto;max-height:80vh;overflow:auto;transform:translateY(-50%)}</style>
 </head>
 <body><div class="app-shell">
 <header class="titlebar"><div class="brand"><span class="app-icon">RG</span><h1>Remote Gateway</h1></div><div class="connection"><a class="nav-link" href="/admin">状态</a><a class="nav-link" href="/settings">设置</a><button id="theme-toggle" class="tool theme-toggle" type="button">主题：系统</button><span id="status">正在连接…</span></div></header>
@@ -131,6 +132,7 @@ let selectedHost = '';
 let sessionUsername = '';
 let sessionPassword = '';
 let sessionOptions = { width: 1920, height: 1080, bitrate: 4000000, sound: true, printer: true, encoder: 'auto' };
+function automaticResolution(){const scale=Math.max(1,window.devicePixelRatio||1);return {width:Math.min(7680,Math.max(640,Math.round(screen.width*scale/2)*2)),height:Math.min(4320,Math.max(480,Math.round(screen.height*scale/2)*2))}}
 let printSessionStartedMs = 0;
 let rdpState = '';
 const chooser = document.querySelector('#chooser');
@@ -547,9 +549,10 @@ if ((pendingSession?.target || pendingSession?.host) && pendingSession?.accessTo
   selectedHost = pendingSession.host || '';
   sessionUsername = pendingSession.username || '';
   sessionPassword = pendingSession.password || '';
+  const automaticSize=automaticResolution();
   sessionOptions = {
-    width: Number(pendingSession.width) || 1920,
-    height: Number(pendingSession.height) || 1080,
+    width: Number(pendingSession.width) || automaticSize.width,
+    height: Number(pendingSession.height) || automaticSize.height,
     bitrate: Number(pendingSession.bitrate) || 4000000,
     sound: pendingSession.sound !== false,
     printer: pendingSession.printer !== false,
