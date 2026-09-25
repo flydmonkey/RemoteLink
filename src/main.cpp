@@ -74,6 +74,39 @@ struct VncActivity {
     bool active = true;
 };
 
+struct VncBridgeLease {
+    std::shared_ptr<remote_gateway::VncBridge> bridge;
+    std::chrono::steady_clock::time_point expires_at;
+};
+
+std::vector<VncActivity> load_vnc_activity(const std::filesystem::path& path) {
+    std::ifstream input(path);
+    if (!input) return {};
+    const auto data = nlohmann::json::parse(input, nullptr, false);
+    if (!data.is_array()) return {};
+    std::vector<VncActivity> activity;
+    for (const auto& item : data) activity.push_back({item.value("id", ""),
+        item.value("targetId", ""), item.value("targetName", ""),
+        item.value("username", ""), item.value("startedAt", 0LL),
+        item.value("endedAt", 0LL), item.value("active", false)});
+    return activity;
+}
+
+void save_vnc_activity(const std::filesystem::path& path,
+                       const std::vector<VncActivity>& activity) {
+    nlohmann::json data = nlohmann::json::array();
+    for (const auto& item : activity) data.push_back({{"id",item.id},
+        {"targetId",item.target_id},{"targetName",item.target_name},
+        {"username",item.username},{"startedAt",item.started_at},
+        {"endedAt",item.ended_at},{"active",item.active}});
+    const auto temporary = path.string() + ".tmp";
+    { std::ofstream output(temporary, std::ios::trunc); output << data.dump(2);
+      if (!output) throw std::runtime_error("cannot save VNC activity"); }
+    std::filesystem::rename(temporary, path);
+    std::filesystem::permissions(path, std::filesystem::perms::owner_read |
+        std::filesystem::perms::owner_write, std::filesystem::perm_options::replace);
+}
+
 std::string hex_encode(const unsigned char* bytes, std::size_t size) {
     constexpr char hex[] = "0123456789abcdef";
     std::string output(size * 2, '0');
@@ -418,14 +451,32 @@ int main() {
     const auto connection_secrets_path = state_root / "connection-secrets";
     const auto vnc_connections_path = state_root / "vnc-connections.json";
     const auto vnc_connection_secrets_path = state_root / "vnc-connection-secrets";
+    const auto vnc_ca_path = state_root / "vnc-ca";
     auto vnc_connections = load_vnc_connections(vnc_connections_path, allowed_hosts);
     save_vnc_connections(vnc_connections_path, vnc_connection_secrets_path, vnc_connections);
     std::mutex vnc_connections_mutex;
     remote_gateway::VncTicketStore vnc_tickets;
     std::mutex vnc_bridges_mutex;
-    std::unordered_map<std::string, std::shared_ptr<remote_gateway::VncBridge>> vnc_bridges;
+    std::unordered_map<std::string, VncBridgeLease> vnc_bridges;
+    std::jthread vnc_bridge_reaper([&vnc_bridges, &vnc_bridges_mutex](std::stop_token stop) {
+        while (!stop.stop_requested()) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            const auto now = std::chrono::steady_clock::now();
+            std::lock_guard lock(vnc_bridges_mutex);
+            std::erase_if(vnc_bridges, [now](const auto& item) {
+                return item.second.expires_at <= now;
+            });
+        }
+    });
+    const auto vnc_activity_path = state_root / "vnc-activity.json";
     std::mutex vnc_activity_mutex;
-    std::vector<VncActivity> vnc_activity;
+    auto vnc_activity = load_vnc_activity(vnc_activity_path);
+    const auto startup_time = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    for (auto& item : vnc_activity) if (item.active) {
+        item.active = false; item.ended_at = startup_time;
+    }
+    if (!vnc_activity.empty()) save_vnc_activity(vnc_activity_path, vnc_activity);
     const auto connections_migration_marker = state_root / "connections.migrated";
     const auto configured_targets = remote_gateway::load_targets(targets_file, allowed_hosts);
     auto managed_targets = load_managed_connections(connections_path, allowed_hosts);
@@ -485,7 +536,7 @@ int main() {
     http.set_vnc_ticket_handler([&vnc_tickets](const std::string& ticket) {
         return vnc_tickets.consume(ticket);
     });
-    http.set_vnc_session_observer([&vnc_activity, &vnc_activity_mutex,
+    http.set_vnc_session_observer([&vnc_activity, &vnc_activity_mutex, &vnc_activity_path,
                                    &vnc_bridges, &vnc_bridges_mutex](
                                       const remote_gateway::VncDestination& destination,
                                       bool connected) {
@@ -502,6 +553,17 @@ int main() {
             found->active = false;
             found->ended_at = now;
         }
+        try {
+            save_vnc_activity(vnc_activity_path, vnc_activity);
+        } catch (const std::exception& error) {
+            std::cerr << "cannot persist VNC activity: " << error.what() << '\n';
+        }
+        if (connected) {
+            std::lock_guard bridge_lock(vnc_bridges_mutex);
+            const auto bridge = vnc_bridges.find(destination.session_id);
+            if (bridge != vnc_bridges.end())
+                bridge->second.expires_at = std::chrono::steady_clock::time_point::max();
+        }
         if (!connected) {
             std::lock_guard bridge_lock(vnc_bridges_mutex);
             vnc_bridges.erase(destination.session_id);
@@ -511,7 +573,7 @@ int main() {
                           &users_path, &target_catalog, &managed_targets, &connections_path,
                           &connection_secrets_path,
                           &vnc_connections, &vnc_connections_mutex, &vnc_connections_path,
-                          &vnc_connection_secrets_path, &vnc_tickets,
+                          &vnc_connection_secrets_path, &vnc_ca_path, &vnc_tickets,
                           &vnc_bridges, &vnc_bridges_mutex,
                           &vnc_activity, &vnc_activity_mutex,
                           &allowed_hosts, tls_enabled](
@@ -598,7 +660,8 @@ int main() {
                 .target_name=connection->name, .username=vnc_username,
                 .hostname="127.0.0.1", .port=bridge->port()});
             { std::lock_guard bridge_lock(vnc_bridges_mutex);
-              vnc_bridges.emplace(ticket, std::move(bridge)); }
+              vnc_bridges.emplace(ticket, VncBridgeLease{std::move(bridge),
+                  std::chrono::steady_clock::now() + std::chrono::seconds(30)}); }
             response.body = json{{"ticket", ticket},
                 {"websocketUrl", "/vnc/ws?ticket=" + ticket},
                 {"viewOnly", connection->view_only},
@@ -616,7 +679,7 @@ int main() {
                     connections.push_back({{"id", connection.id}, {"name", connection.name},
                         {"host", connection.hostname},
                         {"port", connection.port}, {"viewOnly", connection.view_only},
-                        {"username", connection.username}, {"caFile", connection.ca_file},
+                        {"username", connection.username}, {"hasCaCertificate", !connection.ca_file.empty()},
                         {"hasPassword", !connection.password.empty()}});
                 response.body = json{{"connections", std::move(connections)}}.dump(); return response;
             }
@@ -638,7 +701,45 @@ int main() {
                 if (host.empty() || port < 1 || port > 65535) {
                     response.status=400; response.body=json{{"error","invalid VNC destination"}}.dump(); return response;
                 }
-                response.body=json{{"reachable",test_tcp_connection(host,static_cast<std::uint16_t>(port))}}.dump(); return response;
+                auto username = payload.value("username", "");
+                auto password = payload.value("password", "");
+                std::string ca_file;
+                const auto ca_certificate = payload.value("caCertificate", "");
+                const auto id = payload.value("id", "");
+                if (!id.empty()) {
+                    std::lock_guard lock(vnc_connections_mutex);
+                    const auto existing = std::find_if(vnc_connections.begin(), vnc_connections.end(),
+                        [&](const auto& item) { return item.id == id; });
+                    if (existing != vnc_connections.end()) {
+                        if (password.empty()) password = existing->password;
+                        if (username.empty()) username = existing->username;
+                        if (ca_certificate.empty()) ca_file = existing->ca_file;
+                    }
+                }
+                std::filesystem::path temporary_ca;
+                if (!ca_certificate.empty()) {
+                    if (ca_certificate.size() > 1024 * 1024 ||
+                        ca_certificate.find("-----BEGIN CERTIFICATE-----") == std::string::npos ||
+                        ca_certificate.find("-----END CERTIFICATE-----") == std::string::npos) {
+                        response.status=400; response.body=json{{"error","CA 证书格式无效"}}.dump(); return response;
+                    }
+                    std::filesystem::create_directories(vnc_ca_path);
+                    temporary_ca = vnc_ca_path / ("test-" + generate_connection_id() + ".pem");
+                    { std::ofstream output(temporary_ca, std::ios::trunc); output << ca_certificate;
+                      if (!output) { response.status=500; response.body=json{{"error","无法暂存 CA 证书"}}.dump(); return response; } }
+                    std::filesystem::permissions(temporary_ca, std::filesystem::perms::owner_read |
+                        std::filesystem::perms::owner_write, std::filesystem::perm_options::replace);
+                    ca_file = temporary_ca.string();
+                }
+                std::string test_error;
+                auto test_bridge = remote_gateway::VncBridge::create({.hostname=host,
+                    .port=static_cast<std::uint16_t>(port), .username=username,
+                    .password=password, .ca_file=ca_file}, test_error);
+                if (!temporary_ca.empty()) std::filesystem::remove(temporary_ca);
+                response.body = test_bridge
+                    ? json{{"reachable",true},{"authenticated",true}}.dump()
+                    : json{{"reachable",false},{"authenticated",false},{"error",test_error}}.dump();
+                return response;
             }
             if (request.method == "POST" && request.path == "/api/admin/vnc/save") {
                 auto id = payload.value("id", ""); const auto name = payload.value("name", "");
@@ -646,25 +747,43 @@ int main() {
                 if (id.empty()) id = "vnc-" + generate_connection_id();
                 static const std::regex valid_id("^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$");
                 const auto password = payload.value("password", "");
+                const auto ca_certificate = payload.value("caCertificate", "");
                 if (!std::regex_match(id, valid_id)) { response.status=400; response.body=json{{"error","连接 ID 无效"}}.dump(); return response; }
                 if (name.empty() || name.size() > 128) { response.status=400; response.body=json{{"error","连接名称不能为空且不能超过 128 个字符"}}.dump(); return response; }
                 if (host.empty() || host.size() > 255) { response.status=400; response.body=json{{"error","目标主机不能为空且不能超过 255 个字符"}}.dump(); return response; }
                 if (port < 1 || port > 65535) { response.status=400; response.body=json{{"error","端口必须在 1 到 65535 之间"}}.dump(); return response; }
                 if (password.size() > 4096) { response.status=400; response.body=json{{"error","VNC 密码过长"}}.dump(); return response; }
-                if (payload.value("username", "").size() > 256 || payload.value("caFile", "").size() > 1024) { response.status=400; response.body=json{{"error","VNC TLS 配置过长"}}.dump(); return response; }
+                if (payload.value("username", "").size() > 256 || ca_certificate.size() > 1024 * 1024) { response.status=400; response.body=json{{"error","VNC TLS 配置过长"}}.dump(); return response; }
+                if (!ca_certificate.empty() &&
+                    (ca_certificate.find("-----BEGIN CERTIFICATE-----") == std::string::npos ||
+                     ca_certificate.find("-----END CERTIFICATE-----") == std::string::npos)) {
+                    response.status=400; response.body=json{{"error","CA 证书格式无效"}}.dump(); return response;
+                }
                 std::lock_guard lock(vnc_connections_mutex);
                 auto found = std::find_if(vnc_connections.begin(), vnc_connections.end(),
                     [&](const auto& item) { return item.id == id; });
                 VncConnection updated{id, name, host,
                     static_cast<std::uint16_t>(port), password, payload.value("viewOnly", false),
-                    payload.value("username", ""), payload.value("caFile", "")};
+                    payload.value("username", ""), ""};
                 if (found == vnc_connections.end() && !payload.value("id", "").empty()) {
                     response.status=404; response.body=json{{"error","VNC connection not found"}}.dump(); return response;
                 }
                 if (found != vnc_connections.end()) {
                     if (updated.password.empty()) updated.password = found->password;
+                    updated.ca_file = found->ca_file;
                     *found = std::move(updated);
                 } else vnc_connections.push_back(std::move(updated));
+                auto saved = std::find_if(vnc_connections.begin(), vnc_connections.end(),
+                    [&](const auto& item) { return item.id == id; });
+                if (!ca_certificate.empty()) {
+                    std::filesystem::create_directories(vnc_ca_path);
+                    const auto certificate_path = vnc_ca_path / (id + ".pem");
+                    { std::ofstream output(certificate_path, std::ios::trunc); output << ca_certificate;
+                      if (!output) { response.status=500; response.body=json{{"error","无法保存 CA 证书"}}.dump(); return response; } }
+                    std::filesystem::permissions(certificate_path, std::filesystem::perms::owner_read |
+                        std::filesystem::perms::owner_write, std::filesystem::perm_options::replace);
+                    saved->ca_file = certificate_path.string();
+                }
                 save_vnc_connections(vnc_connections_path, vnc_connection_secrets_path, vnc_connections);
                 response.body=json{{"id",id}}.dump(); return response;
             }
@@ -676,6 +795,7 @@ int main() {
                   if (before == vnc_connections.size()) { response.status=404; response.body=json{{"error","VNC connection not found"}}.dump(); return response; }
                   save_vnc_connections(vnc_connections_path, vnc_connection_secrets_path, vnc_connections); }
                 std::filesystem::remove(vnc_connection_secrets_path / (id + ".password"));
+                std::filesystem::remove(vnc_ca_path / (id + ".pem"));
                 { std::lock_guard users_lock(users_mutex);
                   for (auto& user : users) std::erase(user.allowed_targets, id);
                   save_users(users_path, users); }

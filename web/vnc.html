@@ -1,21 +1,937 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>RemoteLink · VNC</title><script src="/i18n.js" defer></script>
-<style>.app:not(.admin-open){height:270px}.workspace:not(.admin-open)>main{padding:0 20px 20px}</style>
-<style>
-:root{color-scheme:dark;--bg:#202020;--panel:#2b2b2b;--control:#222;--line:#ffffff20;--text:#f5f5f5;--muted:#ffffff92;--accent:#6cc5f3;--accent-text:#10232d;--danger:#ff99a4;font:14px/1.45 "Segoe UI Variable","Segoe UI","Microsoft YaHei UI",sans-serif}*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:28px 16px;color:var(--text);background:var(--bg)}button,input,select{font:inherit}.app{width:min(560px,100%);margin:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel);box-shadow:0 18px 50px #0006;overflow:hidden;transition:width .18s}.app.admin-open{width:min(960px,100%)}.titlebar{height:52px;display:flex;align-items:center;gap:18px;padding:0 14px}.brand{display:flex;align-items:center;gap:10px}.mark,.avatar{display:grid;place-items:center;width:26px;height:26px;border:0;border-radius:6px;background:var(--accent);color:var(--accent-text);font-size:10px;font-weight:800}.avatar{border-radius:50%;cursor:pointer}.protocol-nav{align-self:stretch;display:flex}.protocol-nav a{position:relative;display:flex;align-items:center;padding:0 14px;color:var(--muted);text-decoration:none;font-weight:600}.protocol-nav a[aria-current=page]{color:var(--text)}.protocol-nav a[aria-current=page]:after{content:"";position:absolute;left:14px;right:14px;bottom:0;height:2px;background:var(--accent)}.manage-toggle{margin-left:auto;min-height:32px;padding:5px 11px;border:1px solid var(--line);border-radius:4px;color:var(--text);background:#363636;cursor:pointer}.manage-toggle[hidden]{display:none}.account{position:relative}.account-menu{position:absolute;z-index:4;right:0;top:36px;width:180px;padding:6px;border:1px solid var(--line);border-radius:7px;background:var(--panel);box-shadow:0 14px 36px #0008}.account-menu[hidden]{display:none}.account-menu div,.account-menu a,.account-menu button{display:block;width:100%;padding:8px 10px;border:0;border-radius:4px;color:var(--text);background:transparent;text-align:left;text-decoration:none}.account-menu div{color:var(--muted);border-bottom:1px solid var(--line)}.workspace{display:block}.workspace.admin-open{display:grid;grid-template-columns:190px 1fr}.side{padding:14px 10px;border-right:1px solid var(--line);background:#292929}.side[hidden]{display:none}.side h2{margin:4px 10px 10px;color:var(--muted);font-size:12px}.side a{display:block;padding:8px 10px;border-radius:4px;color:var(--muted);text-decoration:none}.side a.active{color:var(--text);background:#ffffff0d;box-shadow:inset 2px 0 var(--accent)}main{padding:16px 20px 24px}.hero{display:flex;align-items:center;gap:12px;padding-bottom:18px}.hero-icon{display:grid;place-items:center;width:44px;height:44px;border-radius:8px;background:#ffffff0c;color:var(--accent);font-weight:700}.hero h1{margin:0;font-size:20px}.hero p{margin:2px 0 0;color:var(--muted);font-size:12px}.connect-form{display:grid;grid-template-columns:100px 1fr;gap:12px;align-items:center}select,input{width:100%;min-height:36px;padding:7px 10px;border:1px solid var(--line);border-radius:4px;color:var(--text);background:var(--control)}.actions,.notice{grid-column:1/-1}.actions{display:flex;justify-content:flex-end;gap:8px}.primary,.secondary{min-height:34px;padding:6px 14px;border:1px solid var(--line);border-radius:4px;color:var(--text);background:#363636;cursor:pointer}.primary{border:0;color:var(--accent-text);background:var(--accent);font-weight:600}.notice{min-height:20px;color:var(--danger)}dialog{width:min(470px,calc(100% - 32px));padding:20px;border:1px solid var(--line);border-radius:8px;color:var(--text);background:var(--panel)}dialog form{display:grid;grid-template-columns:100px 1fr;gap:12px;align-items:center}dialog h2,.dialog-actions,.dialog-notice{grid-column:1/-1}.dialog-actions{display:flex;justify-content:flex-end;gap:8px}.dialog-notice{min-height:18px;color:var(--danger)}@media(max-width:650px){body{padding:0}.app,.app.admin-open{min-height:100vh;border:0;border-radius:0}.brand strong{display:none}.protocol-nav a{padding:0 9px}.workspace.admin-open{display:block}.side{border:0}.side a{display:inline-block}main{padding:16px 14px}.connect-form,dialog form{grid-template-columns:1fr}.actions,.notice,dialog h2,.dialog-actions,.dialog-notice{grid-column:1}}
-</style><style>.connect-form .actions .primary{min-width:124px}.titlebar{gap:18px}.brand{gap:0}.brand strong{font-size:14px;font-weight:600}.protocol-nav{gap:2px}.protocol-nav a{min-width:58px;justify-content:center}.manage-toggle{display:grid;place-items:center;width:34px;height:34px;min-height:34px;margin-left:auto;padding:0;border:0;color:var(--muted);background:transparent}.manage-toggle:hover,.manage-toggle[aria-expanded=true]{color:var(--text);background:#ffffff0d}.manage-toggle svg{width:18px;height:18px}.avatar{display:grid;place-items:center;width:34px;height:34px;padding:0;border-radius:4px;color:#b3b3b3;background:transparent}.avatar:hover,.avatar[aria-expanded=true]{background:#ffffff0d}.avatar-icon{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#363636}.avatar svg{width:16px;height:16px}.hero{gap:12px;padding:16px 0 18px}.hero-icon{width:44px;height:44px;color:var(--accent);background:var(--accent)}.hero-icon svg{width:25px;height:25px;color:var(--accent-text)}.hero h1{margin:0 0 2px;font-size:20px}.hero p{font-size:12px}.connect-form>label{font-weight:600}.connect-form select{min-height:36px;border-color:#ffffff20;border-bottom-color:#ffffff42}.notice{min-height:20px}.admin-panel[hidden],.admin-view[hidden]{display:none}.admin-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.admin-head h1{margin:0;font-size:20px}.connection-list{border:1px solid var(--line);border-radius:6px;overflow:hidden}.connection-row{display:grid;grid-template-columns:minmax(120px,1fr) 1fr 70px auto;align-items:center;gap:10px;padding:11px;border-bottom:1px solid var(--line)}.connection-row:last-child{border-bottom:0}.row-actions{display:flex;gap:6px}.activity-row{display:grid;grid-template-columns:minmax(120px,1fr) 120px 150px;gap:10px;padding:11px;border-bottom:1px solid var(--line)}.activity-row:last-child{border-bottom:0}.empty{padding:24px;color:var(--muted);text-align:center}</style></head><body>
-<div class="app" id="app"><header class="titlebar"><div class="brand"><strong>RemoteLink</strong></div><nav class="protocol-nav"><a href="/">RDP</a><a href="/vnc" aria-current="page">VNC</a><a href="/ssh">SSH</a></nav><button class="manage-toggle" id="manage-toggle" type="button" title="VNC 管理" aria-label="VNC 管理" aria-expanded="false" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg></button><div class="account"><button class="avatar" id="account-trigger" aria-label="用户账户" aria-expanded="false"><span class="avatar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-4 3.1-6 7-6s6.2 2 7 6"/></svg></span></button><div class="account-menu" id="account-menu" hidden><div id="account-name">当前账户</div><a id="users-link" href="/users" hidden>用户管理</a><button id="logout">退出登录</button></div></div></header>
-<div class="workspace" id="workspace"><aside class="side" id="admin-nav" hidden><h2>VNC 管理</h2><a class="active" href="#connections" data-view="connections">连接管理</a><a href="/vnc/permissions">用户授权</a><a href="#sessions" data-view="sessions">活动会话</a><a href="#history" data-view="history">连接历史</a></aside><main><section id="connection-card"><div class="hero"><div class="hero-icon"><svg data-protocol-icon="vnc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><circle cx="8" cy="9" r="1.25"/><circle cx="16" cy="9" r="1.25"/><circle cx="12" cy="13" r="1.25"/><path d="m9.1 9.7 1.8 2.1m4-2.1-1.8 2.1M8 21h8m-4-4v4"/></svg></div><div><h1>VNC 连接</h1><p>选择计算机并连接</p></div></div><form id="connect-form" class="connect-form"><label for="target">我的连接</label><select id="target" required><option value="">正在读取连接…</option></select><div id="notice" class="notice"></div><div class="actions"><button class="primary" type="submit">连接</button></div></form></section><section class="admin-panel" id="admin-panel" hidden><div class="admin-view" data-panel="connections"><div class="admin-head"><h1>VNC 连接管理</h1><button class="primary" id="admin-add" type="button">添加连接</button></div><div id="connection-list" class="connection-list"></div></div><div class="admin-view" data-panel="sessions" hidden><div class="admin-head"><h1>活动会话</h1></div><div id="active-list" class="connection-list"></div></div><div class="admin-view" data-panel="history" hidden><div class="admin-head"><h1>连接历史</h1></div><div id="history-list" class="connection-list"></div></div></section></main></div></div>
-<dialog id="editor"><form id="editor-form"><h2 id="editor-title">添加 VNC 连接</h2><label for="name">名称</label><input id="name" maxlength="128" required><label for="host">主机</label><input id="host" maxlength="255" required><label for="port">端口</label><input id="port" type="number" min="1" max="65535" value="5900" required><label for="vnc-username">用户名</label><input id="vnc-username" maxlength="256" placeholder="VeNCrypt Plain 可选"><label for="password">密码</label><input id="password" type="password" maxlength="4096"><label for="ca-file">CA 证书</label><input id="ca-file" maxlength="1024" placeholder="留空使用系统 CA"><label for="view-only">访问模式</label><select id="view-only"><option value="false">允许控制</option><option value="true">只读</option></select><div id="editor-notice" class="dialog-notice" role="status"></div><div class="dialog-actions"><button class="secondary" id="test-connection" type="button">测试连接</button><button class="secondary" id="cancel" type="button">取消</button><button class="primary">保存</button></div></form></dialog>
-<script>
-const token=sessionStorage.getItem('remote-gateway-access-token')||'',target=document.querySelector('#target'),notice=document.querySelector('#notice'),editor=document.querySelector('#editor'),app=document.querySelector('#app'),workspace=document.querySelector('#workspace'),adminNav=document.querySelector('#admin-nav'),manageToggle=document.querySelector('#manage-toggle'),connectionCard=document.querySelector('#connection-card'),adminPanel=document.querySelector('#admin-panel'),connectionList=document.querySelector('#connection-list');adminNav.querySelector('a[href="/vnc/permissions"]')?.remove();let adminConnections=[],editingConnection=null;
-async function api(path,options={}){const response=await fetch(path,{...options,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'}}),text=await response.text();let data={};try{data=text?JSON.parse(text):{}}catch{data={error:text||`HTTP ${response.status}`}}if(response.status===401){location.href='/';throw new Error('登录已失效')}if(response.status===403)throw new Error('当前账号没有管理权限');if(!response.ok)throw new Error(data.error||`保存请求失败（HTTP ${response.status}）`);return data}
-async function refresh(){const [account,data]=await Promise.all([api('/api/auth/me'),api('/api/vnc/targets')]),name=account.name||account.username||'账户',targets=data.targets||[];document.querySelector('#account-name').textContent=account.username&&account.username!==name?`${name} · ${account.username}`:name;document.querySelector('#users-link').hidden=!account.admin;manageToggle.hidden=!account.admin;target.replaceChildren();for(const item of targets){const option=new Option(`${item.name} · ${item.viewOnly?'只读':'可控制'}`,item.id);option.dataset.name=item.name;target.add(option)}if(!targets.length)target.add(new Option('尚未分配 VNC 设备',''));else target.selectedIndex=0}
-async function openManagement(){const opening=adminPanel.hidden;adminNav.hidden=!opening;adminPanel.hidden=!opening;connectionCard.hidden=opening;app.classList.toggle('admin-open',opening);workspace.classList.toggle('admin-open',opening);manageToggle.setAttribute('aria-expanded',String(opening));manageToggle.title=opening?'返回 VNC 连接':'VNC 管理';manageToggle.setAttribute('aria-label',manageToggle.title);if(opening){const [connections,activity]=await Promise.all([api('/api/admin/vnc'),api('/api/admin/vnc/activity')]);adminConnections=connections.connections||[];renderConnections();renderActivity(activity)}}manageToggle.onclick=()=>openManagement().catch(error=>notice.textContent=error.message);
-document.querySelector('#connect-form').onsubmit=event=>{event.preventDefault();if(!target.value)return;const option=target.selectedOptions[0];location.href=`/vnc/session?target=${encodeURIComponent(target.value)}&name=${encodeURIComponent(option.dataset.name||option.textContent)}`};
-function renderConnections(){connectionList.replaceChildren();for(const item of adminConnections){const row=document.createElement('div');row.className='connection-row';row.innerHTML='<strong></strong><span class="muted address"></span><span class="muted mode"></span><div class="row-actions"><button class="secondary edit">编辑</button><button class="secondary remove">删除</button></div>';row.querySelector('strong').textContent=item.name;row.querySelector('.address').textContent=`${item.host}:${item.port}`;row.querySelector('.mode').textContent=item.viewOnly?'只读':'控制';row.querySelector('.edit').onclick=()=>openConnectionEditor(item);row.querySelector('.remove').onclick=()=>removeConnection(item);connectionList.append(row)}if(!adminConnections.length)connectionList.innerHTML='<div class="empty">尚未配置 VNC 连接。</div>'}function openConnectionEditor(item=null){editingConnection=item;document.querySelector('#editor-form').reset();document.querySelector('#editor-title').textContent=item?'编辑 VNC 连接':'添加 VNC 连接';document.querySelector('#name').value=item?.name||'';document.querySelector('#host').value=item?.host||'';document.querySelector('#port').value=item?.port||5900;document.querySelector('#vnc-username').value=item?.username||'';document.querySelector('#ca-file').value=item?.caFile||'';document.querySelector('#view-only').value=String(!!item?.viewOnly);document.querySelector('#editor-notice').textContent='';editor.showModal()}async function removeConnection(item){if(!confirm(`删除“${item.name}”？`))return;await api('/api/admin/vnc/delete',{method:'POST',body:JSON.stringify({id:item.id})});adminConnections=(await api('/api/admin/vnc')).connections||[];renderConnections();await refresh()}document.querySelector('#admin-add').onclick=()=>openConnectionEditor();document.querySelector('#cancel').onclick=()=>editor.close();document.querySelector('#test-connection').onclick=async event=>{const button=event.currentTarget,host=document.querySelector('#host').value.trim(),port=Number(document.querySelector('#port').value),message=document.querySelector('#editor-notice');if(!host||port<1||port>65535){message.textContent='请先填写有效的主机和端口。';return}button.disabled=true;message.textContent='正在测试连接…';try{const result=await api('/api/admin/vnc/test',{method:'POST',body:JSON.stringify({host,port})});message.textContent=result.reachable?'连接成功。':'无法连接目标 VNC 服务。'}catch(error){message.textContent=`测试失败：${error.message}`}finally{button.disabled=false}};document.querySelector('#editor-form').onsubmit=async event=>{event.preventDefault();try{await api('/api/admin/vnc/save',{method:'POST',body:JSON.stringify({id:editingConnection?.id,name:document.querySelector('#name').value.trim(),host:document.querySelector('#host').value.trim(),port:Number(document.querySelector('#port').value),username:document.querySelector('#vnc-username').value.trim(),password:document.querySelector('#password').value,caFile:document.querySelector('#ca-file').value.trim(),viewOnly:document.querySelector('#view-only').value==='true'})});editor.close();editingConnection=null;await refresh();if(!adminPanel.hidden){adminConnections=(await api('/api/admin/vnc')).connections||[];renderConnections()}}catch(error){document.querySelector('#editor-notice').textContent=`保存失败：${error.message}`}};
-function renderActivity(data){const render=(root,items,active)=>{root.replaceChildren();for(const item of items){const row=document.createElement('div');row.className='activity-row';const time=new Date((active?item.startedAt:item.endedAt)*1000).toLocaleString();row.innerHTML='<strong></strong><span class="muted user"></span><span class="muted time"></span>';row.children[0].textContent=item.targetName;row.querySelector('.user').textContent=item.username;row.querySelector('.time').textContent=time;root.append(row)}if(!items.length)root.innerHTML=`<div class="empty">${active?'暂无活动会话。':'暂无连接历史。'}</div>`};render(document.querySelector('#active-list'),data.active||[],true);render(document.querySelector('#history-list'),data.history||[],false)}
-adminNav.querySelectorAll('[data-view]').forEach(link=>link.onclick=event=>{event.preventDefault();adminNav.querySelectorAll('[data-view]').forEach(item=>item.classList.toggle('active',item===link));document.querySelectorAll('.admin-view').forEach(panel=>panel.hidden=panel.dataset.panel!==link.dataset.view)});
-const trigger=document.querySelector('#account-trigger'),menu=document.querySelector('#account-menu');trigger.onclick=()=>{menu.hidden=!menu.hidden;trigger.setAttribute('aria-expanded',String(!menu.hidden))};document.addEventListener('click',event=>{if(!event.target.closest('.account')){menu.hidden=true;trigger.setAttribute('aria-expanded','false')}});document.querySelector('#logout').onclick=()=>{sessionStorage.clear();location.href='/'};if(!token)location.href='/';else refresh().then(()=>{if(new URLSearchParams(location.search).get('admin')==='1'&&!manageToggle.hidden)return openManagement()}).catch(error=>{if(error.message!=='unauthorized')notice.textContent=`无法读取连接：${error.message}`});
-</script></body></html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>RemoteLink · VNC</title>
+    <script src="/i18n.js" defer></script>
+    <style>
+      .app:not(.admin-open) {
+        height: 270px;
+      }
+      .workspace:not(.admin-open) > main {
+        padding: 0 20px 20px;
+      }
+    </style>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #202020;
+        --panel: #2b2b2b;
+        --control: #222;
+        --line: #ffffff20;
+        --text: #f5f5f5;
+        --muted: #ffffff92;
+        --accent: #6cc5f3;
+        --accent-text: #10232d;
+        --danger: #ff99a4;
+        font:
+          14px/1.45 "Segoe UI Variable",
+          "Segoe UI",
+          "Microsoft YaHei UI",
+          sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        padding: 28px 16px;
+        color: var(--text);
+        background: var(--bg);
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+      .app {
+        width: min(560px, 100%);
+        margin: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: 0 18px 50px #0006;
+        overflow: hidden;
+        transition: width 0.18s;
+      }
+      .app.admin-open {
+        width: min(960px, 100%);
+      }
+      .titlebar {
+        height: 52px;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 0 14px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .mark,
+      .avatar {
+        display: grid;
+        place-items: center;
+        width: 26px;
+        height: 26px;
+        border: 0;
+        border-radius: 6px;
+        background: var(--accent);
+        color: var(--accent-text);
+        font-size: 10px;
+        font-weight: 800;
+      }
+      .avatar {
+        border-radius: 50%;
+        cursor: pointer;
+      }
+      .protocol-nav {
+        align-self: stretch;
+        display: flex;
+      }
+      .protocol-nav a {
+        position: relative;
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        color: var(--muted);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .protocol-nav a[aria-current="page"] {
+        color: var(--text);
+      }
+      .protocol-nav a[aria-current="page"]:after {
+        content: "";
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        bottom: 0;
+        height: 2px;
+        background: var(--accent);
+      }
+      .manage-toggle {
+        margin-left: auto;
+        min-height: 32px;
+        padding: 5px 11px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        color: var(--text);
+        background: #363636;
+        cursor: pointer;
+      }
+      .manage-toggle[hidden] {
+        display: none;
+      }
+      .account {
+        position: relative;
+      }
+      .account-menu {
+        position: absolute;
+        z-index: 4;
+        right: 0;
+        top: 36px;
+        width: 180px;
+        padding: 6px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--panel);
+        box-shadow: 0 14px 36px #0008;
+      }
+      .account-menu[hidden] {
+        display: none;
+      }
+      .account-menu div,
+      .account-menu a,
+      .account-menu button {
+        display: block;
+        width: 100%;
+        padding: 8px 10px;
+        border: 0;
+        border-radius: 4px;
+        color: var(--text);
+        background: transparent;
+        text-align: left;
+        text-decoration: none;
+      }
+      .account-menu div {
+        color: var(--muted);
+        border-bottom: 1px solid var(--line);
+      }
+      .workspace {
+        display: block;
+      }
+      .workspace.admin-open {
+        display: grid;
+        grid-template-columns: 190px 1fr;
+      }
+      .side {
+        padding: 14px 10px;
+        border-right: 1px solid var(--line);
+        background: #292929;
+      }
+      .side[hidden] {
+        display: none;
+      }
+      .side h2 {
+        margin: 4px 10px 10px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .side a {
+        display: block;
+        padding: 8px 10px;
+        border-radius: 4px;
+        color: var(--muted);
+        text-decoration: none;
+      }
+      .side a.active {
+        color: var(--text);
+        background: #ffffff0d;
+        box-shadow: inset 2px 0 var(--accent);
+      }
+      main {
+        padding: 16px 20px 24px;
+      }
+      .hero {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding-bottom: 18px;
+      }
+      .hero-icon {
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        border-radius: 8px;
+        background: #ffffff0c;
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .hero h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+      .hero p {
+        margin: 2px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .connect-form {
+        display: grid;
+        grid-template-columns: 100px 1fr;
+        gap: 12px;
+        align-items: center;
+      }
+      select,
+      input {
+        width: 100%;
+        min-height: 36px;
+        padding: 7px 10px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        color: var(--text);
+        background: var(--control);
+      }
+      .actions,
+      .notice {
+        grid-column: 1/-1;
+      }
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      .primary,
+      .secondary {
+        min-height: 34px;
+        padding: 6px 14px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        color: var(--text);
+        background: #363636;
+        cursor: pointer;
+      }
+      .primary {
+        border: 0;
+        color: var(--accent-text);
+        background: var(--accent);
+        font-weight: 600;
+      }
+      .notice {
+        min-height: 20px;
+        color: var(--danger);
+      }
+      dialog {
+        width: min(470px, calc(100% - 32px));
+        padding: 20px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--text);
+        background: var(--panel);
+      }
+      dialog form {
+        display: grid;
+        grid-template-columns: 100px 1fr;
+        gap: 12px;
+        align-items: center;
+      }
+      dialog h2,
+      .dialog-actions,
+      .dialog-notice {
+        grid-column: 1/-1;
+      }
+      .dialog-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      .dialog-notice {
+        min-height: 18px;
+        color: var(--danger);
+      }
+      @media (max-width: 650px) {
+        body {
+          padding: 0;
+        }
+        .app,
+        .app.admin-open {
+          min-height: 100vh;
+          border: 0;
+          border-radius: 0;
+        }
+        .brand strong {
+          display: none;
+        }
+        .protocol-nav a {
+          padding: 0 9px;
+        }
+        .workspace.admin-open {
+          display: block;
+        }
+        .side {
+          border: 0;
+        }
+        .side a {
+          display: inline-block;
+        }
+        main {
+          padding: 16px 14px;
+        }
+        .connect-form,
+        dialog form {
+          grid-template-columns: 1fr;
+        }
+        .actions,
+        .notice,
+        dialog h2,
+        .dialog-actions,
+        .dialog-notice {
+          grid-column: 1;
+        }
+      }
+    </style>
+    <style>
+      .connect-form .actions .primary {
+        min-width: 124px;
+      }
+      .titlebar {
+        gap: 18px;
+      }
+      .brand {
+        gap: 0;
+      }
+      .brand strong {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .protocol-nav {
+        gap: 2px;
+      }
+      .protocol-nav a {
+        min-width: 58px;
+        justify-content: center;
+      }
+      .manage-toggle {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        min-height: 34px;
+        margin-left: auto;
+        padding: 0;
+        border: 0;
+        color: var(--muted);
+        background: transparent;
+      }
+      .manage-toggle:hover,
+      .manage-toggle[aria-expanded="true"] {
+        color: var(--text);
+        background: #ffffff0d;
+      }
+      .manage-toggle svg {
+        width: 18px;
+        height: 18px;
+      }
+      .avatar {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        border-radius: 4px;
+        color: #b3b3b3;
+        background: transparent;
+      }
+      .avatar:hover,
+      .avatar[aria-expanded="true"] {
+        background: #ffffff0d;
+      }
+      .avatar-icon {
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #363636;
+      }
+      .avatar svg {
+        width: 16px;
+        height: 16px;
+      }
+      .hero {
+        gap: 12px;
+        padding: 16px 0 18px;
+      }
+      .hero-icon {
+        width: 44px;
+        height: 44px;
+        color: var(--accent);
+        background: var(--accent);
+      }
+      .hero-icon svg {
+        width: 25px;
+        height: 25px;
+        color: var(--accent-text);
+      }
+      .hero h1 {
+        margin: 0 0 2px;
+        font-size: 20px;
+      }
+      .hero p {
+        font-size: 12px;
+      }
+      .connect-form > label {
+        font-weight: 600;
+      }
+      .connect-form select {
+        min-height: 36px;
+        border-color: #ffffff20;
+        border-bottom-color: #ffffff42;
+      }
+      .notice {
+        min-height: 20px;
+      }
+      .admin-panel[hidden],
+      .admin-view[hidden] {
+        display: none;
+      }
+      .admin-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      .admin-head h1 {
+        margin: 0;
+        font-size: 20px;
+      }
+      .connection-list {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .connection-row {
+        display: grid;
+        grid-template-columns: minmax(120px, 1fr) 1fr 70px auto;
+        align-items: center;
+        gap: 10px;
+        padding: 11px;
+        border-bottom: 1px solid var(--line);
+      }
+      .connection-row:last-child {
+        border-bottom: 0;
+      }
+      .row-actions {
+        display: flex;
+        gap: 6px;
+      }
+      .activity-row {
+        display: grid;
+        grid-template-columns: minmax(120px, 1fr) 120px 150px;
+        gap: 10px;
+        padding: 11px;
+        border-bottom: 1px solid var(--line);
+      }
+      .activity-row:last-child {
+        border-bottom: 0;
+      }
+      .empty {
+        padding: 24px;
+        color: var(--muted);
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app" id="app">
+      <header class="titlebar">
+        <div class="brand"><strong>RemoteLink</strong></div>
+        <nav class="protocol-nav">
+          <a href="/">RDP</a><a href="/vnc" aria-current="page">VNC</a
+          ><a href="/ssh">SSH</a>
+        </nav>
+        <button
+          class="manage-toggle"
+          id="manage-toggle"
+          type="button"
+          title="VNC 管理"
+          aria-label="VNC 管理"
+          aria-expanded="false"
+          hidden
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            aria-hidden="true"
+          >
+            <path d="M3 12h4l2-6 4 12 2-6h6" />
+          </svg>
+        </button>
+        <div class="account">
+          <button
+            class="avatar"
+            id="account-trigger"
+            aria-label="用户账户"
+            aria-expanded="false"
+          >
+            <span class="avatar-icon"
+              ><svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="8" r="3.5" />
+                <path d="M5 20c.8-4 3.1-6 7-6s6.2 2 7 6" /></svg
+            ></span>
+          </button>
+          <div class="account-menu" id="account-menu" hidden>
+            <div id="account-name">当前账户</div>
+            <a id="users-link" href="/users" hidden>用户管理</a
+            ><button id="logout">退出登录</button>
+          </div>
+        </div>
+      </header>
+      <div class="workspace" id="workspace">
+        <aside class="side" id="admin-nav" hidden>
+          <h2>VNC 管理</h2>
+          <a class="active" href="#connections" data-view="connections"
+            >连接管理</a
+          ><a href="/vnc/permissions">用户授权</a
+          ><a href="#sessions" data-view="sessions">活动会话</a
+          ><a href="#history" data-view="history">连接历史</a>
+        </aside>
+        <main>
+          <section id="connection-card">
+            <div class="hero">
+              <div class="hero-icon">
+                <svg
+                  data-protocol-icon="vnc"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="2" y="3" width="20" height="14" rx="2" />
+                  <circle cx="8" cy="9" r="1.25" />
+                  <circle cx="16" cy="9" r="1.25" />
+                  <circle cx="12" cy="13" r="1.25" />
+                  <path d="m9.1 9.7 1.8 2.1m4-2.1-1.8 2.1M8 21h8m-4-4v4" />
+                </svg>
+              </div>
+              <div>
+                <h1>VNC 连接</h1>
+                <p>选择计算机并连接</p>
+              </div>
+            </div>
+            <form id="connect-form" class="connect-form">
+              <label for="target">我的连接</label
+              ><select id="target" required>
+                <option value="">正在读取连接…</option>
+              </select>
+              <div id="notice" class="notice"></div>
+              <div class="actions">
+                <button class="primary" type="submit">连接</button>
+              </div>
+            </form>
+          </section>
+          <section class="admin-panel" id="admin-panel" hidden>
+            <div class="admin-view" data-panel="connections">
+              <div class="admin-head">
+                <h1>VNC 连接管理</h1>
+                <button class="primary" id="admin-add" type="button">
+                  添加连接
+                </button>
+              </div>
+              <div id="connection-list" class="connection-list"></div>
+            </div>
+            <div class="admin-view" data-panel="sessions" hidden>
+              <div class="admin-head"><h1>活动会话</h1></div>
+              <div id="active-list" class="connection-list"></div>
+            </div>
+            <div class="admin-view" data-panel="history" hidden>
+              <div class="admin-head"><h1>连接历史</h1></div>
+              <div id="history-list" class="connection-list"></div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+    <dialog id="editor">
+      <form id="editor-form">
+        <h2 id="editor-title">添加 VNC 连接</h2>
+        <label for="name">名称</label
+        ><input id="name" maxlength="128" required /><label for="host"
+          >主机</label
+        ><input id="host" maxlength="255" required /><label for="port"
+          >端口</label
+        ><input
+          id="port"
+          type="number"
+          min="1"
+          max="65535"
+          value="5900"
+          required
+        /><label for="vnc-username">用户名</label
+        ><input
+          id="vnc-username"
+          maxlength="256"
+          placeholder="VeNCrypt Plain 可选"
+        /><label for="password">密码</label
+        ><input id="password" type="password" maxlength="4096" /><label
+          for="ca-file"
+          >CA 证书</label
+        ><input
+          id="ca-file"
+          type="file"
+          accept=".pem,.crt,.cer,application/x-pem-file"
+        /><label for="view-only">访问模式</label
+        ><select id="view-only">
+          <option value="false">允许控制</option>
+          <option value="true">只读</option>
+        </select>
+        <div id="editor-notice" class="dialog-notice" role="status"></div>
+        <div class="dialog-actions">
+          <button class="secondary" id="test-connection" type="button">
+            测试连接</button
+          ><button class="secondary" id="cancel" type="button">取消</button
+          ><button class="primary">保存</button>
+        </div>
+      </form>
+    </dialog>
+    <script>
+      const token = sessionStorage.getItem("remote-gateway-access-token") || "",
+        target = document.querySelector("#target"),
+        notice = document.querySelector("#notice"),
+        editor = document.querySelector("#editor"),
+        app = document.querySelector("#app"),
+        workspace = document.querySelector("#workspace"),
+        adminNav = document.querySelector("#admin-nav"),
+        manageToggle = document.querySelector("#manage-toggle"),
+        connectionCard = document.querySelector("#connection-card"),
+        adminPanel = document.querySelector("#admin-panel"),
+        connectionList = document.querySelector("#connection-list");
+      adminNav.querySelector('a[href="/vnc/permissions"]')?.remove();
+      let adminConnections = [],
+        editingConnection = null;
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+            ...options,
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }),
+          text = await response.text();
+        let data = {};
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch {
+          data = { error: text || `HTTP ${response.status}` };
+        }
+        if (response.status === 401) {
+          location.href = "/";
+          throw new Error("登录已失效");
+        }
+        if (response.status === 403) throw new Error("当前账号没有管理权限");
+        if (!response.ok)
+          throw new Error(
+            data.error || `保存请求失败（HTTP ${response.status}）`,
+          );
+        return data;
+      }
+      async function refresh() {
+        const [account, data] = await Promise.all([
+            api("/api/auth/me"),
+            api("/api/vnc/targets"),
+          ]),
+          name = account.name || account.username || "账户",
+          targets = data.targets || [];
+        document.querySelector("#account-name").textContent =
+          account.username && account.username !== name
+            ? `${name} · ${account.username}`
+            : name;
+        document.querySelector("#users-link").hidden = !account.admin;
+        manageToggle.hidden = !account.admin;
+        target.replaceChildren();
+        for (const item of targets) {
+          const option = new Option(
+            `${item.name} · ${item.viewOnly ? "只读" : "可控制"}`,
+            item.id,
+          );
+          option.dataset.name = item.name;
+          target.add(option);
+        }
+        if (!targets.length) target.add(new Option("尚未分配 VNC 设备", ""));
+        else target.selectedIndex = 0;
+      }
+      async function openManagement() {
+        const opening = adminPanel.hidden;
+        adminNav.hidden = !opening;
+        adminPanel.hidden = !opening;
+        connectionCard.hidden = opening;
+        app.classList.toggle("admin-open", opening);
+        workspace.classList.toggle("admin-open", opening);
+        manageToggle.setAttribute("aria-expanded", String(opening));
+        manageToggle.title = opening ? "返回 VNC 连接" : "VNC 管理";
+        manageToggle.setAttribute("aria-label", manageToggle.title);
+        if (opening) {
+          const [connections, activity] = await Promise.all([
+            api("/api/admin/vnc"),
+            api("/api/admin/vnc/activity"),
+          ]);
+          adminConnections = connections.connections || [];
+          renderConnections();
+          renderActivity(activity);
+        }
+      }
+      manageToggle.onclick = () =>
+        openManagement().catch((error) => (notice.textContent = error.message));
+      document.querySelector("#connect-form").onsubmit = (event) => {
+        event.preventDefault();
+        if (!target.value) return;
+        const option = target.selectedOptions[0];
+        location.href = `/vnc/session?target=${encodeURIComponent(target.value)}&name=${encodeURIComponent(option.dataset.name || option.textContent)}`;
+      };
+      function renderConnections() {
+        connectionList.replaceChildren();
+        for (const item of adminConnections) {
+          const row = document.createElement("div");
+          row.className = "connection-row";
+          row.innerHTML =
+            '<strong></strong><span class="muted address"></span><span class="muted mode"></span><div class="row-actions"><button class="secondary edit">编辑</button><button class="secondary remove">删除</button></div>';
+          row.querySelector("strong").textContent = item.name;
+          row.querySelector(".address").textContent =
+            `${item.host}:${item.port}`;
+          row.querySelector(".mode").textContent = item.viewOnly
+            ? "只读"
+            : "控制";
+          row.querySelector(".edit").onclick = () => openConnectionEditor(item);
+          row.querySelector(".remove").onclick = () => removeConnection(item);
+          connectionList.append(row);
+        }
+        if (!adminConnections.length)
+          connectionList.innerHTML =
+            '<div class="empty">尚未配置 VNC 连接。</div>';
+      }
+      function openConnectionEditor(item = null) {
+        editingConnection = item;
+        document.querySelector("#editor-form").reset();
+        document.querySelector("#editor-title").textContent = item
+          ? "编辑 VNC 连接"
+          : "添加 VNC 连接";
+        document.querySelector("#name").value = item?.name || "";
+        document.querySelector("#host").value = item?.host || "";
+        document.querySelector("#port").value = item?.port || 5900;
+        document.querySelector("#vnc-username").value = item?.username || "";
+        document.querySelector("#view-only").value = String(!!item?.viewOnly);
+        document.querySelector("#editor-notice").textContent =
+          item?.hasCaCertificate
+            ? "已托管 CA 证书；不选择新文件将保留现有证书。"
+            : "";
+        editor.showModal();
+      }
+      async function removeConnection(item) {
+        if (!confirm(`删除“${item.name}”？`)) return;
+        await api("/api/admin/vnc/delete", {
+          method: "POST",
+          body: JSON.stringify({ id: item.id }),
+        });
+        adminConnections = (await api("/api/admin/vnc")).connections || [];
+        renderConnections();
+        await refresh();
+      }
+      document.querySelector("#admin-add").onclick = () =>
+        openConnectionEditor();
+      document.querySelector("#cancel").onclick = () => editor.close();
+      document.querySelector("#test-connection").onclick = async (event) => {
+        const button = event.currentTarget,
+          host = document.querySelector("#host").value.trim(),
+          port = Number(document.querySelector("#port").value),
+          message = document.querySelector("#editor-notice");
+        if (!host || port < 1 || port > 65535) {
+          message.textContent = "请先填写有效的主机和端口。";
+          return;
+        }
+        button.disabled = true;
+        message.textContent = "正在验证 VNC 协议和身份信息…";
+        try {
+          const caCertificate =
+            (await document.querySelector("#ca-file").files[0]?.text()) || "";
+          const result = await api("/api/admin/vnc/test", {
+            method: "POST",
+            body: JSON.stringify({
+              id: editingConnection?.id,
+              host,
+              port,
+              username: document.querySelector("#vnc-username").value.trim(),
+              password: document.querySelector("#password").value,
+              caCertificate,
+            }),
+          });
+          message.textContent = result.authenticated
+            ? "连接和身份验证成功。"
+            : `验证失败：${result.error || "请检查密码或 TLS 配置。"}`;
+        } catch (error) {
+          message.textContent = `测试失败：${error.message}`;
+        } finally {
+          button.disabled = false;
+        }
+      };
+      document.querySelector("#editor-form").onsubmit = async (event) => {
+        event.preventDefault();
+        try {
+          const caCertificate =
+            (await document.querySelector("#ca-file").files[0]?.text()) || "";
+          await api("/api/admin/vnc/save", {
+            method: "POST",
+            body: JSON.stringify({
+              id: editingConnection?.id,
+              name: document.querySelector("#name").value.trim(),
+              host: document.querySelector("#host").value.trim(),
+              port: Number(document.querySelector("#port").value),
+              username: document.querySelector("#vnc-username").value.trim(),
+              password: document.querySelector("#password").value,
+              caCertificate,
+              viewOnly: document.querySelector("#view-only").value === "true",
+            }),
+          });
+          editor.close();
+          editingConnection = null;
+          await refresh();
+          if (!adminPanel.hidden) {
+            adminConnections = (await api("/api/admin/vnc")).connections || [];
+            renderConnections();
+          }
+        } catch (error) {
+          document.querySelector("#editor-notice").textContent =
+            `保存失败：${error.message}`;
+        }
+      };
+      function renderActivity(data) {
+        const render = (root, items, active) => {
+          root.replaceChildren();
+          for (const item of items) {
+            const row = document.createElement("div");
+            row.className = "activity-row";
+            const time = new Date(
+              (active ? item.startedAt : item.endedAt) * 1000,
+            ).toLocaleString();
+            row.innerHTML =
+              '<strong></strong><span class="muted user"></span><span class="muted time"></span>';
+            row.children[0].textContent = item.targetName;
+            row.querySelector(".user").textContent = item.username;
+            row.querySelector(".time").textContent = time;
+            root.append(row);
+          }
+          if (!items.length)
+            root.innerHTML = `<div class="empty">${active ? "暂无活动会话。" : "暂无连接历史。"}</div>`;
+        };
+        render(document.querySelector("#active-list"), data.active || [], true);
+        render(
+          document.querySelector("#history-list"),
+          data.history || [],
+          false,
+        );
+      }
+      adminNav.querySelectorAll("[data-view]").forEach(
+        (link) =>
+          (link.onclick = (event) => {
+            event.preventDefault();
+            adminNav
+              .querySelectorAll("[data-view]")
+              .forEach((item) =>
+                item.classList.toggle("active", item === link),
+              );
+            document
+              .querySelectorAll(".admin-view")
+              .forEach(
+                (panel) =>
+                  (panel.hidden = panel.dataset.panel !== link.dataset.view),
+              );
+          }),
+      );
+      const trigger = document.querySelector("#account-trigger"),
+        menu = document.querySelector("#account-menu");
+      trigger.onclick = () => {
+        menu.hidden = !menu.hidden;
+        trigger.setAttribute("aria-expanded", String(!menu.hidden));
+      };
+      document.addEventListener("click", (event) => {
+        if (!event.target.closest(".account")) {
+          menu.hidden = true;
+          trigger.setAttribute("aria-expanded", "false");
+        }
+      });
+      document.querySelector("#logout").onclick = () => {
+        sessionStorage.clear();
+        location.href = "/";
+      };
+      if (!token) location.href = "/";
+      else
+        refresh()
+          .then(() => {
+            if (
+              new URLSearchParams(location.search).get("admin") === "1" &&
+              !manageToggle.hidden
+            )
+              return openManagement();
+          })
+          .catch((error) => {
+            if (error.message !== "unauthorized")
+              notice.textContent = `无法读取连接：${error.message}`;
+          });
+    </script>
+  </body>
+</html>

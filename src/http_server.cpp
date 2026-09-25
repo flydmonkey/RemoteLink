@@ -552,7 +552,7 @@ void HttpServer::run() {
                                      settings_request ? "/settings.html" : "/connect.html";
             if (vnc_request) page = "/vnc.html";
             else if (vnc_session_request) page = "/vnc-session.html";
-            else if (vnc_admin_request) page = "/vnc-admin.html";
+            else if (vnc_admin_request) page = "/vnc.html";
             else if (vnc_permissions_request) page = "/users.html";
             else if (users_request) page = "/users.html";
             else if (ssh_request) page = "/ssh.html";
