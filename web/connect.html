@@ -539,7 +539,7 @@
             </div>
           </div>
           <form id="connection-form">
-            <label for="target">我的连接</label>
+            <label class="connection-label" for="target">我的连接</label>
             <div>
               <select id="target" required disabled>
                 <option value="">请选择已授权连接</option></select
@@ -709,6 +709,12 @@
       }
       .connection-card > form > label:not(.remember) {
         font-weight: 600;
+      }
+      .connection-label {
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 20px;
       }
       .connection-card input {
         background: #222;

@@ -54,6 +54,18 @@ test("RDP page exposes the protocol navigation", async ({ page }) => {
     "font-weight",
     "600",
   );
+  await expect(page.locator(".connection-label")).toHaveCSS(
+    "font-size",
+    "14px",
+  );
+  await expect(page.locator(".connection-label")).toHaveCSS(
+    "font-weight",
+    "600",
+  );
+  await expect(page.locator(".connection-label")).toHaveCSS(
+    "line-height",
+    "20px",
+  );
   await expect(page.locator("#connection-form #username")).toHaveCount(0);
   await expect(page.locator("#connection-form #password")).toHaveCount(0);
   await expect(page.locator("#connection-form #remember")).toHaveCount(0);
@@ -196,6 +208,18 @@ test("VNC administrators add connections from management only", async ({
     "font-weight",
     "600",
   );
+  await expect(page.locator(".connection-label")).toHaveCSS(
+    "font-size",
+    "14px",
+  );
+  await expect(page.locator(".connection-label")).toHaveCSS(
+    "font-weight",
+    "600",
+  );
+  await expect(page.locator(".connection-label")).toHaveCSS(
+    "line-height",
+    "20px",
+  );
   await expect(page.locator("#account-name")).toHaveText(
     "Administrator · admin",
   );
@@ -296,6 +320,18 @@ test("SSH page exposes password and key connection management", async ({
   await expect(page.locator("#connect")).toHaveCSS("min-height", "34px");
   await expect(page.locator("#connect")).toHaveCSS("font-size", "14px");
   await expect(page.locator("#connect")).toHaveCSS("font-weight", "600");
+  await expect(page.locator(".connection-label")).toHaveCSS(
+    "font-size",
+    "14px",
+  );
+  await expect(page.locator(".connection-label")).toHaveCSS(
+    "font-weight",
+    "600",
+  );
+  await expect(page.locator(".connection-label")).toHaveCSS(
+    "line-height",
+    "20px",
+  );
   await page.locator("#account-trigger").click();
   await expect(page.locator("#account-menu")).toBeVisible();
   await expect(page.locator("#logout")).toHaveText("退出登录");

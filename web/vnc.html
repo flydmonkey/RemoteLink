@@ -481,6 +481,12 @@
       .connect-form > label {
         font-weight: 600;
       }
+      .connection-label {
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 20px;
+      }
       .connect-form select {
         min-height: 36px;
         border-color: #ffffff20;
@@ -643,7 +649,7 @@
               </div>
             </div>
             <form id="connect-form" class="connect-form">
-              <label for="target">我的连接</label
+              <label class="connection-label" for="target">我的连接</label
               ><select id="target" required>
                 <option value="">正在读取连接…</option>
               </select>

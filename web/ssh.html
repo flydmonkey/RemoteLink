@@ -9,7 +9,9 @@
       :root {
         color-scheme: dark;
         font:
-          14px/1.45 "Segoe UI",
+          14px/1.45 "Segoe UI Variable",
+          "Segoe UI",
+          "Microsoft YaHei UI",
           sans-serif;
         --bg: #202020;
         --panel: #2b2b2b;
@@ -221,6 +223,12 @@
         gap: 12px;
         align-items: center;
         margin-bottom: 12px;
+      }
+      .connection-label {
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 20px;
       }
       select,
       input,
@@ -520,7 +528,7 @@
           </div>
         </div>
         <div class="field">
-          <strong>我的连接</strong
+          <label class="connection-label" for="target">我的连接</label
           ><select id="target">
             <option value="">请选择 SSH 设备</option>
           </select>
