@@ -6,6 +6,30 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
+test("connection labels stay on one line in English", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("remotelink-language", "en");
+    sessionStorage.setItem("remotelink-access-token", "test");
+  });
+  await page.route("**/api/auth/me", (route) =>
+    route.fulfill({ json: { name: "Test User", username: "test", admin: false } }),
+  );
+  for (const protocol of ["rdp", "vnc", "ssh"])
+    await page.route(`**/api/${protocol}/targets`, (route) =>
+      route.fulfill({
+        json: { targets: [{ id: `${protocol}-1`, name: "Test connection" }] },
+      }),
+    );
+
+  for (const path of ["/connect.html", "/vnc.html", "/ssh.html"]) {
+    await page.goto(path);
+    const label = page.locator(".connection-label");
+    await expect(label).toHaveText("My connections");
+    await expect(label).toHaveCSS("white-space", "nowrap");
+    expect((await label.boundingBox()).height).toBeLessThanOrEqual(20);
+  }
+});
+
 test("RDP page exposes the protocol navigation", async ({ page }) => {
   await page.goto("/connect.html");
   await expect(page).toHaveTitle("RemoteLink · RDP");
