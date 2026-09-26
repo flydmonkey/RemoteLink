@@ -150,6 +150,15 @@ std::optional<std::string> gzip_compress(const std::string& input) {
     return output;
 }
 
+void replace_all(std::string& value, const std::string& search,
+                 const std::string& replacement) {
+    std::size_t position = 0;
+    while ((position = value.find(search, position)) != std::string::npos) {
+        value.replace(position, search.size(), replacement);
+        position += replacement.size();
+    }
+}
+
 std::string status_text(int status) {
     switch (status) {
         case 200: return "200 OK";
@@ -628,6 +637,7 @@ void HttpServer::run() {
         const bool ssh_session_request = parsed.method == "GET" &&
             (resource_path == "/ssh/session" || resource_path == "/ssh-session.html");
         const bool icon_request = parsed.method == "GET" && resource_path == "/remotelink-icon.png";
+        const bool favicon_request = parsed.method == "GET" && resource_path == "/favicon.ico";
         const bool i18n_request = parsed.method == "GET" && resource_path == "/i18n.js";
         const bool novnc_request = parsed.method == "GET" &&
             resource_path.starts_with("/vendor/novnc/") &&
@@ -657,11 +667,13 @@ void HttpServer::run() {
         }
         else if (root_request || admin_request || session_request || settings_request ||
                  vnc_request || vnc_session_request || vnc_admin_request || vnc_permissions_request ||
-                 users_request || ssh_request || ssh_session_request || icon_request || i18n_request || novnc_request || xterm_request) {
+                 users_request || ssh_request || ssh_session_request || icon_request || favicon_request ||
+                 i18n_request || novnc_request || xterm_request) {
             const char* configured_web_root = std::getenv("REMOTELINK_WEB_ROOT");
             const std::string web_root = configured_web_root && *configured_web_root
                 ? configured_web_root : REMOTELINK_WEB_ROOT;
-            std::string page = icon_request ? "/remotelink-icon.png" :
+            std::string page = favicon_request ? "/favicon.ico" :
+                                     icon_request ? "/remotelink-icon.png" :
                                      i18n_request ? "/i18n.js" :
                                      admin_request ? "/admin.html" :
                                      session_request ? "/index.html" :
@@ -681,10 +693,13 @@ void HttpServer::run() {
             contents << input.rdbuf();
             body = contents.str();
             status_code = input ? 200 : 500;
-            content_type = icon_request ? "image/png" :
+            content_type = favicon_request ? "image/x-icon" :
+                           icon_request ? "image/png" :
                            xterm_request && resource_path.ends_with(".css") ? "text/css; charset=utf-8" :
                            (i18n_request || novnc_request || xterm_request) ? "application/javascript; charset=utf-8" :
                            "text/html; charset=utf-8";
+            if (content_type != "image/png" && content_type != "image/x-icon")
+                replace_all(body, "__REMOTELINK_VERSION__", REMOTELINK_VERSION);
         }
         else if (api_request && api_handler_) {
             const auto api_response = api_handler_(parsed);
@@ -696,7 +711,7 @@ void HttpServer::run() {
             body = "Not found\n";
         }
 
-        const bool static_asset = icon_request || i18n_request || novnc_request || xterm_request;
+        const bool static_asset = icon_request || favicon_request || i18n_request || novnc_request || xterm_request;
         const bool html_document = root_request || admin_request || session_request || settings_request ||
             vnc_request || vnc_session_request || vnc_admin_request || vnc_permissions_request ||
             users_request || ssh_request || ssh_session_request;

@@ -25,6 +25,9 @@ localized_pages = [
     )
 ]
 
+favicon = (web / "favicon.ico").read_bytes()
+assert favicon[:4] == b"\x00\x00\x01\x00", "favicon.ico is missing or invalid"
+
 for native_dialog in ("prompt(", "confirm(", "alert("):
     assert native_dialog not in "\n".join((admin, connect, session, settings))
 

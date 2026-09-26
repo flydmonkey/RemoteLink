@@ -97,6 +97,7 @@ if(REMOTELINK_ENABLE_STREAMING)
     )
     target_compile_definitions(remotelink_streaming PRIVATE
         REMOTELINK_WEB_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/web"
+        REMOTELINK_VERSION="${PROJECT_VERSION}"
     )
 endif()
 
