@@ -4,6 +4,7 @@
 #include "remotelink/test_pattern_source.hpp"
 #ifdef REMOTELINK_ENABLE_STREAMING
 #include "remotelink/http_server.hpp"
+#include "remotelink/ice_advertisement.hpp"
 #include "remotelink/webrtc_server.hpp"
 #include "remotelink/webrtc_video_sink.hpp"
 #include "remotelink/rdp_frame_source.hpp"
@@ -604,6 +605,13 @@ int main() {
     // Signaling remains an in-process backend on loopback. HttpServer exposes
     // it publicly as /ws on the same HTTPS port as the UI and REST API.
     remotelink::WebRtcServer webrtc(18081, access_tokens);
+    const auto ice_advertisement = remotelink::ice_advertisement_from_environment();
+    webrtc.set_ice_advertisement(ice_advertisement);
+    if (ice_advertisement.rewrite_candidates()) {
+        std::cout << "advertising ICE host candidates as " << ice_advertisement.address
+                  << " udp " << ice_advertisement.port_begin << '-'
+                  << ice_advertisement.port_end << '\n';
+    }
     std::vector<remotelink::WebRtcServer::PublicTarget> public_targets;
     for (const auto& target : target_catalog) public_targets.push_back({
         target.id, target.name, target.rdp.hostname, target.rdp.username,

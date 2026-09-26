@@ -59,10 +59,13 @@ ENV LD_LIBRARY_PATH=/opt/remotelink/lib \
     REMOTELINK_STATE_DIR=/var/lib/remotelink \
     REMOTELINK_TARGETS_FILE=/etc/remotelink/targets.json \
     REMOTELINK_ALLOWED_HOSTS=* \
-    REMOTELINK_BEHIND_TLS_PROXY=1
+    REMOTELINK_BEHIND_TLS_PROXY=1 \
+    REMOTELINK_ICE_UDP_PORT_MIN=50000 \
+    REMOTELINK_ICE_UDP_PORT_MAX=50019
 
 VOLUME ["/var/lib/remotelink"]
-EXPOSE 18080
+EXPOSE 18080/tcp
+EXPOSE 50000-50019/udp
 USER remotelink
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/remotelink-entrypoint"]
 CMD ["/opt/remotelink/bin/remotelink"]

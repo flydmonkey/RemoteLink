@@ -17,7 +17,13 @@ Browser
 ```
 
 The LAN version uses ICE host candidates and does not require STUN or TURN.
-Public-internet connectivity is deliberately out of scope for the MVP.
+Inside Docker, libdatachannel otherwise advertises the container bridge address,
+which a browser on another machine cannot reach. Set
+`REMOTELINK_ICE_ADVERTISED_ADDRESS` to the gateway host address and publish the
+same UDP port range the process binds (`REMOTELINK_ICE_UDP_PORT_MIN` through
+`REMOTELINK_ICE_UDP_PORT_MAX`, 50000-50019 by default). Host candidates keep
+that port and use the advertised address. Public-internet connectivity without
+a directly reachable host address remains out of scope.
 
 ## Latency policy
 

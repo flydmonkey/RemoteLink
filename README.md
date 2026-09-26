@@ -17,12 +17,15 @@ docker run -d \
   --name remotelink \
   --restart unless-stopped \
   -p 18080:18080 \
+  -p 50000-50019:50000-50019/udp \
   -e REMOTELINK_ADMIN_PASSWORD='replace-with-a-strong-password' \
   -e REMOTELINK_BEHIND_TLS_PROXY=1 \
   -e REMOTELINK_ALLOWED_HOSTS='*' \
   -v remotelink-state:/var/lib/remotelink \
   flydmonkey/remotelink:latest
 ```
+
+The image publishes two ports: TCP `18080` for the UI, API, and WebSocket signaling, and UDP `50000-50019` for RDP WebRTC media. Publish each UDP port with the same host and container port number.
 
 Open <http://localhost:18080> and sign in with username `admin` and the password
 set in `REMOTELINK_ADMIN_PASSWORD`. Then open **Management** to add RDP, VNC,
@@ -40,6 +43,32 @@ export REMOTELINK_ADMIN_PASSWORD='replace-with-a-strong-password'
 docker compose up -d
 ```
 
+A browser on the Docker host can open the published TCP port directly. A browser
+on another machine cannot use the container bridge address. Set
+`REMOTELINK_ICE_ADVERTISED_ADDRESS` to the address that browser should connect
+to, and keep the UDP range published with matching host and container ports:
+
+```bash
+docker run -d \
+  --name remotelink \
+  --restart unless-stopped \
+  -p 18080:18080 \
+  -p 50000-50019:50000-50019/udp \
+  -e REMOTELINK_ADMIN_PASSWORD='replace-with-a-strong-password' \
+  -e REMOTELINK_BEHIND_TLS_PROXY=1 \
+  -e REMOTELINK_ALLOWED_HOSTS='*' \
+  -e REMOTELINK_ICE_ADVERTISED_ADDRESS='192.0.2.10' \
+  -e REMOTELINK_ICE_UDP_PORT_MIN=50000 \
+  -e REMOTELINK_ICE_UDP_PORT_MAX=50019 \
+  -v remotelink-state:/var/lib/remotelink \
+  flydmonkey/remotelink:latest
+```
+
+Replace `192.0.2.10` with the Docker host's reachable IP. Compose reads the same
+address from `REMOTELINK_ICE_ADVERTISED_ADDRESS` and already publishes UDP
+50000-50019. On Linux, `network_mode: host` is an alternative that lets
+candidates use the host's own addresses; do not combine it with published ports.
+
 To upgrade the container while preserving its data:
 
 ```bash
@@ -49,9 +78,10 @@ docker rm -f remotelink
 ```
 
 This quick-start configuration serves plain HTTP for local evaluation or use
-behind a trusted TLS reverse proxy. For LAN or Internet access, expose only the
-proxy's HTTPS endpoint and keep port `18080` private. Pin a release such as
-`flydmonkey/remotelink:0.3.2` instead of `latest` when reproducible deployments
+behind a trusted TLS reverse proxy. The proxy forwards the UI and WebSocket on
+TCP `18080`; browsers still need direct access to UDP `50000-50019` for RDP
+media. Pin a release such as
+`flydmonkey/remotelink:0.3.4` instead of `latest` when reproducible deployments
 are required.
 
 ## Features
@@ -100,7 +130,7 @@ The VNC client uses only noVNC Core; RemoteLink supplies its own connection and 
 - FreeRDP 3 and WinPR 3 development packages
 - OpenH264, Opus, libyuv, OpenSSL, libssh2, and libdatachannel
 - A TLS certificate trusted by client browsers
-- TCP 18080 and WebRTC UDP ICE connectivity (`18081` is loopback-only internally)
+- TCP 18080 and WebRTC UDP ICE connectivity. Docker bridge deployments must publish the configured UDP range and set `REMOTELINK_ICE_ADVERTISED_ADDRESS` (`18081` is loopback-only internally)
 
 ## Build
 
@@ -138,6 +168,9 @@ After first login, administrators manage RDP, VNC, and SSH connections from each
 | `REMOTELINK_STATE_DIR` | Persistent users, files, print jobs, and audit state |
 | `REMOTELINK_USER_FILE_QUOTA_BYTES` | Optional per-user file quota |
 | `REMOTELINK_BLOCKED_FILE_EXTENSIONS` | Optional blocked upload extensions |
+| `REMOTELINK_ICE_ADVERTISED_ADDRESS` | Optional IPv4 or IPv6 address written into ICE host candidates. Required when the browser is not on the gateway host network, including Docker bridge networking. |
+| `REMOTELINK_ICE_UDP_PORT_MIN` | First UDP port for ICE. With an advertised address and no explicit range, RemoteLink uses 50000. Publish this range one-to-one. |
+| `REMOTELINK_ICE_UDP_PORT_MAX` | Last UDP port for ICE. The default upper bound is 50019. |
 
 ```bash
 export REMOTELINK_TARGETS_FILE=/etc/remotelink/targets.json
@@ -169,7 +202,7 @@ bash ./scripts/build-docker.sh
 REMOTELINK_IMAGE=remotelink REMOTELINK_ADMIN_PASSWORD='change-this-password' docker compose up -d
 ```
 
-The service is available on port `18080`. The Compose configuration persists all users,
+The service publishes TCP `18080` and UDP `50000-50019`. The Compose configuration persists all users,
 connections, credentials, and audit data in the `remotelink-state` volume. It assumes TLS is
 terminated by a trusted reverse proxy. Do not expose the plain HTTP port directly to an
 untrusted network. To build another repository/tag or push with Buildx:

@@ -17,12 +17,15 @@ docker run -d \
   --name remotelink \
   --restart unless-stopped \
   -p 18080:18080 \
+  -p 50000-50019:50000-50019/udp \
   -e REMOTELINK_ADMIN_PASSWORD='请替换为安全密码' \
   -e REMOTELINK_BEHIND_TLS_PROXY=1 \
   -e REMOTELINK_ALLOWED_HOSTS='*' \
   -v remotelink-state:/var/lib/remotelink \
   flydmonkey/remotelink:latest
 ```
+
+镜像需要对外发布两个端口：TCP `18080` 提供页面、接口和 WebSocket 信令，UDP `50000-50019` 提供 RDP 的 WebRTC 媒体。宿主机和容器必须使用相同的 UDP 端口号。
 
 打开 <http://localhost:18080>，使用用户名 `admin` 和
 `REMOTELINK_ADMIN_PASSWORD` 中设置的密码登录。登录后进入“管理”添加
@@ -39,6 +42,30 @@ export REMOTELINK_ADMIN_PASSWORD='请替换为安全密码'
 docker compose up -d
 ```
 
+浏览器和 Docker 在同一台机器上时，打开已发布的 TCP 端口即可。另一台机器上的浏览器
+无法访问容器网桥地址，需要把 `REMOTELINK_ICE_ADVERTISED_ADDRESS` 设成浏览器能够
+访问的网关地址。UDP 端口仍按上面的范围发布，宿主机和容器端口号保持一致：
+
+```bash
+docker run -d \
+  --name remotelink \
+  --restart unless-stopped \
+  -p 18080:18080 \
+  -p 50000-50019:50000-50019/udp \
+  -e REMOTELINK_ADMIN_PASSWORD='请替换为安全密码' \
+  -e REMOTELINK_BEHIND_TLS_PROXY=1 \
+  -e REMOTELINK_ALLOWED_HOSTS='*' \
+  -e REMOTELINK_ICE_ADVERTISED_ADDRESS='192.0.2.10' \
+  -e REMOTELINK_ICE_UDP_PORT_MIN=50000 \
+  -e REMOTELINK_ICE_UDP_PORT_MAX=50019 \
+  -v remotelink-state:/var/lib/remotelink \
+  flydmonkey/remotelink:latest
+```
+
+把 `192.0.2.10` 换成 Docker 宿主机上浏览器能够到达的地址。Compose 会读取
+`REMOTELINK_ICE_ADVERTISED_ADDRESS`，并已经发布 UDP 50000-50019。Linux 上也可以
+改用 `network_mode: host`，让候选地址直接使用宿主机网卡；不要同时再发布端口。
+
 升级镜像时保留原有数据：
 
 ```bash
@@ -48,8 +75,8 @@ docker rm -f remotelink
 ```
 
 上述快速开始通过明文 HTTP 服务，仅适合本机试用或放在可信 TLS 反向代理后方。
-局域网或公网部署时，对外只暴露反向代理的 HTTPS 端口，并将 `18080` 保持为内网端口。
-需要可重现部署时，建议使用 `flydmonkey/remotelink:0.3.2` 等明确版本，而不是 `latest`。
+反向代理只转发 TCP `18080` 上的页面和 WebSocket；RDP 媒体仍要求浏览器能够直接访问 UDP `50000-50019`。
+需要可重现部署时，建议使用 `flydmonkey/remotelink:0.3.4` 等明确版本，而不是 `latest`。
 
 ## 功能
 
@@ -126,7 +153,7 @@ SSH 同样使用 30 秒有效的一次性 WSS 票据。密码、私钥和私钥�
 - FreeRDP 3 和 WinPR 3 开发包
 - OpenH264、Opus、libyuv、OpenSSL、libssh2 和 libdatachannel
 - 客户端浏览器信任的 TLS 证书
-- TCP 18080 以及 WebRTC UDP ICE 网络连通（`18081` 仅供本机内部使用）
+- TCP 18080 以及 WebRTC UDP ICE 网络连通。Docker bridge 部署必须发布配置的 UDP 端口范围，并设置 `REMOTELINK_ICE_ADVERTISED_ADDRESS`（`18081` 仅供本机内部使用）
 
 ## 编译
 
@@ -164,6 +191,9 @@ ctest --test-dir build --output-on-failure
 | `REMOTELINK_STATE_DIR` | 用户、文件、打印任务和审计数据目录 |
 | `REMOTELINK_USER_FILE_QUOTA_BYTES` | 可选的单用户文件配额 |
 | `REMOTELINK_BLOCKED_FILE_EXTENSIONS` | 可选的上传扩展名黑名单 |
+| `REMOTELINK_ICE_ADVERTISED_ADDRESS` | 可选的 IPv4 或 IPv6 地址，会写入 ICE host 候选。浏览器与网关不在同一主机网络时必须设置，Docker bridge 网络属于这种情况。 |
+| `REMOTELINK_ICE_UDP_PORT_MIN` | ICE 使用的起始 UDP 端口。设置了通告地址但未指定范围时，默认从 50000 开始。发布端口时宿主机和容器端口必须一致。 |
+| `REMOTELINK_ICE_UDP_PORT_MAX` | ICE 使用的结束 UDP 端口。默认到 50019。 |
 
 ```bash
 export REMOTELINK_TARGETS_FILE=/etc/remotelink/targets.json
@@ -194,7 +224,7 @@ bash ./scripts/build-docker.sh
 REMOTELINK_IMAGE=remotelink REMOTELINK_ADMIN_PASSWORD='请修改为安全密码' docker compose up -d
 ```
 
-服务监听 `18080` 端口，Compose 使用 `remotelink-state` 卷持久化用户、连接、凭据和审计数据。
+服务发布 TCP `18080` 和 UDP `50000-50019`。Compose 使用 `remotelink-state` 卷持久化用户、连接、凭据和审计数据。
 默认配置假定 HTTPS 由可信反向代理终止，请勿把明文 HTTP 端口直接暴露到不受信任的网络。
 如需指定镜像仓库、版本并通过 Buildx 推送：
 

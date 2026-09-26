@@ -878,9 +878,21 @@
       ? systemLanguage()
       : aliases[preference] || preference;
   document.documentElement.lang = language;
+  function translationRoot(node) {
+    if (!node || typeof node.nodeType !== "number") return null;
+    if (
+      node.nodeType === Node.ELEMENT_NODE ||
+      node.nodeType === Node.DOCUMENT_NODE ||
+      node.nodeType === Node.DOCUMENT_FRAGMENT_NODE
+    )
+      return node;
+    return node.parentElement || null;
+  }
   function translate(root = document) {
+    const target = translationRoot(root);
+    if (!target) return;
     const dict = dictionaries[language] || {};
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
     for (const node of nodes) {
@@ -890,7 +902,7 @@
         translated = dict[trimmed];
       if (translated) node.nodeValue = raw.replace(trimmed, translated);
     }
-    for (const element of root.querySelectorAll?.(
+    for (const element of target.querySelectorAll?.(
       "[title],[aria-label],[placeholder]",
     ) || []) {
       for (const attribute of ["title", "aria-label", "placeholder"]) {
@@ -902,12 +914,9 @@
   translate();
   new MutationObserver((records) => {
     for (const record of records) {
-      if (record.type === "characterData")
-        translate(record.target.parentElement);
-      if (record.type === "attributes") translate(record.target);
-      for (const node of record.addedNodes)
-        if (node.nodeType === 1 || node.nodeType === 3)
-          translate(node.nodeType === 1 ? node : node.parentElement);
+      if (record.type === "characterData" || record.type === "attributes")
+        translate(record.target);
+      for (const node of record.addedNodes) translate(node);
     }
   }).observe(document.documentElement, {
     attributes: true,

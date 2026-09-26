@@ -55,11 +55,14 @@ deployments should use an internal or public CA and normal certificate renewal.
 
 - TCP 18080: HTTPS UI, REST API, health endpoint, and WSS signaling at `/ws`.
 - TCP 18081 on loopback only: internal plaintext signaling backend; do not expose it.
-- UDP: ICE host-candidate ports selected by libdatachannel.
+- UDP: ICE host-candidate ports. On a host install these are ephemeral. In Docker,
+  set `REMOTELINK_ICE_ADVERTISED_ADDRESS` to an address the browser can reach and
+  publish `REMOTELINK_ICE_UDP_PORT_MIN`-`REMOTELINK_ICE_UDP_PORT_MAX`
+  (defaults 50000-50019) with the same host and container port numbers.
 - TCP 3389 outbound from the gateway to each allow-listed Windows target.
 
-No STUN or TURN server is required while browser and gateway can reach one
-another directly on the LAN.
+No STUN or TURN server is required while the browser can reach the gateway's
+advertised ICE address directly. A container bridge address is not that address.
 
 ## Operations
 

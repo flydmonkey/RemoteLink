@@ -1,6 +1,7 @@
 #pragma once
 
 #include "remotelink/encoded_frame.hpp"
+#include "remotelink/ice_advertisement.hpp"
 
 #include <cstdint>
 #include <functional>
@@ -57,6 +58,7 @@ public:
     void set_bitrate_handler(BitrateHandler handler);
     void set_key_frame_handler(PeerHandler handler);
     void set_close_handler(PeerHandler handler);
+    void set_ice_advertisement(IceAdvertisement advertisement);
     [[nodiscard]] std::size_t peer_count() const;
     bool disconnect_peer(const std::string& peer_id);
 
@@ -77,6 +79,7 @@ private:
     PeerHandler key_frame_handler_;
     PeerHandler close_handler_;
     std::vector<std::string> access_tokens_;
+    IceAdvertisement ice_advertisement_;
     std::uint64_t next_peer_id_ = 1;
 };
 

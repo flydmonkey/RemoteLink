@@ -44,6 +44,8 @@ for language in ("zh-TW", "en", "ja", "ko"):
     assert language in session
 assert "requestVideoFrameCallback" in session
 assert "whiteRatio" in session
+assert "function translationRoot" in i18n
+assert "function translationRoot" in session
 for source, button_id in (
     (session, "logout"),
     (vnc_session, "disconnect"),

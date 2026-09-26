@@ -2,8 +2,10 @@
 
 ## 0.3.4
 
+- Advertise a configured host address on ICE candidates so browsers outside a Docker network can receive RDP media.
 - Compress eligible HTTP text responses with gzip when the client accepts gzip.
 - Serve a multi-size favicon and stamp HTML asset URLs with the running version.
+- Ignore detached text nodes while translating session pages.
 
 ## 0.3.3
 

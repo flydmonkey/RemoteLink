@@ -1681,8 +1681,20 @@
         ),
       );
       const opT = (value) => operationDictionary[value] || value;
+      function translationRoot(node) {
+        if (!node || typeof node.nodeType !== "number") return null;
+        if (
+          node.nodeType === Node.ELEMENT_NODE ||
+          node.nodeType === Node.DOCUMENT_NODE ||
+          node.nodeType === Node.DOCUMENT_FRAGMENT_NODE
+        )
+          return node;
+        return node.parentElement || null;
+      }
       function translateOperation(root = document) {
-        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        const target = translationRoot(root);
+        if (!target) return;
+        const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
         const nodes = [];
         while (walker.nextNode()) nodes.push(walker.currentNode);
         for (const node of nodes) {
@@ -1692,7 +1704,7 @@
           if (operationDictionary[trimmed])
             node.nodeValue = raw.replace(trimmed, operationDictionary[trimmed]);
         }
-        for (const element of root.querySelectorAll?.("[title],[aria-label]") ||
+        for (const element of target.querySelectorAll?.("[title],[aria-label]") ||
           [])
           for (const attribute of ["title", "aria-label"]) {
             const value = element.getAttribute(attribute);
@@ -1703,11 +1715,7 @@
       translateOperation();
       new MutationObserver((records) => {
         for (const record of records)
-          for (const node of record.addedNodes)
-            if (node.nodeType === 1 || node.nodeType === 3)
-              translateOperation(
-                node.nodeType === 1 ? node : node.parentElement,
-              );
+          for (const node of record.addedNodes) translateOperation(node);
       }).observe(document.body, { childList: true, subtree: true });
       const video = document.querySelector("#desktop");
       const sessionLoading = document.querySelector("#session-loading");

@@ -147,6 +147,10 @@ void WebRtcServer::set_key_frame_handler(PeerHandler handler) {
 void WebRtcServer::set_close_handler(PeerHandler handler) {
     std::lock_guard lock(mutex_); close_handler_ = std::move(handler);
 }
+void WebRtcServer::set_ice_advertisement(IceAdvertisement advertisement) {
+    std::lock_guard lock(mutex_);
+    ice_advertisement_ = std::move(advertisement);
+}
 
 void WebRtcServer::accept(const std::shared_ptr<rtc::WebSocket>& socket) {
     auto peer = std::make_shared<Peer>();
@@ -276,23 +280,33 @@ void WebRtcServer::handle_message(const std::shared_ptr<Peer>& peer,
         peer->connected = false;
         peer->started = true;
         const std::uint64_t generation = ++peer->generation;
+        IceAdvertisement ice;
+        {
+            std::lock_guard lock(mutex_);
+            ice = ice_advertisement_;
+        }
         rtc::Configuration config;
         config.disableAutoNegotiation = true;
+        if (ice.restrict_ports()) {
+            config.portRangeBegin = ice.port_begin;
+            config.portRangeEnd = ice.port_end;
+        }
+        const std::string advertised = ice.address;
         peer->connection = std::make_shared<rtc::PeerConnection>(config);
 
-        peer->connection->onLocalDescription([weak = std::weak_ptr<Peer>(peer), generation](rtc::Description description) {
+        peer->connection->onLocalDescription([weak = std::weak_ptr<Peer>(peer), generation, advertised](rtc::Description description) {
             if (auto locked = weak.lock(); locked && locked->generation.load() == generation) {
                 locked->socket->send(json {
                     {"type", description.typeString()},
-                    {"sdp", std::string(description)}
+                    {"sdp", rewrite_session_description(std::string(description), advertised)}
                 }.dump());
             }
         });
-        peer->connection->onLocalCandidate([weak = std::weak_ptr<Peer>(peer), generation](rtc::Candidate candidate) {
+        peer->connection->onLocalCandidate([weak = std::weak_ptr<Peer>(peer), generation, advertised](rtc::Candidate candidate) {
             if (auto locked = weak.lock(); locked && locked->generation.load() == generation) {
                 locked->socket->send(json {
                     {"type", "candidate"},
-                    {"candidate", std::string(candidate)},
+                    {"candidate", rewrite_host_candidate(std::string(candidate), advertised)},
                     {"mid", candidate.mid()}
                 }.dump());
             }

@@ -9,6 +9,7 @@ include(FetchContent)
 find_package(Threads REQUIRED)
 
 add_library(remotelink_core
+    src/ice_advertisement.cpp
     src/input_text.cpp
     src/security_policy.cpp
     src/session.cpp
@@ -116,6 +117,9 @@ if(REMOTELINK_BUILD_TESTS)
     add_executable(remotelink_tests tests/core_tests.cpp)
     target_link_libraries(remotelink_tests PRIVATE remotelink_core)
     add_test(NAME remotelink_tests COMMAND remotelink_tests)
+    add_executable(remotelink_ice_tests tests/ice_advertisement_tests.cpp)
+    target_link_libraries(remotelink_ice_tests PRIVATE remotelink_core)
+    add_test(NAME remotelink_ice_tests COMMAND remotelink_ice_tests)
     if(REMOTELINK_ENABLE_STREAMING)
         add_executable(remotelink_target_config_tests tests/target_config_tests.cpp)
         target_compile_features(remotelink_target_config_tests PRIVATE cxx_std_20)
