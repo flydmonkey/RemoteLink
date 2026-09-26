@@ -1,5 +1,12 @@
 # RemoteLink changelog
 
+## 0.3.3
+
+- Added Docker Hub quick-start documentation for the published AMD64 and ARM64 images.
+- Documented the security behavior and deployment requirements of TLS proxy mode.
+- Kept English connection labels on one line across RDP, VNC, and SSH.
+- Simplified account menus to show only the username and use the shared Language label.
+
 ## 0.3.2
 
 - Publish Docker release images for both AMD64 and ARM64 under the same version tags.
