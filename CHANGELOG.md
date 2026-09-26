@@ -1,5 +1,11 @@
 # RemoteLink changelog
 
+## 0.3.1
+
+- Unified all product, service, executable, configuration, and container naming as RemoteLink.
+- Added reproducible Docker image packaging with persistent state and health checks.
+- Added release publishing to GHCR and Docker Hub through GitHub Actions.
+
 ## 0.3.0
 
 - Added unified RDP, VNC, and SSH session auditing with user, target, duration,

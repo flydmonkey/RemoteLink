@@ -27,7 +27,9 @@ jobs:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
           version="${GITHUB_REF_NAME#v}"
-          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then version="0.3.0-${GITHUB_SHA::7}"; fi
+          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
+            version="$(tr -d '[:space:]' < VERSION)-${GITHUB_SHA::7}"
+          fi
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "local_image=remotelink-ci:${version}" >> "$GITHUB_OUTPUT"
           echo "ghcr_image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/remotelink" >> "$GITHUB_OUTPUT"
