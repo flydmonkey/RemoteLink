@@ -66,7 +66,7 @@ ctest --test-dir build --output-on-failure
 For WSL2 development:
 
 ```bash
-cd /mnt/c/Users/Administrator/Projects/apache/remote-gateway
+cd /mnt/c/Users/Administrator/Projects/apache/remotelink
 npm ci
 bash ./scripts/copy-novnc-core.sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
@@ -76,30 +76,30 @@ ctest --test-dir build --output-on-failure
 
 ## Configuration
 
-After first login, administrators manage RDP, VNC, and SSH connections from each protocol's **Management** page and grant access from **User management**. Connection credentials are stored in owner-only files under `RG_STATE_DIR`, are never returned by the API, and can be replaced or cleared from the interface. `RG_TARGETS_FILE` remains available for importing legacy RDP targets; imported connections are migrated to managed state on first start.
+After first login, administrators manage RDP, VNC, and SSH connections from each protocol's **Management** page and grant access from **User management**. Connection credentials are stored in owner-only files under `REMOTELINK_STATE_DIR`, are never returned by the API, and can be replaced or cleared from the interface. `REMOTELINK_TARGETS_FILE` remains available for importing legacy RDP targets; imported connections are migrated to managed state on first start.
 
 | Variable | Purpose |
 | --- | --- |
-| `RG_TARGETS_FILE` | Optional legacy RDP target import file |
-| `RG_ALLOWED_HOSTS` | RDP host/CIDR allow-list; defaults to `*` (all DNS names and IP addresses). VNC destinations are unrestricted. |
-| `RG_ACCESS_TOKEN_FILE` | Protected primary-administrator recovery credential |
-| `RG_TLS_CERTIFICATE` | TLS certificate chain |
-| `RG_TLS_PRIVATE_KEY` | TLS private key |
-| `RG_STATE_DIR` | Persistent users, files, print jobs, and audit state |
-| `RG_USER_FILE_QUOTA_BYTES` | Optional per-user file quota |
-| `RG_BLOCKED_FILE_EXTENSIONS` | Optional blocked upload extensions |
+| `REMOTELINK_TARGETS_FILE` | Optional legacy RDP target import file |
+| `REMOTELINK_ALLOWED_HOSTS` | RDP host/CIDR allow-list; defaults to `*` (all DNS names and IP addresses). VNC destinations are unrestricted. |
+| `REMOTELINK_ACCESS_TOKEN_FILE` | Protected primary-administrator recovery credential |
+| `REMOTELINK_TLS_CERTIFICATE` | TLS certificate chain |
+| `REMOTELINK_TLS_PRIVATE_KEY` | TLS private key |
+| `REMOTELINK_STATE_DIR` | Persistent users, files, print jobs, and audit state |
+| `REMOTELINK_USER_FILE_QUOTA_BYTES` | Optional per-user file quota |
+| `REMOTELINK_BLOCKED_FILE_EXTENSIONS` | Optional blocked upload extensions |
 
 ```bash
-export RG_TARGETS_FILE=/etc/remote-gateway/targets.json
-export RG_ALLOWED_HOSTS='*'
-export RG_ACCESS_TOKEN_FILE=/run/credentials/remote-gateway.service/access-token
-export RG_TLS_CERTIFICATE=/etc/remote-gateway/tls/fullchain.pem
-export RG_TLS_PRIVATE_KEY=/etc/remote-gateway/tls/privkey.pem
-export RG_STATE_DIR=/var/lib/remote-gateway
-./build/remote-gateway
+export REMOTELINK_TARGETS_FILE=/etc/remotelink/targets.json
+export REMOTELINK_ALLOWED_HOSTS='*'
+export REMOTELINK_ACCESS_TOKEN_FILE=/run/credentials/remotelink.service/access-token
+export REMOTELINK_TLS_CERTIFICATE=/etc/remotelink/tls/fullchain.pem
+export REMOTELINK_TLS_PRIVATE_KEY=/etc/remotelink/tls/privkey.pem
+export REMOTELINK_STATE_DIR=/var/lib/remotelink
+./build/remotelink
 ```
 
-`RG_ALLOW_INSECURE_HTTP=1` may be used for localhost-only development. Never use insecure HTTP for LAN or Internet access.
+`REMOTELINK_ALLOW_INSECURE_HTTP=1` may be used for localhost-only development. Never use insecure HTTP for LAN or Internet access.
 
 ## Deployment
 
@@ -208,7 +208,7 @@ and SSH containers and execute the full regression. It uses the bootstrap
 `REMOTELINK_TEST_TOKEN`, or `REMOTELINK_TEST_ADMIN_USERNAME` and
 `REMOTELINK_TEST_ADMIN_PASSWORD`, after changing that credential.
 
-The deployment retains the internal `remote-gateway` service identifier for compatibility, while the product and browser interface use **RemoteLink**.
+The product name, executable, service, installation paths, configuration variables, and browser interface all use **RemoteLink** consistently.
 
 Open `https://GATEWAY-IP:18080` after deployment. Change weak bootstrap credentials immediately under **Administration → User management**.
 
@@ -247,7 +247,7 @@ gpupdate /force
 - Connection passwords, SSH private keys and VNC CA certificates are stored server-side and never returned to browsers.
 - Verify an SSH SHA-256 host fingerprint out of band before confirming trust; reset and confirm it again after a host reinstall or key change.
 - Keep the recovery token in a secret manager or systemd encrypted credentials.
-- `RG_ALLOWED_HOSTS` defaults to `*`, allowing every domain name and IPv4/IPv6 address. Set an explicit comma-separated host/CIDR list when deployment policy requires destination restrictions.
+- `REMOTELINK_ALLOWED_HOSTS` defaults to `*`, allowing every domain name and IPv4/IPv6 address. Set an explicit comma-separated host/CIDR list when deployment policy requires destination restrictions.
 - User files and print jobs are isolated by stable user identity.
 - The persistent user registry uses owner-only permissions.
 

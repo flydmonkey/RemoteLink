@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
-  echo "usage: $0 /path/to/remote-gateway.env" >&2
+  echo "usage: $0 /path/to/remotelink.env" >&2
   exit 2
 fi
 
@@ -17,12 +17,12 @@ set -a
 source "$config_file"
 set +a
 
-read -r -s -p "Gateway access token: " RG_ACCESS_TOKEN
+read -r -s -p "Gateway access token: " REMOTELINK_ACCESS_TOKEN
 echo
-read -r -s -p "RDP password: " RG_RDP_PASSWORD
+read -r -s -p "RDP password: " REMOTELINK_RDP_PASSWORD
 echo
-export RG_ACCESS_TOKEN RG_RDP_PASSWORD
+export REMOTELINK_ACCESS_TOKEN REMOTELINK_RDP_PASSWORD
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 project_dir=$(cd -- "$script_dir/.." && pwd)
-exec "$project_dir/build/remote-gateway"
+exec "$project_dir/build/remotelink"

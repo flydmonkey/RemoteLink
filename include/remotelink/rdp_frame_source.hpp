@@ -1,6 +1,6 @@
 #pragma once
 
-#include "remote_gateway/frame_source.hpp"
+#include "remotelink/frame_source.hpp"
 
 #include <cstdint>
 #include <atomic>
@@ -13,7 +13,7 @@
 struct rdp_context;
 typedef struct rdp_context rdpContext;
 
-namespace remote_gateway {
+namespace remotelink {
 
 struct RdpConnectionOptions {
     std::string hostname;
@@ -70,4 +70,4 @@ private:
     AudioHandler audio_handler_;
 };
 
-}  // namespace remote_gateway
+}  // namespace remotelink

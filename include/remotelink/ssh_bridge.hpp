@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-namespace remote_gateway {
+namespace remotelink {
 
 struct SshBridgeOptions {
     std::string hostname;
@@ -33,4 +33,4 @@ private:
     std::unique_ptr<Impl> impl_;
 };
 
-}  // namespace remote_gateway
+}  // namespace remotelink

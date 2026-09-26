@@ -1,11 +1,11 @@
 #pragma once
 
-#include "remote_gateway/rdp_frame_source.hpp"
+#include "remotelink/rdp_frame_source.hpp"
 
 #include <string>
 #include <vector>
 
-namespace remote_gateway {
+namespace remotelink {
 
 struct TargetConfig {
     std::string id;
@@ -17,4 +17,4 @@ struct TargetConfig {
 std::vector<TargetConfig> load_targets(const std::string& path,
                                        const std::string& allowed_hosts);
 
-}  // namespace remote_gateway
+}  // namespace remotelink

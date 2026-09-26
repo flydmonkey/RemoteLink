@@ -1,4 +1,4 @@
-#include "remote_gateway/vnc_bridge.hpp"
+#include "remotelink/vnc_bridge.hpp"
 
 extern "C" {
 #include <rfb/rfb.h>
@@ -13,7 +13,7 @@ extern "C" {
 #include <mutex>
 #include <thread>
 
-namespace remote_gateway {
+namespace remotelink {
 namespace {
 void bridge_tag() {}
 }
@@ -158,4 +158,4 @@ std::shared_ptr<VncBridge> VncBridge::create(VncBridgeOptions options, std::stri
 std::uint16_t VncBridge::port() const { return static_cast<std::uint16_t>(impl_->downstream->port); }
 void VncBridge::stop() { if (impl_) impl_->shutdown(); }
 
-}  // namespace remote_gateway
+}  // namespace remotelink

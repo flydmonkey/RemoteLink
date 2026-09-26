@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 
-#include "remote_gateway/ssh_bridge.hpp"
+#include "remotelink/ssh_bridge.hpp"
 
-namespace remote_gateway {
+namespace remotelink {
 
 struct SshFileEntry {
     std::string name;
@@ -34,4 +34,4 @@ public:
                        std::string& error);
 };
 
-}  // namespace remote_gateway
+}  // namespace remotelink

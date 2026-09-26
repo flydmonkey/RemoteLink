@@ -1,13 +1,13 @@
 #pragma once
 
-#include "remote_gateway/frame_sink.hpp"
-#include "remote_gateway/h264_encoder.hpp"
-#include "remote_gateway/webrtc_server.hpp"
+#include "remotelink/frame_sink.hpp"
+#include "remotelink/h264_encoder.hpp"
+#include "remotelink/webrtc_server.hpp"
 
 #include <cstdint>
 #include <atomic>
 
-namespace remote_gateway {
+namespace remotelink {
 
 class WebRtcVideoSink final : public FrameSink {
 public:
@@ -28,4 +28,4 @@ private:
     std::atomic_uint64_t sent_bytes_ = 0;
 };
 
-}  // namespace remote_gateway
+}  // namespace remotelink

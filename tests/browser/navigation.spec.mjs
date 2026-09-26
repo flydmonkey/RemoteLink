@@ -82,7 +82,7 @@ test("a user without connections can still sign out", async ({ page }) => {
     );
   await page.goto("/connect.html");
   await page.evaluate(() =>
-    sessionStorage.setItem("remote-gateway-access-token", "test"),
+    sessionStorage.setItem("remotelink-access-token", "test"),
   );
   await page.reload();
   await page.locator("#account-trigger").click();
@@ -90,14 +90,14 @@ test("a user without connections can still sign out", async ({ page }) => {
   await expect(page.locator("#login")).toHaveAttribute("open", "");
   expect(
     await page.evaluate(() =>
-      sessionStorage.getItem("remote-gateway-access-token"),
+      sessionStorage.getItem("remotelink-access-token"),
     ),
   ).toBeNull();
 });
 
 test("VNC page follows the existing RemoteLink shell", async ({ page }) => {
   await page.addInitScript(() =>
-    sessionStorage.setItem("remote-gateway-access-token", "test"),
+    sessionStorage.setItem("remotelink-access-token", "test"),
   );
   await page.route("**/api/auth/me", (route) =>
     route.fulfill({
@@ -146,7 +146,7 @@ test("regular users only see protocols with authorized connections", async ({
   page,
 }) => {
   await page.addInitScript(() =>
-    sessionStorage.setItem("remote-gateway-access-token", "test"),
+    sessionStorage.setItem("remotelink-access-token", "test"),
   );
   await page.route("**/api/auth/me", (route) =>
     route.fulfill({ json: { name: "Test User", username: "test", admin: false } }),
@@ -170,7 +170,7 @@ test("VNC administrators add connections from management only", async ({
   page,
 }) => {
   await page.addInitScript(() =>
-    sessionStorage.setItem("remote-gateway-access-token", "test"),
+    sessionStorage.setItem("remotelink-access-token", "test"),
   );
   await page.route("**/api/auth/me", (route) =>
     route.fulfill({
@@ -336,7 +336,7 @@ test("SSH page exposes password and key connection management", async ({
   page,
 }) => {
   await page.addInitScript(() =>
-    sessionStorage.setItem("remote-gateway-access-token", "test"),
+    sessionStorage.setItem("remotelink-access-token", "test"),
   );
   await page.route("**/api/auth/me", (route) =>
     route.fulfill({ json: { admin: true } }),
@@ -421,7 +421,7 @@ test("SSH and user management use the shared English interface vocabulary", asyn
   page,
 }) => {
   await page.addInitScript(() => {
-    sessionStorage.setItem("remote-gateway-access-token", "test");
+    sessionStorage.setItem("remotelink-access-token", "test");
     localStorage.setItem("remotelink-language", "en");
   });
   await page.route("**/api/auth/me", (route) =>
@@ -465,7 +465,7 @@ test("VNC session uses noVNC Core with RemoteLink controls", async ({
 }) => {
   let sessionRequests = 0;
   await page.addInitScript(() =>
-    sessionStorage.setItem("remote-gateway-access-token", "test"),
+    sessionStorage.setItem("remotelink-access-token", "test"),
   );
   await page.route("**/api/vnc/sessions", (route) => {
     sessionRequests++;
@@ -524,7 +524,7 @@ test("VNC disconnect returns even when the target is unavailable", async ({
   page,
 }) => {
   await page.addInitScript(() =>
-    sessionStorage.setItem("remote-gateway-access-token", "test"),
+    sessionStorage.setItem("remotelink-access-token", "test"),
   );
   await page.route("**/api/vnc/sessions", (route) =>
     route.fulfill({ status: 502, json: { error: "unavailable" } }),
@@ -538,7 +538,7 @@ test("VNC disconnect returns even when the target is unavailable", async ({
 
 test("VNC legacy management UI is no longer duplicated", async ({ page }) => {
   await page.addInitScript(() =>
-    sessionStorage.setItem("remote-gateway-access-token", "test"),
+    sessionStorage.setItem("remotelink-access-token", "test"),
   );
   await page.route("**/api/auth/me", (route) =>
     route.fulfill({
@@ -594,7 +594,7 @@ test("user management exposes the complete account lifecycle", async ({
   page,
 }) => {
   await page.addInitScript(() =>
-    sessionStorage.setItem("remote-gateway-access-token", "test"),
+    sessionStorage.setItem("remotelink-access-token", "test"),
   );
   await page.route("**/api/admin/users", (route) =>
     route.fulfill({
@@ -659,7 +659,7 @@ test("SSH session file manager opens in home and supports file actions", async (
   page,
 }) => {
   await page.addInitScript(() => {
-    sessionStorage.setItem("remote-gateway-access-token", "test-token");
+    sessionStorage.setItem("remotelink-access-token", "test-token");
     sessionStorage.setItem(
       "remotelink-ssh-session",
       JSON.stringify({ targetId: "ssh-1", websocketUrl: "/unavailable" }),

@@ -55,7 +55,8 @@ for source, button_id in (
 for page in localized_pages:
     source = page.read_text(encoding="utf-8")
     assert "/i18n.js" in source, f"{page.name} is missing shared i18n"
-    assert "Remote Gateway" not in source, f"{page.name} contains the old brand"
+    for old_brand in ("Remote" + " Gateway", "remote" + "-gateway", "remote" + "_gateway"):
+        assert old_brand not in source, f"{page.name} contains the old brand"
 for retired_copy in ("连接历史", "VNC 管理", "SSH 设置", "SSH 管理"):
     assert retired_copy not in "\n".join(
         page.read_text(encoding="utf-8") for page in localized_pages

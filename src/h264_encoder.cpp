@@ -1,4 +1,4 @@
-#include "remote_gateway/h264_encoder.hpp"
+#include "remotelink/h264_encoder.hpp"
 
 #include <libyuv/convert.h>
 #include <wels/codec_api.h>
@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <thread>
 
-namespace remote_gateway {
+namespace remotelink {
 
 H264Encoder::H264Encoder(std::uint32_t width, std::uint32_t height,
                          std::uint32_t fps, std::uint32_t bitrate)
@@ -136,4 +136,4 @@ EncodedFrame H264Encoder::encode(const Frame& frame) {
     return output;
 }
 
-}  // namespace remote_gateway
+}  // namespace remotelink

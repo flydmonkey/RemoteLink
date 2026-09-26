@@ -46,8 +46,8 @@ jobs:
         run: >-
           cmake -S . -B build -G Ninja
           -DCMAKE_BUILD_TYPE=Release
-          -DREMOTE_GATEWAY_ENABLE_STREAMING=ON
-          -DREMOTE_GATEWAY_BUILD_TESTS=ON
+          -DREMOTELINK_ENABLE_STREAMING=ON
+          -DREMOTELINK_BUILD_TESTS=ON
 
       - name: Build and test
         run: |

@@ -1,11 +1,11 @@
-#include "remote_gateway/vnc_ticket_store.hpp"
+#include "remotelink/vnc_ticket_store.hpp"
 
 #include <openssl/rand.h>
 
 #include <array>
 #include <stdexcept>
 
-namespace remote_gateway {
+namespace remotelink {
 namespace {
 std::string random_ticket() {
     std::array<unsigned char, 32> bytes {};
@@ -60,4 +60,4 @@ void VncTicketStore::remove_expired_locked(std::chrono::steady_clock::time_point
     std::erase_if(entries_, [now](const auto& item) { return item.second.expires_at <= now; });
 }
 
-}  // namespace remote_gateway
+}  // namespace remotelink

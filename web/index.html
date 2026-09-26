@@ -1980,7 +1980,7 @@
       const themeNames = { system: "系统", light: "浅色", dark: "深色" };
       const themeOrder = ["system", "light", "dark"];
       let selectedTheme =
-        localStorage.getItem("remote-gateway-theme") || "system";
+        localStorage.getItem("remotelink-theme") || "system";
       function applyTheme() {
         document.documentElement.dataset.theme =
           selectedTheme === "system" ? "" : selectedTheme;
@@ -1995,7 +1995,7 @@
           themeOrder[
             (themeOrder.indexOf(selectedTheme) + 1) % themeOrder.length
           ];
-        localStorage.setItem("remote-gateway-theme", selectedTheme);
+        localStorage.setItem("remotelink-theme", selectedTheme);
         applyTheme();
       });
       applyTheme();
@@ -2304,7 +2304,7 @@
       logout.addEventListener("click", () => {
         if (ws?.readyState === WebSocket.OPEN)
           ws.send(JSON.stringify({ type: "stop" }));
-        sessionStorage.removeItem("remote-gateway-session");
+        sessionStorage.removeItem("remotelink-session");
         location.replace("/");
       });
 
@@ -2355,8 +2355,8 @@
                 : message.message);
             status.textContent = `连接失败：${text}`;
             if (location.pathname.startsWith("/session")) {
-              sessionStorage.setItem("remote-gateway-error", text);
-              sessionStorage.removeItem("remote-gateway-session");
+              sessionStorage.setItem("remotelink-error", text);
+              sessionStorage.removeItem("remotelink-session");
               location.replace("/");
             }
             return;
@@ -2388,7 +2388,7 @@
             video.srcObject = null;
             remoteAudio.srcObject = null;
             if (location.pathname.startsWith("/session")) {
-              sessionStorage.removeItem("remote-gateway-session");
+              sessionStorage.removeItem("remotelink-session");
               location.replace("/");
               return;
             }
@@ -2398,7 +2398,7 @@
           }
           if (message.type === "auth-error") {
             accessToken = "";
-            sessionStorage.removeItem("remote-gateway-access-token");
+            sessionStorage.removeItem("remotelink-access-token");
             authError.textContent = "登录状态已失效，请重新登录";
             loginPassword.value = "";
             login.showModal();
@@ -2447,7 +2447,7 @@
           return;
         }
         accessToken = (await response.json()).token;
-        sessionStorage.setItem("remote-gateway-access-token", accessToken);
+        sessionStorage.setItem("remotelink-access-token", accessToken);
         loginPassword.value = "";
         status.textContent = opT("正在认证…");
         if (ws && ws.readyState < WebSocket.CLOSING) {
@@ -2459,35 +2459,35 @@
       const pendingSession = (() => {
         try {
           return JSON.parse(
-            sessionStorage.getItem("remote-gateway-session") || "null",
+            sessionStorage.getItem("remotelink-session") || "null",
           );
         } catch {
           return null;
         }
       })();
       const sharedAccessToken =
-        sessionStorage.getItem("remote-gateway-access-token") || "";
+        sessionStorage.getItem("remotelink-access-token") || "";
       if (
         (pendingSession?.target || pendingSession?.host) &&
         pendingSession?.accessToken
       ) {
-        if (!localStorage.getItem("remote-gateway-audio-fix-v2")) {
+        if (!localStorage.getItem("remotelink-audio-fix-v2")) {
           pendingSession.sound = true;
           pendingSession.printer = true;
           sessionStorage.setItem(
-            "remote-gateway-session",
+            "remotelink-session",
             JSON.stringify(pendingSession),
           );
           try {
             const migrated = JSON.parse(
-              localStorage.getItem("remote-gateway-settings") || "{}",
+              localStorage.getItem("remotelink-settings") || "{}",
             );
             localStorage.setItem(
-              "remote-gateway-settings",
+              "remotelink-settings",
               JSON.stringify({ ...migrated, sound: true, printer: true }),
             );
           } catch {}
-          localStorage.setItem("remote-gateway-audio-fix-v2", "enabled");
+          localStorage.setItem("remotelink-audio-fix-v2", "enabled");
         }
         accessToken = pendingSession.accessToken;
         selectedTarget = pendingSession.target;
@@ -2561,7 +2561,7 @@
       );
       let remoteVolume = Math.max(
         0,
-        Math.min(1, Number(localStorage.getItem("remote-gateway-volume") ?? 1)),
+        Math.min(1, Number(localStorage.getItem("remotelink-volume") ?? 1)),
       );
       remoteAudio.volume = remoteVolume;
       function updateAudioControl() {
@@ -2595,7 +2595,7 @@
           );
           remoteAudio.volume = remoteVolume;
           remoteAudio.muted = false;
-          localStorage.setItem("remote-gateway-volume", String(remoteVolume));
+          localStorage.setItem("remotelink-volume", String(remoteVolume));
           updateAudioControl();
           status.textContent = `远程声音音量 ${Math.round(remoteVolume * 100)}%`;
         },

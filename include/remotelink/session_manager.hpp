@@ -1,6 +1,6 @@
 #pragma once
 
-#include "remote_gateway/target_config.hpp"
+#include "remotelink/target_config.hpp"
 
 #include <cstdint>
 #include <deque>
@@ -12,7 +12,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace remote_gateway {
+namespace remotelink {
 class RdpFrameSource;
 class Session;
 class WebRtcServer;
@@ -91,4 +91,4 @@ private:
                           std::string username = {}, std::string reason = {});
     void save_events_locked() const;
 };
-}  // namespace remote_gateway
+}  // namespace remotelink

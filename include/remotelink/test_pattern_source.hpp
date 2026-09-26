@@ -1,11 +1,11 @@
 #pragma once
 
-#include "remote_gateway/frame_source.hpp"
+#include "remotelink/frame_source.hpp"
 
 #include <chrono>
 #include <cstdint>
 
-namespace remote_gateway {
+namespace remotelink {
 
 class TestPatternSource final : public FrameSource {
 public:
@@ -22,5 +22,5 @@ private:
     std::chrono::nanoseconds frame_interval_;
 };
 
-}  // namespace remote_gateway
+}  // namespace remotelink
 

@@ -1,31 +1,31 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(remote_gateway VERSION 0.3.0 LANGUAGES C CXX)
+project(remotelink VERSION 0.3.0 LANGUAGES C CXX)
 
-option(REMOTE_GATEWAY_BUILD_TESTS "Build unit tests" ON)
-option(REMOTE_GATEWAY_ENABLE_STREAMING "Build WebRTC/H.264 streaming support" ON)
+option(REMOTELINK_BUILD_TESTS "Build unit tests" ON)
+option(REMOTELINK_ENABLE_STREAMING "Build WebRTC/H.264 streaming support" ON)
 
 include(FetchContent)
 find_package(Threads REQUIRED)
 
-add_library(remote_gateway_core
+add_library(remotelink_core
     src/input_text.cpp
     src/security_policy.cpp
     src/session.cpp
     src/test_pattern_source.cpp
 )
-set_target_properties(remote_gateway_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties(remotelink_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-target_include_directories(remote_gateway_core PUBLIC include)
-target_compile_features(remote_gateway_core PUBLIC cxx_std_20)
+target_include_directories(remotelink_core PUBLIC include)
+target_compile_features(remotelink_core PUBLIC cxx_std_20)
 
 if(MSVC)
-    target_compile_options(remote_gateway_core PRIVATE /W4 /permissive-)
+    target_compile_options(remotelink_core PRIVATE /W4 /permissive-)
 else()
-    target_compile_options(remote_gateway_core PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    target_compile_options(remotelink_core PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
 
-if(REMOTE_GATEWAY_ENABLE_STREAMING)
+if(REMOTELINK_ENABLE_STREAMING)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(OPENH264 REQUIRED IMPORTED_TARGET openh264)
     pkg_check_modules(OPUS REQUIRED IMPORTED_TARGET opus)
@@ -73,7 +73,7 @@ if(REMOTE_GATEWAY_ENABLE_STREAMING)
         FetchContent_MakeAvailable(libdatachannel)
     endif()
 
-    add_library(remote_gateway_streaming
+    add_library(remotelink_streaming
         src/h264_encoder.cpp
         src/http_server.cpp
         src/rdp_frame_source.cpp
@@ -86,45 +86,45 @@ if(REMOTE_GATEWAY_ENABLE_STREAMING)
         src/webrtc_server.cpp
         src/webrtc_video_sink.cpp
     )
-    target_include_directories(remote_gateway_streaming PUBLIC include PRIVATE
+    target_include_directories(remotelink_streaming PUBLIC include PRIVATE
         ${LIBYUV_INCLUDE_DIR} ${libvncserver_SOURCE_DIR}/include ${libvncserver_BINARY_DIR}/include)
-    target_compile_features(remote_gateway_streaming PUBLIC cxx_std_20)
-    target_link_libraries(remote_gateway_streaming
-        PUBLIC remote_gateway_core
+    target_compile_features(remotelink_streaming PUBLIC cxx_std_20)
+    target_link_libraries(remotelink_streaming
+        PUBLIC remotelink_core
         PRIVATE LibDataChannel::LibDataChannel PkgConfig::OPENH264 PkgConfig::OPUS OpenSSL::SSL OpenSSL::Crypto
                 PkgConfig::FREERDP PkgConfig::LIBSSH2 Threads::Threads ${LIBYUV_LIBRARY} vncclient vncserver
     )
-    target_compile_definitions(remote_gateway_streaming PRIVATE
-        REMOTE_GATEWAY_WEB_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/web"
+    target_compile_definitions(remotelink_streaming PRIVATE
+        REMOTELINK_WEB_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/web"
     )
 endif()
 
-add_executable(remote-gateway src/main.cpp)
-target_link_libraries(remote-gateway PRIVATE remote_gateway_core)
-if(REMOTE_GATEWAY_ENABLE_STREAMING)
-    target_link_libraries(remote-gateway PRIVATE remote_gateway_streaming OpenSSL::Crypto)
-    target_compile_definitions(remote-gateway PRIVATE REMOTE_GATEWAY_ENABLE_STREAMING=1)
+add_executable(remotelink src/main.cpp)
+target_link_libraries(remotelink PRIVATE remotelink_core)
+if(REMOTELINK_ENABLE_STREAMING)
+    target_link_libraries(remotelink PRIVATE remotelink_streaming OpenSSL::Crypto)
+    target_compile_definitions(remotelink PRIVATE REMOTELINK_ENABLE_STREAMING=1)
 endif()
 
-if(REMOTE_GATEWAY_BUILD_TESTS)
+if(REMOTELINK_BUILD_TESTS)
     enable_testing()
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
-    add_test(NAME remote_gateway_web_ui_tests
+    add_test(NAME remotelink_web_ui_tests
              COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/web_ui_tests.py)
-    add_executable(remote_gateway_tests tests/core_tests.cpp)
-    target_link_libraries(remote_gateway_tests PRIVATE remote_gateway_core)
-    add_test(NAME remote_gateway_tests COMMAND remote_gateway_tests)
-    if(REMOTE_GATEWAY_ENABLE_STREAMING)
-        add_executable(remote_gateway_target_config_tests tests/target_config_tests.cpp)
-        target_compile_features(remote_gateway_target_config_tests PRIVATE cxx_std_20)
-        target_link_libraries(remote_gateway_target_config_tests PRIVATE remote_gateway_streaming)
-        add_test(NAME remote_gateway_target_config_tests COMMAND remote_gateway_target_config_tests)
-        add_executable(remote_gateway_vnc_ticket_tests tests/vnc_ticket_store_tests.cpp)
-        target_compile_features(remote_gateway_vnc_ticket_tests PRIVATE cxx_std_20)
-        target_link_libraries(remote_gateway_vnc_ticket_tests PRIVATE remote_gateway_streaming)
-        add_test(NAME remote_gateway_vnc_ticket_tests COMMAND remote_gateway_vnc_ticket_tests)
-        add_executable(remote_gateway_webrtc_smoke tests/webrtc_smoke.cpp)
-        target_compile_features(remote_gateway_webrtc_smoke PRIVATE cxx_std_20)
-        target_link_libraries(remote_gateway_webrtc_smoke PRIVATE LibDataChannel::LibDataChannel)
+    add_executable(remotelink_tests tests/core_tests.cpp)
+    target_link_libraries(remotelink_tests PRIVATE remotelink_core)
+    add_test(NAME remotelink_tests COMMAND remotelink_tests)
+    if(REMOTELINK_ENABLE_STREAMING)
+        add_executable(remotelink_target_config_tests tests/target_config_tests.cpp)
+        target_compile_features(remotelink_target_config_tests PRIVATE cxx_std_20)
+        target_link_libraries(remotelink_target_config_tests PRIVATE remotelink_streaming)
+        add_test(NAME remotelink_target_config_tests COMMAND remotelink_target_config_tests)
+        add_executable(remotelink_vnc_ticket_tests tests/vnc_ticket_store_tests.cpp)
+        target_compile_features(remotelink_vnc_ticket_tests PRIVATE cxx_std_20)
+        target_link_libraries(remotelink_vnc_ticket_tests PRIVATE remotelink_streaming)
+        add_test(NAME remotelink_vnc_ticket_tests COMMAND remotelink_vnc_ticket_tests)
+        add_executable(remotelink_webrtc_smoke tests/webrtc_smoke.cpp)
+        target_compile_features(remotelink_webrtc_smoke PRIVATE cxx_std_20)
+        target_link_libraries(remotelink_webrtc_smoke PRIVATE LibDataChannel::LibDataChannel)
     endif()
 endif()

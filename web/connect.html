@@ -979,14 +979,14 @@
           const message = JSON.parse(event.data);
           if (message.type === "auth-error") {
             accessToken = "";
-            sessionStorage.removeItem("remote-gateway-access-token");
+            sessionStorage.removeItem("remotelink-access-token");
             authError.textContent = "登录状态已失效，请重新登录";
             loginPassword.value = "";
             login.showModal();
             return;
           }
           if (message.type !== "authenticated") return;
-          sessionStorage.setItem("remote-gateway-access-token", accessToken);
+          sessionStorage.setItem("remotelink-access-token", accessToken);
           if (login.open) login.close();
           targets = message.targets || [];
           targetList.replaceChildren();
@@ -997,7 +997,7 @@
             option.textContent = `${target.name} · ${target.host}`;
             targetSelect.append(option);
           }
-          const preferred = localStorage.getItem("remote-gateway-last-target");
+          const preferred = localStorage.getItem("remotelink-last-target");
           targetSelect.value = targets.some((item) => item.id === preferred)
             ? preferred
             : targets[0]?.id || "";
@@ -1032,7 +1032,7 @@
           }
           const account = await response.json();
           accessToken = account.token;
-          sessionStorage.setItem("remote-gateway-access-token", accessToken);
+          sessionStorage.setItem("remotelink-access-token", accessToken);
           loginPassword.value = "";
           statusNav.hidden = !account.admin;
           showAccount(account);
@@ -1054,11 +1054,11 @@
             return;
           }
           const host = selected.host;
-          localStorage.setItem("remote-gateway-last-target", selected.id);
+          localStorage.setItem("remotelink-last-target", selected.id);
           let settings = {};
           try {
             settings = JSON.parse(
-              localStorage.getItem("remote-gateway-settings") || "{}",
+              localStorage.getItem("remotelink-settings") || "{}",
             );
           } catch {}
           if (!(Number(settings.width) > 0 && Number(settings.height) > 0))
@@ -1079,7 +1079,7 @@
               networkCaps[network.effectiveType],
             );
           sessionStorage.setItem(
-            "remote-gateway-session",
+            "remotelink-session",
             JSON.stringify({
               target: selected?.id || "",
               host,
@@ -1094,11 +1094,11 @@
           }
           location.href = "/session";
         });
-      accessToken = sessionStorage.getItem("remote-gateway-access-token") || "";
-      const returnedError = sessionStorage.getItem("remote-gateway-error");
+      accessToken = sessionStorage.getItem("remotelink-access-token") || "";
+      const returnedError = sessionStorage.getItem("remotelink-error");
       if (returnedError) {
         error.textContent = returnedError;
-        sessionStorage.removeItem("remote-gateway-error");
+        sessionStorage.removeItem("remotelink-error");
       }
       async function resumeAccount() {
         if (!accessToken) {
@@ -1117,7 +1117,7 @@
           connectGateway();
         } catch {
           accessToken = "";
-          sessionStorage.removeItem("remote-gateway-access-token");
+          sessionStorage.removeItem("remotelink-access-token");
           login.showModal();
         }
       }
@@ -1126,8 +1126,8 @@
           socket.onclose = null;
           socket.close();
         }
-        sessionStorage.removeItem("remote-gateway-access-token");
-        sessionStorage.removeItem("remote-gateway-session");
+        sessionStorage.removeItem("remotelink-access-token");
+        sessionStorage.removeItem("remotelink-session");
         location.reload();
       });
       resumeAccount();

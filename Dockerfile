@@ -17,13 +17,13 @@ COPY . .
 RUN bash ./scripts/copy-novnc-core.sh \
     && cmake -S . -B build -G Ninja \
       -DCMAKE_BUILD_TYPE=Release \
-      -DREMOTE_GATEWAY_ENABLE_STREAMING=ON \
-      -DREMOTE_GATEWAY_BUILD_TESTS=OFF \
+      -DREMOTELINK_ENABLE_STREAMING=ON \
+      -DREMOTELINK_BUILD_TESTS=OFF \
     && cmake --build build --parallel "$(nproc)" \
     && find web -type f -name '*.html' -exec \
       sed -i "s/__REMOTELINK_VERSION__/${REMOTELINK_VERSION}/g" {} + \
-    && install -D -m 0755 build/remote-gateway /stage/bin/remote-gateway \
-    && install -D -m 0755 build/libremote_gateway_streaming.so /stage/lib/libremote_gateway_streaming.so \
+    && install -D -m 0755 build/remotelink /stage/bin/remotelink \
+    && install -D -m 0755 build/libremotelink_streaming.so /stage/lib/libremotelink_streaming.so \
     && find build -name 'libdatachannel.so*' -exec cp -a {} /stage/lib/ \; \
     && find build -name 'libvncclient.so*' -exec cp -a {} /stage/lib/ \; \
     && find build -name 'libvncserver.so*' -exec cp -a {} /stage/lib/ \; \
@@ -46,25 +46,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --user-group --home-dir /nonexistent \
       --shell /usr/sbin/nologin remotelink \
-    && install -d -o remotelink -g remotelink -m 0750 /var/lib/remote-gateway \
-    && install -d -o root -g remotelink -m 0750 /etc/remote-gateway \
-    && printf '{"targets":[]}\n' > /etc/remote-gateway/targets.json
+    && install -d -o remotelink -g remotelink -m 0750 /var/lib/remotelink \
+    && install -d -o root -g remotelink -m 0750 /etc/remotelink \
+    && printf '{"targets":[]}\n' > /etc/remotelink/targets.json
 
 COPY --from=builder /stage/ /opt/remotelink/
 COPY --from=builder /src/web /opt/remotelink/web
 COPY docker/entrypoint.sh /usr/local/bin/remotelink-entrypoint
 
 ENV LD_LIBRARY_PATH=/opt/remotelink/lib \
-    RG_WEB_ROOT=/opt/remotelink/web \
-    RG_STATE_DIR=/var/lib/remote-gateway \
-    RG_TARGETS_FILE=/etc/remote-gateway/targets.json \
-    RG_ALLOWED_HOSTS=* \
-    RG_BEHIND_TLS_PROXY=1
+    REMOTELINK_WEB_ROOT=/opt/remotelink/web \
+    REMOTELINK_STATE_DIR=/var/lib/remotelink \
+    REMOTELINK_TARGETS_FILE=/etc/remotelink/targets.json \
+    REMOTELINK_ALLOWED_HOSTS=* \
+    REMOTELINK_BEHIND_TLS_PROXY=1
 
-VOLUME ["/var/lib/remote-gateway"]
+VOLUME ["/var/lib/remotelink"]
 EXPOSE 18080
 USER remotelink
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/remotelink-entrypoint"]
-CMD ["/opt/remotelink/bin/remote-gateway"]
+CMD ["/opt/remotelink/bin/remotelink"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD curl --fail --silent http://127.0.0.1:18080/healthz || exit 1

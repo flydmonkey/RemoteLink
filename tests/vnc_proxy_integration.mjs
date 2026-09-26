@@ -61,7 +61,7 @@ try {
   if ("password" in session)
     throw new Error("VNC password leaked in session response");
   await page.evaluate(
-    (value) => sessionStorage.setItem("remote-gateway-access-token", value),
+    (value) => sessionStorage.setItem("remotelink-access-token", value),
     token,
   );
   await page.goto(

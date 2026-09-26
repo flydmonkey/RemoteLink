@@ -1458,7 +1458,7 @@
       adminLogout.innerHTML =
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M14 8l4 4-4 4M9 12h9"/></svg>';
       const selectedTheme =
-        localStorage.getItem("remote-gateway-theme") || "system";
+        localStorage.getItem("remotelink-theme") || "system";
       document.documentElement.dataset.theme =
         selectedTheme === "system" ? "" : selectedTheme;
       async function api(path, options = {}) {
@@ -1958,7 +1958,7 @@
         } catch (error) {
           if (error.message === "unauthorized") {
             accessToken = "";
-            sessionStorage.removeItem("remote-gateway-access-token");
+            sessionStorage.removeItem("remotelink-access-token");
             clearInterval(refreshTimer);
             loginError.textContent = "访问令牌已失效，请重新输入";
             login.showModal();
@@ -2011,7 +2011,7 @@
           if (!response.ok) throw new Error("unauthorized");
           accessToken = (await response.json()).token;
           render(await api("/api/admin/state"));
-          sessionStorage.setItem("remote-gateway-access-token", accessToken);
+          sessionStorage.setItem("remotelink-access-token", accessToken);
           login.close();
           loginPassword.value = "";
           await refreshUsers();
@@ -2024,10 +2024,10 @@
               : `无法连接：${error.message}`;
         }
       });
-      accessToken = sessionStorage.getItem("remote-gateway-access-token") || "";
+      accessToken = sessionStorage.getItem("remotelink-access-token") || "";
       document.querySelector("#admin-logout").addEventListener("click", () => {
-        sessionStorage.removeItem("remote-gateway-access-token");
-        sessionStorage.removeItem("remote-gateway-session");
+        sessionStorage.removeItem("remotelink-access-token");
+        sessionStorage.removeItem("remotelink-session");
         location.href = "/";
       });
       if (accessToken) {
@@ -2209,7 +2209,7 @@
         } catch (error) {
           if (error.message === "unauthorized") {
             accessToken = "";
-            sessionStorage.removeItem("remote-gateway-access-token");
+            sessionStorage.removeItem("remotelink-access-token");
             clearInterval(refreshTimer);
             login.showModal();
           } else notice.textContent = `状态刷新失败：${error.message}`;

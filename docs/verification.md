@@ -8,7 +8,7 @@ The LAN release is verified with the following gates:
 3. HTTPS `/healthz` reports `status=ok` and `tls=true`; plain HTTP is rejected.
 4. `tests/signaling_smoke.py` proves an invalid WSS token is rejected and a
    valid token is accepted.
-5. `remote_gateway_webrtc_smoke` authenticates, negotiates WebRTC, receives at
+5. `remotelink_webrtc_smoke` authenticates, negotiates WebRTC, receives at
    least three H.264 RTP packets, opens the input DataChannel, and sends pointer
    movement, left-button down/up, wheel, and Shift down/up events.
 6. The `rdpInputEvents` health counter increases by six during the native smoke
@@ -17,7 +17,7 @@ The LAN release is verified with the following gates:
    growing packet/decoded-frame count, and displays the real Windows desktop.
 8. With an active browser peer, SIGTERM exits the process and releases the public
    listener; after restart the unchanged page reconnects and resumes decoding.
-9. Exactly one `remote-gateway` process exposes TCP 18080; its internal signaling
+9. Exactly one `remotelink` process exposes TCP 18080; its internal signaling
    backend on TCP 18081 is bound only to `127.0.0.1`.
 10. Two simultaneous clients report `sessions=2`; closing either client returns
     the count to one without interrupting the other stream.

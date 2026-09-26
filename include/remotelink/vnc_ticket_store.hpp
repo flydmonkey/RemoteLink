@@ -7,7 +7,7 @@
 #include <string>
 #include <unordered_map>
 
-namespace remote_gateway {
+namespace remotelink {
 
 struct VncDestination {
     std::string session_id;
@@ -36,4 +36,4 @@ private:
     std::unordered_map<std::string, Entry> entries_;
 };
 
-}  // namespace remote_gateway
+}  // namespace remotelink

@@ -6,7 +6,7 @@
       "host": "10.17.12.55",
       "port": 3389,
       "username": "administrator",
-      "passwordFile": "/run/credentials/remote-gateway.service/server-55-password",
+      "passwordFile": "/run/credentials/remotelink.service/server-55-password",
       "width": 1280,
       "height": 720,
       "ignoreCertificate": true

@@ -7,11 +7,11 @@
 #include <string>
 #include <thread>
 
-#include "remote_gateway/vnc_ticket_store.hpp"
+#include "remotelink/vnc_ticket_store.hpp"
 
 typedef struct ssl_ctx_st SSL_CTX;
 
-namespace remote_gateway {
+namespace remotelink {
 
 struct HttpRequest {
     std::string method;
@@ -70,4 +70,4 @@ private:
     std::jthread thread_;
 };
 
-}  // namespace remote_gateway
+}  // namespace remotelink

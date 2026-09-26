@@ -1,8 +1,10 @@
 # Upgrading RemoteLink 0.2 to 0.3
 
-RemoteLink 0.3 keeps the existing state directory and does not require a
-manual database migration. Back up `RG_STATE_DIR` and the service configuration
-before deploying the new package.
+RemoteLink 0.3 keeps the state file format and does not require a database
+conversion. Back up `REMOTELINK_STATE_DIR` and the service configuration before
+deploying the new package. Installations created before the product-wide naming
+cleanup must move their state and configuration into the documented RemoteLink
+paths and update environment-variable names to the `REMOTELINK_` prefix.
 
 ## Automatic compatibility
 

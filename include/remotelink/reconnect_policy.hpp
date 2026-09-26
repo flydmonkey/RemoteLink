@@ -6,7 +6,7 @@
 #include <stop_token>
 #include <thread>
 
-namespace remote_gateway {
+namespace remotelink {
 
 inline std::chrono::seconds reconnect_delay(std::size_t consecutive_failures) {
     if (consecutive_failures == 0) return std::chrono::seconds(0);
@@ -27,4 +27,4 @@ inline bool interruptible_wait(std::stop_token stop_token,
     return false;
 }
 
-}  // namespace remote_gateway
+}  // namespace remotelink

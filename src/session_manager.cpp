@@ -1,11 +1,11 @@
-#include "remote_gateway/session_manager.hpp"
+#include "remotelink/session_manager.hpp"
 
-#include "remote_gateway/rdp_frame_source.hpp"
-#include "remote_gateway/security_policy.hpp"
-#include "remote_gateway/session_identity.hpp"
-#include "remote_gateway/session.hpp"
-#include "remote_gateway/webrtc_server.hpp"
-#include "remote_gateway/webrtc_video_sink.hpp"
+#include "remotelink/rdp_frame_source.hpp"
+#include "remotelink/security_policy.hpp"
+#include "remotelink/session_identity.hpp"
+#include "remotelink/session.hpp"
+#include "remotelink/webrtc_server.hpp"
+#include "remotelink/webrtc_video_sink.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -14,7 +14,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 
-namespace remote_gateway {
+namespace remotelink {
 
 struct SessionManager::ManagedSession {
     std::string identity;
@@ -72,9 +72,9 @@ bool SessionManager::start(const std::string& peer_id, const std::string& target
     rdp.audio_playback = audio_playback;
     rdp.redirect_printers = redirect_printers;
     if (redirect_files) {
-        const char* state_root = std::getenv("RG_STATE_DIR");
+        const char* state_root = std::getenv("REMOTELINK_STATE_DIR");
         rdp.shared_files_path = (std::filesystem::path(state_root && *state_root
-            ? state_root : "/var/lib/remote-gateway") / "users" /
+            ? state_root : "/var/lib/remotelink") / "users" /
             std::to_string(user_identity) / "files").string();
         std::filesystem::create_directories(rdp.shared_files_path);
     } else {
@@ -318,4 +318,4 @@ std::vector<SessionManager::TargetSnapshot> SessionManager::target_snapshots() c
     }
     return result;
 }
-}  // namespace remote_gateway
+}  // namespace remotelink

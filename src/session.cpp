@@ -1,9 +1,9 @@
-#include "remote_gateway/session.hpp"
+#include "remotelink/session.hpp"
 
 #include <stdexcept>
 #include <iostream>
 
-namespace remote_gateway {
+namespace remotelink {
 
 Session::Session(std::unique_ptr<FrameSource> source,
                  std::unique_ptr<FrameSink> sink,
@@ -78,4 +78,4 @@ std::uint64_t Session::dropped_frames() const {
     return frames_.dropped_frames();
 }
 
-}  // namespace remote_gateway
+}  // namespace remotelink

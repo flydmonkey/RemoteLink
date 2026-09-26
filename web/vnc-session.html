@@ -344,7 +344,7 @@
     </dialog>
     <script type="module">
       import RFB from "/vendor/novnc/core/rfb.js?v=__REMOTELINK_VERSION__";
-      const token = sessionStorage.getItem("remote-gateway-access-token") || "";
+      const token = sessionStorage.getItem("remotelink-access-token") || "";
       const parameters = new URLSearchParams(location.search);
       const targetId = parameters.get("target") || "";
       let rfb = null,

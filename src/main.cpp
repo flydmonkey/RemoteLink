@@ -1,18 +1,18 @@
-#include "remote_gateway/frame_sink.hpp"
-#include "remote_gateway/security_policy.hpp"
-#include "remote_gateway/session.hpp"
-#include "remote_gateway/test_pattern_source.hpp"
-#ifdef REMOTE_GATEWAY_ENABLE_STREAMING
-#include "remote_gateway/http_server.hpp"
-#include "remote_gateway/webrtc_server.hpp"
-#include "remote_gateway/webrtc_video_sink.hpp"
-#include "remote_gateway/rdp_frame_source.hpp"
-#include "remote_gateway/session_manager.hpp"
-#include "remote_gateway/target_config.hpp"
-#include "remote_gateway/vnc_ticket_store.hpp"
-#include "remote_gateway/vnc_bridge.hpp"
-#include "remote_gateway/ssh_bridge.hpp"
-#include "remote_gateway/ssh_files.hpp"
+#include "remotelink/frame_sink.hpp"
+#include "remotelink/security_policy.hpp"
+#include "remotelink/session.hpp"
+#include "remotelink/test_pattern_source.hpp"
+#ifdef REMOTELINK_ENABLE_STREAMING
+#include "remotelink/http_server.hpp"
+#include "remotelink/webrtc_server.hpp"
+#include "remotelink/webrtc_video_sink.hpp"
+#include "remotelink/rdp_frame_source.hpp"
+#include "remotelink/session_manager.hpp"
+#include "remotelink/target_config.hpp"
+#include "remotelink/vnc_ticket_store.hpp"
+#include "remotelink/vnc_bridge.hpp"
+#include "remotelink/ssh_bridge.hpp"
+#include "remotelink/ssh_files.hpp"
 #endif
 
 #include <atomic>
@@ -91,11 +91,11 @@ struct VncActivity {
 };
 
 struct VncBridgeLease {
-    std::shared_ptr<remote_gateway::VncBridge> bridge;
+    std::shared_ptr<remotelink::VncBridge> bridge;
     std::chrono::steady_clock::time_point expires_at;
 };
 struct SshBridgeLease {
-    std::shared_ptr<remote_gateway::SshBridge> bridge;
+    std::shared_ptr<remotelink::SshBridge> bridge;
     std::chrono::steady_clock::time_point expires_at;
 };
 
@@ -160,7 +160,7 @@ bool password_matches(std::string_view password, std::string_view salt_hex,
     }
     if (PKCS5_PBKDF2_HMAC(password.data(), static_cast<int>(password.size()), salt.data(),
         static_cast<int>(salt.size()), 210000, EVP_sha256(), static_cast<int>(hash.size()), hash.data()) != 1) return false;
-    return remote_gateway::constant_time_equal(hex_encode(hash.data(), hash.size()), expected_hex);
+    return remotelink::constant_time_equal(hex_encode(hash.data(), hash.size()), expected_hex);
 }
 
 std::string generate_access_token() {
@@ -208,15 +208,15 @@ void save_users(const std::filesystem::path& path, const std::vector<GatewayUser
     std::filesystem::rename(temporary, path);
 }
 
-std::vector<remote_gateway::TargetConfig> load_managed_connections(
+std::vector<remotelink::TargetConfig> load_managed_connections(
     const std::filesystem::path& path, const std::string& allowed_hosts) {
-    std::vector<remote_gateway::TargetConfig> result;
+    std::vector<remotelink::TargetConfig> result;
     if (!std::filesystem::is_regular_file(path)) return result;
     std::ifstream input(path);
     const auto data = nlohmann::json::parse(input, nullptr, false);
     if (!data.is_array()) throw std::runtime_error("invalid managed connection registry");
     for (const auto& item : data) {
-        remote_gateway::TargetConfig target;
+        remotelink::TargetConfig target;
         target.id = item.value("id", ""); target.name = item.value("name", "");
         target.group = item.value("group", "默认分组");
         target.rdp.hostname = item.value("host", "");
@@ -232,7 +232,7 @@ std::vector<remote_gateway::TargetConfig> load_managed_connections(
         target.rdp.width = item.value("width", 1920U); target.rdp.height = item.value("height", 1080U);
         target.rdp.ignore_certificate = item.value("ignoreCertificate", true);
         if (target.id.empty() || target.name.empty() || target.rdp.hostname.empty() ||
-            !remote_gateway::host_is_allowed(target.rdp.hostname, allowed_hosts))
+            !remotelink::host_is_allowed(target.rdp.hostname, allowed_hosts))
             throw std::runtime_error("invalid managed connection: " + target.id);
         result.push_back(std::move(target));
     }
@@ -241,7 +241,7 @@ std::vector<remote_gateway::TargetConfig> load_managed_connections(
 
 void save_managed_connections(const std::filesystem::path& path,
                               const std::filesystem::path& secret_directory,
-                              const std::vector<remote_gateway::TargetConfig>& targets) {
+                              const std::vector<remotelink::TargetConfig>& targets) {
     std::filesystem::create_directories(secret_directory);
     std::filesystem::permissions(secret_directory, std::filesystem::perms::owner_all,
                                  std::filesystem::perm_options::replace);
@@ -429,9 +429,9 @@ std::string required_secret(const char* environment_name, const char* file_envir
     return value;
 }
 
-class MetricsSink final : public remote_gateway::FrameSink {
+class MetricsSink final : public remotelink::FrameSink {
 public:
-    void consume(const remote_gateway::Frame& frame) override {
+    void consume(const remotelink::Frame& frame) override {
         ++frames_;
         const auto now = std::chrono::steady_clock::now();
         if (now - last_report_ >= std::chrono::seconds(1)) {
@@ -455,33 +455,33 @@ int main() {
 
     std::cout << "RemoteLink 0.1.0\n";
 
-#ifdef REMOTE_GATEWAY_ENABLE_STREAMING
-    const std::string access_token = required_secret("RG_ACCESS_TOKEN", "RG_ACCESS_TOKEN_FILE");
+#ifdef REMOTELINK_ENABLE_STREAMING
+    const std::string access_token = required_secret("REMOTELINK_ACCESS_TOKEN", "REMOTELINK_ACCESS_TOKEN_FILE");
     std::vector<std::string> access_tokens {access_token};
-    if (const char* additional = std::getenv("RG_ACCESS_TOKENS"); additional && *additional) {
-        auto parsed = remote_gateway::parse_access_tokens(additional);
+    if (const char* additional = std::getenv("REMOTELINK_ACCESS_TOKENS"); additional && *additional) {
+        auto parsed = remotelink::parse_access_tokens(additional);
         access_tokens.insert(access_tokens.end(), parsed.begin(), parsed.end());
     }
-    const char* certificate = std::getenv("RG_TLS_CERTIFICATE");
-    const char* private_key = std::getenv("RG_TLS_PRIVATE_KEY");
+    const char* certificate = std::getenv("REMOTELINK_TLS_CERTIFICATE");
+    const char* private_key = std::getenv("REMOTELINK_TLS_PRIVATE_KEY");
     const bool tls_enabled = certificate != nullptr && *certificate != '\0' &&
                              private_key != nullptr && *private_key != '\0';
-    const char* tls_proxy_environment = std::getenv("RG_BEHIND_TLS_PROXY");
+    const char* tls_proxy_environment = std::getenv("REMOTELINK_BEHIND_TLS_PROXY");
     const bool tls_proxy = tls_proxy_environment != nullptr && *tls_proxy_environment != '\0';
-    if (!tls_enabled && !tls_proxy && std::getenv("RG_ALLOW_INSECURE_HTTP") == nullptr) {
+    if (!tls_enabled && !tls_proxy && std::getenv("REMOTELINK_ALLOW_INSECURE_HTTP") == nullptr) {
         throw std::runtime_error(
-            "RG_TLS_CERTIFICATE and RG_TLS_PRIVATE_KEY are required "
-            "(set RG_BEHIND_TLS_PROXY=1 behind a TLS reverse proxy, or "
-            "RG_ALLOW_INSECURE_HTTP=1 only for localhost development)");
+            "REMOTELINK_TLS_CERTIFICATE and REMOTELINK_TLS_PRIVATE_KEY are required "
+            "(set REMOTELINK_BEHIND_TLS_PROXY=1 behind a TLS reverse proxy, or "
+            "REMOTELINK_ALLOW_INSECURE_HTTP=1 only for localhost development)");
     }
-    const char* targets_file = std::getenv("RG_TARGETS_FILE");
-    const char* allowed_hosts_environment = std::getenv("RG_ALLOWED_HOSTS");
+    const char* targets_file = std::getenv("REMOTELINK_TARGETS_FILE");
+    const char* allowed_hosts_environment = std::getenv("REMOTELINK_ALLOWED_HOSTS");
     const std::string allowed_hosts = allowed_hosts_environment && *allowed_hosts_environment
         ? allowed_hosts_environment : "*";
-    if (targets_file == nullptr || *targets_file == '\0') throw std::runtime_error("RG_TARGETS_FILE is required");
-    const char* state_directory = std::getenv("RG_STATE_DIR");
+    if (targets_file == nullptr || *targets_file == '\0') throw std::runtime_error("REMOTELINK_TARGETS_FILE is required");
+    const char* state_directory = std::getenv("REMOTELINK_STATE_DIR");
     const std::filesystem::path state_root = state_directory && *state_directory
-        ? state_directory : "/var/lib/remote-gateway";
+        ? state_directory : "/var/lib/remotelink";
     std::filesystem::create_directories(state_root / "files");
     std::filesystem::create_directories(state_root / "print-jobs");
     const auto users_path = state_root / "users.json";
@@ -508,7 +508,7 @@ int main() {
     users[0].username = "admin";
     if (users[0].password_hash.empty()) {
         std::string initial_admin_password = "admin";
-        if (const char* password_file = std::getenv("RG_INITIAL_ADMIN_PASSWORD_FILE");
+        if (const char* password_file = std::getenv("REMOTELINK_INITIAL_ADMIN_PASSWORD_FILE");
             password_file && *password_file) {
             std::ifstream input(password_file, std::ios::binary);
             if (!input) throw std::runtime_error("cannot read initial administrator password");
@@ -539,7 +539,7 @@ int main() {
     auto ssh_connections = load_ssh_connections(ssh_connections_path);
     save_ssh_connections(ssh_connections_path, ssh_connection_secrets_path, ssh_connections);
     std::mutex ssh_connections_mutex;
-    remote_gateway::VncTicketStore ssh_tickets;
+    remotelink::VncTicketStore ssh_tickets;
     std::mutex ssh_bridges_mutex;
     std::unordered_map<std::string, SshBridgeLease> ssh_bridges;
     const auto ssh_activity_path=state_root/"ssh-activity.json";
@@ -549,7 +549,7 @@ int main() {
         std::chrono::system_clock::now().time_since_epoch()).count();
     for(auto& item:ssh_activity)if(item.active){item.active=false;item.ended_at=ssh_startup_time;item.reason="服务重启";}
     if(!ssh_activity.empty())save_vnc_activity(ssh_activity_path,ssh_activity);
-    remote_gateway::VncTicketStore vnc_tickets;
+    remotelink::VncTicketStore vnc_tickets;
     std::mutex vnc_bridges_mutex;
     std::unordered_map<std::string, VncBridgeLease> vnc_bridges;
     std::jthread vnc_bridge_reaper([&vnc_bridges, &vnc_bridges_mutex](std::stop_token stop) {
@@ -580,7 +580,7 @@ int main() {
     }
     if (!vnc_activity.empty()) save_vnc_activity(vnc_activity_path, vnc_activity);
     const auto connections_migration_marker = state_root / "connections.migrated";
-    const auto configured_targets = remote_gateway::load_targets(targets_file, allowed_hosts);
+    const auto configured_targets = remotelink::load_targets(targets_file, allowed_hosts);
     auto managed_targets = load_managed_connections(connections_path, allowed_hosts);
     if (!std::filesystem::exists(connections_migration_marker)) {
         for (const auto& target : configured_targets) {
@@ -599,12 +599,12 @@ int main() {
     // Rewrite legacy inline passwords into owner-only credential files.
     save_managed_connections(connections_path, connection_secrets_path, managed_targets);
     auto target_catalog = managed_targets;
-    remote_gateway::HttpServer http(
+    remotelink::HttpServer http(
         "0.0.0.0", 18080, certificate ? certificate : "", private_key ? private_key : "");
     // Signaling remains an in-process backend on loopback. HttpServer exposes
     // it publicly as /ws on the same HTTPS port as the UI and REST API.
-    remote_gateway::WebRtcServer webrtc(18081, access_tokens);
-    std::vector<remote_gateway::WebRtcServer::PublicTarget> public_targets;
+    remotelink::WebRtcServer webrtc(18081, access_tokens);
+    std::vector<remotelink::WebRtcServer::PublicTarget> public_targets;
     for (const auto& target : target_catalog) public_targets.push_back({
         target.id, target.name, target.rdp.hostname, target.rdp.username,
         target.rdp.width, target.rdp.height});
@@ -614,7 +614,7 @@ int main() {
         for (const auto& user : users) permissions.push_back(user.allowed_targets);
         webrtc.set_user_target_permissions(std::move(permissions));
     }
-    remote_gateway::SessionManager sessions(webrtc, target_catalog, allowed_hosts,
+    remotelink::SessionManager sessions(webrtc, target_catalog, allowed_hosts,
                                              state_root / "rdp-activity.json");
     webrtc.set_start_handler([&sessions, &users, &users_mutex](const std::string& peer, const std::string& target,
                                          const std::string& host, const std::string& username,
@@ -647,7 +647,7 @@ int main() {
     });
     http.set_ssh_session_observer([&ssh_bridges, &ssh_bridges_mutex,
                                    &ssh_activity,&ssh_activity_mutex,&ssh_activity_path](
-        const remote_gateway::VncDestination& destination, bool connected) {
+        const remotelink::VncDestination& destination, bool connected) {
         const auto now=std::chrono::duration_cast<std::chrono::seconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
         {std::lock_guard activity_lock(ssh_activity_mutex);
@@ -660,7 +660,7 @@ int main() {
          if(!connected)ssh_bridges.erase(destination.session_id);}
     });
     http.set_ssh_control_handler([&ssh_bridges, &ssh_bridges_mutex](
-        const remote_gateway::VncDestination& destination, const std::string& message) {
+        const remotelink::VncDestination& destination, const std::string& message) {
         const auto payload=nlohmann::json::parse(message,nullptr,false);
         if(!payload.is_object()||payload.value("type","")!="resize") return;
         std::lock_guard lock(ssh_bridges_mutex);
@@ -670,7 +670,7 @@ int main() {
     });
     http.set_vnc_session_observer([&vnc_activity, &vnc_activity_mutex, &vnc_activity_path,
                                    &vnc_bridges, &vnc_bridges_mutex](
-                                      const remote_gateway::VncDestination& destination,
+                                      const remotelink::VncDestination& destination,
                                       bool connected) {
         const auto now = std::chrono::duration_cast<std::chrono::seconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
@@ -713,9 +713,9 @@ int main() {
                           &ssh_connection_secrets_path, &ssh_tickets, &ssh_bridges,
                           &ssh_bridges_mutex, &ssh_activity, &ssh_activity_mutex,
                           &allowed_hosts, tls_enabled](
-                             const remote_gateway::HttpRequest& request) {
+                             const remotelink::HttpRequest& request) {
         using json = nlohmann::json;
-        remote_gateway::HttpResponse response;
+        remotelink::HttpResponse response;
         if (request.method == "POST" && request.path == "/api/auth/login") {
             const auto payload = json::parse(request.body, nullptr, false);
             const std::string username = payload.is_object() ? payload.value("username", "") : "";
@@ -723,7 +723,7 @@ int main() {
             std::lock_guard lock(users_mutex);
             for (std::size_t id = 0; id < users.size(); ++id) {
                 const auto& user = users[id];
-                if (user.enabled && remote_gateway::constant_time_equal(username, user.username) &&
+                if (user.enabled && remotelink::constant_time_equal(username, user.username) &&
                     password_matches(password, user.password_salt, user.password_hash)) {
                     response.body = json{{"token", user.token}, {"name", user.name},
                         {"admin", id == 0}}.dump(); return response;
@@ -737,7 +737,7 @@ int main() {
             ? request.authorization.substr(prefix.size()) : std::string();
         std::optional<std::size_t> user_identity;
         { std::lock_guard lock(users_mutex);
-          user_identity = remote_gateway::access_token_identity(supplied, access_tokens); }
+          user_identity = remotelink::access_token_identity(supplied, access_tokens); }
         if (!user_identity) {
             response.status = 401;
             response.body = json{{"error", "invalid access token"}}.dump();
@@ -796,15 +796,15 @@ int main() {
             if (selected.host_key_sha256.empty()) {
                 response.status = 409; response.body = json{{"error", "SSH 主机指纹尚未由管理员确认"}}.dump(); return response;
             }
-            const remote_gateway::SshBridgeOptions options{.hostname=selected.hostname,
+            const remotelink::SshBridgeOptions options{.hostname=selected.hostname,
                 .port=selected.port,.username=selected.username,.password=selected.password,
                 .private_key=selected.private_key,.passphrase=selected.passphrase,
                 .host_key_sha256=selected.host_key_sha256};
             const auto remote_path = percent_decode(request.file_name);
             std::string error;
             if (request.method == "GET" && request.path == "/api/ssh/files") {
-                remote_gateway::SshDirectoryListing listing;
-                if (!remote_gateway::SshFiles::list(options, remote_path, listing, error)) {
+                remotelink::SshDirectoryListing listing;
+                if (!remotelink::SshFiles::list(options, remote_path, listing, error)) {
                     response.status = 502; response.body = json{{"error", error}}.dump(); return response;
                 }
                 json items = json::array();
@@ -816,20 +816,20 @@ int main() {
                 if (request.body.size() > 64ULL * 1024 * 1024) {
                     response.status = 413; response.body = json{{"error", "上传文件不能超过 64 MB"}}.dump(); return response;
                 }
-                if (!remote_gateway::SshFiles::upload(options, remote_path, request.body, error)) {
+                if (!remotelink::SshFiles::upload(options, remote_path, request.body, error)) {
                     response.status = 502; response.body = json{{"error",error}}.dump(); return response;
                 }
                 response.body = json{{"status","uploaded"}}.dump(); return response;
             }
             if (request.method == "POST" && request.path == "/api/ssh/files/download") {
                 std::string data;
-                if (!remote_gateway::SshFiles::download(options, remote_path, data, error)) {
+                if (!remotelink::SshFiles::download(options, remote_path, data, error)) {
                     response.status = 502; response.body = json{{"error",error}}.dump(); return response;
                 }
                 response.content_type = "application/octet-stream"; response.body = std::move(data); return response;
             }
             if (request.method == "POST" && request.path == "/api/ssh/files/delete") {
-                if (!remote_gateway::SshFiles::remove(options, remote_path, error)) {
+                if (!remotelink::SshFiles::remove(options, remote_path, error)) {
                     response.status = 502; response.body = json{{"error",error}}.dump(); return response;
                 }
                 response.body = json{{"status","deleted"}}.dump(); return response;
@@ -853,7 +853,7 @@ int main() {
                 response.status=409;response.body=json{{"error","SSH 主机指纹尚未由管理员确认"}}.dump();return response;
             }
             std::string error;
-            auto bridge=remote_gateway::SshBridge::create({.hostname=connection->hostname,
+            auto bridge=remotelink::SshBridge::create({.hostname=connection->hostname,
                 .port=connection->port,.username=connection->username,.password=connection->password,
                 .private_key=connection->private_key,.passphrase=connection->passphrase,
                 .host_key_sha256=connection->host_key_sha256},error);
@@ -902,7 +902,7 @@ int main() {
                 response.status = 404; response.body = json{{"error", "VNC target not found"}}.dump(); return response;
             }
             std::string bridge_error;
-            auto bridge = remote_gateway::VncBridge::create({.hostname=connection->hostname,
+            auto bridge = remotelink::VncBridge::create({.hostname=connection->hostname,
                 .port=connection->port, .username=connection->username,
                 .password=connection->password, .ca_file=connection->ca_file}, bridge_error);
             if (!bridge) {
@@ -952,7 +952,7 @@ int main() {
                     candidate.host_key_sha256=found->host_key_sha256;
                  }}
                 if(candidate.hostname.empty()||candidate.username.empty()||candidate.port==0){response.status=400;response.body=json{{"error","SSH 连接配置无效"}}.dump();return response;}
-                std::string error;auto bridge=remote_gateway::SshBridge::create({.hostname=candidate.hostname,
+                std::string error;auto bridge=remotelink::SshBridge::create({.hostname=candidate.hostname,
                     .port=candidate.port,.username=candidate.username,.password=candidate.password,
                     .private_key=candidate.private_key,.passphrase=candidate.passphrase,
                     .host_key_sha256=candidate.host_key_sha256},error);
@@ -1022,7 +1022,7 @@ int main() {
                 const auto found=std::find_if(ssh_connections.begin(),ssh_connections.end(),[&](const auto& item){return item.id==id;});
                 if(found==ssh_connections.end()){response.status=404;response.body=json{{"error","SSH connection not found"}}.dump();return response;}
                 if(fingerprint.empty()||fingerprint!=found->pending_host_key_sha256){response.status=409;response.body=json{{"error","请先重新测试并核对主机指纹"}}.dump();return response;}
-                std::string error;auto bridge=remote_gateway::SshBridge::create({.hostname=found->hostname,.port=found->port,.username=found->username,.password=found->password,.private_key=found->private_key,.passphrase=found->passphrase,.host_key_sha256=fingerprint},error);
+                std::string error;auto bridge=remotelink::SshBridge::create({.hostname=found->hostname,.port=found->port,.username=found->username,.password=found->password,.private_key=found->private_key,.passphrase=found->passphrase,.host_key_sha256=fingerprint},error);
                 if(!bridge){response.status=409;response.body=json{{"error",error}}.dump();return response;}
                 found->host_key_sha256=fingerprint;found->pending_host_key_sha256.clear();save_ssh_connections(ssh_connections_path,ssh_connection_secrets_path,ssh_connections);
                 response.body=json{{"trusted",true},{"hostKeySha256",fingerprint}}.dump();return response;
@@ -1118,7 +1118,7 @@ int main() {
                     ca_file = temporary_ca.string();
                 }
                 std::string test_error;
-                auto test_bridge = remote_gateway::VncBridge::create({.hostname=host,
+                auto test_bridge = remotelink::VncBridge::create({.hostname=host,
                     .port=static_cast<std::uint16_t>(port), .username=username,
                     .password=password, .ca_file=ca_file}, test_error);
                 if (!temporary_ca.empty()) std::filesystem::remove(temporary_ca);
@@ -1262,10 +1262,10 @@ int main() {
                 const int port = payload.is_object() ? payload.value("port", 3389) : 0;
                 if (name.empty() || name.size() > 128 || group.empty() || group.size() > 64 || host.empty() || host.size() > 255 ||
                     port < 1 || port > 65535 || username.size() > 256 || password.size() > 4096 ||
-                    !remote_gateway::host_is_allowed(host, allowed_hosts)) {
+                    !remotelink::host_is_allowed(host, allowed_hosts)) {
                     response.status = 400; response.body = json{{"error", "invalid connection"}}.dump(); return response;
                 }
-                remote_gateway::TargetConfig target;
+                remotelink::TargetConfig target;
                 target.id = id; target.name = name; target.group = group; target.rdp.hostname = host;
                 target.rdp.port = static_cast<std::uint16_t>(port);
                 target.rdp.username = username; target.rdp.password = password;
@@ -1279,7 +1279,7 @@ int main() {
                 managed_targets.push_back(target); target_catalog.push_back(target);
                 save_managed_connections(connections_path, connection_secrets_path, managed_targets);
                 sessions.set_targets(target_catalog);
-                std::vector<remote_gateway::WebRtcServer::PublicTarget> published;
+                std::vector<remotelink::WebRtcServer::PublicTarget> published;
                 for (const auto& item : target_catalog) published.push_back({item.id, item.name,
                     item.rdp.hostname, item.rdp.username, item.rdp.width, item.rdp.height});
                 webrtc.set_targets(std::move(published));
@@ -1303,7 +1303,7 @@ int main() {
                 const int port = payload.value("port", 3389);
                 if (name.empty() || name.size() > 128 || group.empty() || group.size() > 64 || host.empty() || host.size() > 255 ||
                     port < 1 || port > 65535 || username.size() > 256 || password.size() > 4096 ||
-                    !remote_gateway::host_is_allowed(host, allowed_hosts)) {
+                    !remotelink::host_is_allowed(host, allowed_hosts)) {
                     response.status = 400; response.body = json{{"error", "invalid connection"}}.dump(); return response;
                 }
                 auto updated = *managed;
@@ -1314,7 +1314,7 @@ int main() {
                 *managed = updated; *catalog = updated;
                 save_managed_connections(connections_path, connection_secrets_path, managed_targets);
                 sessions.set_targets(target_catalog);
-                std::vector<remote_gateway::WebRtcServer::PublicTarget> published;
+                std::vector<remotelink::WebRtcServer::PublicTarget> published;
                 for (const auto& item : target_catalog) published.push_back({item.id, item.name,
                     item.rdp.hostname, item.rdp.username, item.rdp.width, item.rdp.height});
                 webrtc.set_targets(std::move(published));
@@ -1338,7 +1338,7 @@ int main() {
                 std::erase_if(target_catalog, [&](const auto& target) { return target.id == id; });
                 save_managed_connections(connections_path, connection_secrets_path, managed_targets);
                 sessions.set_targets(target_catalog);
-                std::vector<remote_gateway::WebRtcServer::PublicTarget> published;
+                std::vector<remotelink::WebRtcServer::PublicTarget> published;
                 for (const auto& item : target_catalog) published.push_back({item.id, item.name,
                     item.rdp.hostname, item.rdp.username, item.rdp.width, item.rdp.height});
                 webrtc.set_targets(std::move(published));
@@ -1492,17 +1492,17 @@ int main() {
             }
             response.status = 404; response.body = json{{"error", "not found"}}.dump(); return response;
         }
-        const char* configured_state = std::getenv("RG_STATE_DIR");
+        const char* configured_state = std::getenv("REMOTELINK_STATE_DIR");
         const std::filesystem::path file_directory =
             std::filesystem::path(configured_state && *configured_state
-                ? configured_state : "/var/lib/remote-gateway") / "users" /
+                ? configured_state : "/var/lib/remotelink") / "users" /
                 std::to_string(*user_identity) / "files";
         const std::filesystem::path print_directory =
             std::filesystem::path(configured_state && *configured_state
-                ? configured_state : "/var/lib/remote-gateway") / "print-jobs";
+                ? configured_state : "/var/lib/remotelink") / "print-jobs";
         const std::filesystem::path audit_path =
             std::filesystem::path(configured_state && *configured_state
-                ? configured_state : "/var/lib/remote-gateway") / "file-audit.jsonl";
+                ? configured_state : "/var/lib/remotelink") / "file-audit.jsonl";
         auto audit_file_action = [&audit_path, user_identity](std::string_view action,
                                                                const std::filesystem::path& path,
                                                                std::uint64_t size = 0) {
@@ -1523,7 +1523,7 @@ int main() {
             return normalized.empty() || normalized == "." ? file_directory : file_directory / normalized;
         };
         const std::uint64_t file_quota = [] {
-            const char* value = std::getenv("RG_USER_FILE_QUOTA_BYTES");
+            const char* value = std::getenv("REMOTELINK_USER_FILE_QUOTA_BYTES");
             if (!value || !*value) return 5ULL * 1024 * 1024 * 1024;
             try { return std::stoull(value); } catch (...) { return 5ULL * 1024 * 1024 * 1024; }
         }();
@@ -1558,11 +1558,11 @@ int main() {
             if (path.empty() || request.body.size() > 64 * 1024 * 1024) {
                 response.status = 400; response.body = json{{"error", "invalid file"}}.dump(); return response;
             }
-            if (const char* blocked = std::getenv("RG_BLOCKED_FILE_EXTENSIONS"); blocked && *blocked) {
+            if (const char* blocked = std::getenv("REMOTELINK_BLOCKED_FILE_EXTENSIONS"); blocked && *blocked) {
                 std::string extension = path.extension().string();
                 std::transform(extension.begin(), extension.end(), extension.begin(),
                     [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-                const auto blocked_extensions = remote_gateway::parse_access_tokens(blocked);
+                const auto blocked_extensions = remotelink::parse_access_tokens(blocked);
                 if (std::find(blocked_extensions.begin(), blocked_extensions.end(), extension) != blocked_extensions.end()) {
                     response.status = 415; response.body = json{{"error", "file type blocked"}}.dump(); return response;
                 }
@@ -1808,11 +1808,11 @@ int main() {
               << "streaming 1280x720 H.264 at 30 FPS; press Ctrl+C to stop\n";
 #else
     std::cout << "streaming disabled; running frame-pipeline metrics\n";
-    remote_gateway::Session session(
-        std::make_unique<remote_gateway::TestPatternSource>(1280, 720, 30),
+    remotelink::Session session(
+        std::make_unique<remotelink::TestPatternSource>(1280, 720, 30),
         std::make_unique<MetricsSink>());
 #endif
-#ifndef REMOTE_GATEWAY_ENABLE_STREAMING
+#ifndef REMOTELINK_ENABLE_STREAMING
     session.start();
 #endif
 
@@ -1820,7 +1820,7 @@ int main() {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
-#ifdef REMOTE_GATEWAY_ENABLE_STREAMING
+#ifdef REMOTELINK_ENABLE_STREAMING
     sessions.stop_all();
     http.stop();
 #else

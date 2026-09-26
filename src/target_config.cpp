@@ -1,6 +1,6 @@
-#include "remote_gateway/target_config.hpp"
+#include "remotelink/target_config.hpp"
 
-#include "remote_gateway/security_policy.hpp"
+#include "remotelink/security_policy.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -11,7 +11,7 @@
 #include <set>
 #include <stdexcept>
 
-namespace remote_gateway {
+namespace remotelink {
 using json = nlohmann::json;
 
 std::vector<TargetConfig> load_targets(const std::string& path,
@@ -55,7 +55,7 @@ std::vector<TargetConfig> load_targets(const std::string& path,
             throw std::runtime_error("duplicate target id: " + target.id);
         }
         if (!host_is_allowed(target.rdp.hostname, allowed_hosts)) {
-            throw std::runtime_error("target host is not present in RG_ALLOWED_HOSTS: " +
+            throw std::runtime_error("target host is not present in REMOTELINK_ALLOWED_HOSTS: " +
                                      target.rdp.hostname);
         }
         if (!password_env.empty()) {
@@ -82,4 +82,4 @@ std::vector<TargetConfig> load_targets(const std::string& path,
     return result;
 }
 
-}  // namespace remote_gateway
+}  // namespace remotelink

@@ -9,7 +9,7 @@ Browser
   `-- WebRTC data channel (keyboard, pointer, clipboard)
                          |
                          v
-                 remote-gateway
+                 remotelink
   HTTP + /ws proxy -> loopback signaling -> peer/session manager
                          |
                          +-> peer A: FreeRDP -> frame queue -> H.264 -> WebRTC A

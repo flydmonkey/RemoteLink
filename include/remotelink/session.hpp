@@ -1,15 +1,15 @@
 #pragma once
 
-#include "remote_gateway/frame_sink.hpp"
-#include "remote_gateway/frame_source.hpp"
-#include "remote_gateway/latest_frame_queue.hpp"
+#include "remotelink/frame_sink.hpp"
+#include "remotelink/frame_source.hpp"
+#include "remotelink/latest_frame_queue.hpp"
 
 #include <atomic>
 #include <cstdint>
 #include <memory>
 #include <thread>
 
-namespace remote_gateway {
+namespace remotelink {
 
 enum class SessionState {
     idle,
@@ -43,5 +43,5 @@ private:
     std::jthread sink_thread_;
 };
 
-}  // namespace remote_gateway
+}  // namespace remotelink
 

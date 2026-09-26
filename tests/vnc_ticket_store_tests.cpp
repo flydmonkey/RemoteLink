@@ -1,4 +1,4 @@
-#include "remote_gateway/vnc_ticket_store.hpp"
+#include "remotelink/vnc_ticket_store.hpp"
 
 #include <cassert>
 #include <chrono>
@@ -6,7 +6,7 @@
 
 int main() {
     using namespace std::chrono_literals;
-    remote_gateway::VncTicketStore tickets(50ms);
+    remotelink::VncTicketStore tickets(50ms);
     const auto ticket = tickets.issue({.target_id="desktop-1", .hostname="127.0.0.1", .port=5901});
     assert(ticket.size() == 64);
     assert(tickets.size() == 1);

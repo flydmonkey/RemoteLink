@@ -1,6 +1,6 @@
-#include "remote_gateway/input_text.hpp"
+#include "remotelink/input_text.hpp"
 
-namespace remote_gateway {
+namespace remotelink {
 
 std::vector<std::uint16_t> utf8_to_utf16(const std::string& text,
                                          std::size_t maximum_units) {
@@ -34,4 +34,4 @@ std::vector<std::uint16_t> utf8_to_utf16(const std::string& text,
     return result;
 }
 
-}  // namespace remote_gateway
+}  // namespace remotelink

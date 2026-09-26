@@ -1,6 +1,6 @@
 #pragma once
 
-#include "remote_gateway/frame.hpp"
+#include "remotelink/frame.hpp"
 
 #include <condition_variable>
 #include <cstddef>
@@ -9,7 +9,7 @@
 #include <optional>
 #include <stop_token>
 
-namespace remote_gateway {
+namespace remotelink {
 
 /**
  * A bounded frame queue optimized for interactive streaming. When the queue
@@ -66,5 +66,5 @@ private:
     std::uint64_t dropped_frames_ = 0;
 };
 
-}  // namespace remote_gateway
+}  // namespace remotelink
 

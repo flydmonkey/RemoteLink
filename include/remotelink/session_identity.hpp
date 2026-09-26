@@ -5,7 +5,7 @@
 #include <string>
 #include <string_view>
 
-namespace remote_gateway {
+namespace remotelink {
 
 inline std::string session_identity(std::string_view hostname,
                                     std::string_view username) {
@@ -23,4 +23,4 @@ inline std::string session_identity(std::string_view hostname,
     return identity;
 }
 
-}  // namespace remote_gateway
+}  // namespace remotelink

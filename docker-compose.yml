@@ -10,10 +10,10 @@ services:
       - "18080:18080"
     environment:
       REMOTELINK_ADMIN_PASSWORD: ${REMOTELINK_ADMIN_PASSWORD:?set REMOTELINK_ADMIN_PASSWORD}
-      RG_BEHIND_TLS_PROXY: "1"
-      RG_ALLOWED_HOSTS: ${RG_ALLOWED_HOSTS:-*}
+      REMOTELINK_BEHIND_TLS_PROXY: "1"
+      REMOTELINK_ALLOWED_HOSTS: ${REMOTELINK_ALLOWED_HOSTS:-*}
     volumes:
-      - remotelink-state:/var/lib/remote-gateway
+      - remotelink-state:/var/lib/remotelink
 
 volumes:
   remotelink-state:

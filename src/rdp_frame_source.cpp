@@ -1,6 +1,6 @@
-#include "remote_gateway/rdp_frame_source.hpp"
-#include "remote_gateway/input_text.hpp"
-#include "remote_gateway/reconnect_policy.hpp"
+#include "remotelink/rdp_frame_source.hpp"
+#include "remotelink/input_text.hpp"
+#include "remotelink/reconnect_policy.hpp"
 
 #include <freerdp/freerdp.h>
 #include <freerdp/addin.h>
@@ -29,7 +29,7 @@
 #include <unordered_map>
 #include <utility>
 
-namespace remote_gateway {
+namespace remotelink {
 
 namespace {
 std::string encode_base64(const std::vector<std::uint8_t>& bytes);
@@ -549,9 +549,9 @@ void RdpFrameSource::run(std::stop_token stop_token, FrameHandler on_frame) {
     rdpSettings* settings = instance->context->settings;
     // The service has no home directory. FreeRDP's printer channel needs a
     // writable ConfigPath for its cached driver metadata.
-    const char* state_root = std::getenv("RG_STATE_DIR");
+    const char* state_root = std::getenv("REMOTELINK_STATE_DIR");
     const std::string freerdp_state = std::string(
-        state_root && *state_root ? state_root : "/var/lib/remote-gateway") + "/freerdp";
+        state_root && *state_root ? state_root : "/var/lib/remotelink") + "/freerdp";
     freerdp_settings_set_string(settings, FreeRDP_ConfigPath, freerdp_state.c_str());
     freerdp_settings_set_string(settings, FreeRDP_ServerHostname, options_.hostname.c_str());
     freerdp_settings_set_uint32(settings, FreeRDP_ServerPort, options_.port);
@@ -649,4 +649,4 @@ void RdpFrameSource::run(std::stop_token stop_token, FrameHandler on_frame) {
     on_frame_ = {};
 }
 
-}  // namespace remote_gateway
+}  // namespace remotelink

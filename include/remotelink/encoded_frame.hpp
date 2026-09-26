@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace remote_gateway {
+namespace remotelink {
 
 struct EncodedFrame {
     std::uint64_t sequence = 0;
@@ -12,5 +12,5 @@ struct EncodedFrame {
     std::vector<std::byte> annex_b;
 };
 
-}  // namespace remote_gateway
+}  // namespace remotelink
 

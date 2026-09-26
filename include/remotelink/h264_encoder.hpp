@@ -1,7 +1,7 @@
 #pragma once
 
-#include "remote_gateway/encoded_frame.hpp"
-#include "remote_gateway/frame.hpp"
+#include "remotelink/encoded_frame.hpp"
+#include "remotelink/frame.hpp"
 
 #include <cstdint>
 #include <atomic>
@@ -11,7 +11,7 @@
 
 struct ISVCEncoder;
 
-namespace remote_gateway {
+namespace remotelink {
 
 class H264Encoder {
 public:
@@ -38,4 +38,4 @@ private:
     std::mutex mutex_;
 };
 
-}  // namespace remote_gateway
+}  // namespace remotelink

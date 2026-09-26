@@ -1,6 +1,6 @@
 #pragma once
 
-#include "remote_gateway/encoded_frame.hpp"
+#include "remotelink/encoded_frame.hpp"
 
 #include <cstdint>
 #include <functional>
@@ -17,7 +17,7 @@ class WebSocket;
 class WebSocketServer;
 }
 
-namespace remote_gateway {
+namespace remotelink {
 
 class WebRtcServer {
 public:
@@ -80,4 +80,4 @@ private:
     std::uint64_t next_peer_id_ = 1;
 };
 
-}  // namespace remote_gateway
+}  // namespace remotelink

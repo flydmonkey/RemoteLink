@@ -1,11 +1,11 @@
 #pragma once
 
-#include "remote_gateway/frame.hpp"
+#include "remotelink/frame.hpp"
 
 #include <functional>
 #include <stop_token>
 
-namespace remote_gateway {
+namespace remotelink {
 
 class FrameSource {
 public:
@@ -15,5 +15,5 @@ public:
     virtual void run(std::stop_token stop_token, FrameHandler on_frame) = 0;
 };
 
-}  // namespace remote_gateway
+}  // namespace remotelink
 

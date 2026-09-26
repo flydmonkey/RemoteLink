@@ -1,4 +1,4 @@
-#include "remote_gateway/ssh_bridge.hpp"
+#include "remotelink/ssh_bridge.hpp"
 
 #include <libssh2.h>
 #include <arpa/inet.h>
@@ -16,7 +16,7 @@
 #include <sstream>
 #include <thread>
 
-namespace remote_gateway {
+namespace remotelink {
 namespace {
 int connect_tcp(const std::string& hostname, std::uint16_t port) {
     addrinfo hints{}; hints.ai_family = AF_UNSPEC; hints.ai_socktype = SOCK_STREAM;
@@ -171,4 +171,4 @@ bool SshBridge::resize(std::uint32_t columns, std::uint32_t rows) {
 }
 void SshBridge::stop() { if (impl_) impl_->shutdown(); }
 
-}  // namespace remote_gateway
+}  // namespace remotelink

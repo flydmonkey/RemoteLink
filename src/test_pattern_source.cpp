@@ -1,9 +1,9 @@
-#include "remote_gateway/test_pattern_source.hpp"
+#include "remotelink/test_pattern_source.hpp"
 
 #include <stdexcept>
 #include <thread>
 
-namespace remote_gateway {
+namespace remotelink {
 
 TestPatternSource::TestPatternSource(std::uint32_t width,
                                      std::uint32_t height,
@@ -53,4 +53,4 @@ void TestPatternSource::run(std::stop_token stop_token, FrameHandler on_frame) {
     }
 }
 
-}  // namespace remote_gateway
+}  // namespace remotelink

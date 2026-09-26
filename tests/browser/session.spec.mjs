@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test('session starts with a black localized loading screen', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('remotelink-language', 'en');
-    sessionStorage.setItem('remote-gateway-session', JSON.stringify({target:'test',accessToken:'test'}));
+    sessionStorage.setItem('remotelink-session', JSON.stringify({target:'test',accessToken:'test'}));
   });
   await page.goto('/index.html');
   await expect(page.locator('#session-loading')).toBeVisible();

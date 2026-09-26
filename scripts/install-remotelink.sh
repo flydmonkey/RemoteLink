@@ -17,10 +17,10 @@ cleanup() {
   esac
 }
 trap cleanup EXIT
-service_name="remote-gateway"
-install_root="/opt/remote-gateway"
-config_root="/etc/remote-gateway"
-state_root="/var/lib/remote-gateway"
+service_name="remotelink"
+install_root="/opt/remotelink"
+config_root="/etc/remotelink"
+state_root="/var/lib/remotelink"
 credential_root="/etc/credstore.encrypted"
 
 if [[ ! -f /etc/os-release ]]; then echo "Unsupported Linux distribution" >&2; exit 1; fi
@@ -102,20 +102,20 @@ pkg-config --exists freerdp3 freerdp-client3 winpr3 || {
 }
 
 cmake -S "${project_root}" -B "${project_root}/build" -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release -DREMOTE_GATEWAY_ENABLE_STREAMING=ON
+  -DCMAKE_BUILD_TYPE=Release -DREMOTELINK_ENABLE_STREAMING=ON
 cmake --build "${project_root}/build" --parallel "$(nproc)"
 ctest --test-dir "${project_root}/build" --output-on-failure
 
-getent passwd remote-gateway >/dev/null || \
-  useradd --system --user-group --home-dir /nonexistent --shell /usr/sbin/nologin remote-gateway
+getent passwd remotelink >/dev/null || \
+  useradd --system --user-group --home-dir /nonexistent --shell /usr/sbin/nologin remotelink
 install -d -o root -g root -m 0755 "${install_root}/bin" "${install_root}/lib" "${install_root}/web"
-install -d -o root -g remote-gateway -m 0750 "${config_root}" "${config_root}/tls"
+install -d -o root -g remotelink -m 0750 "${config_root}" "${config_root}/tls"
 install -d -o root -g root -m 0700 "${credential_root}"
-install -d -o remote-gateway -g remote-gateway -m 0750 "${state_root}"
-install -m 0755 "${project_root}/build/remote-gateway" "${install_root}/bin/remote-gateway"
-install -m 0644 "${project_root}/build/libremote_gateway_streaming.so" "${install_root}/lib/"
-if [[ -f "${project_root}/build/libremote_gateway_core.so" ]]; then
-  install -m 0644 "${project_root}/build/libremote_gateway_core.so" "${install_root}/lib/"
+install -d -o remotelink -g remotelink -m 0750 "${state_root}"
+install -m 0755 "${project_root}/build/remotelink" "${install_root}/bin/remotelink"
+install -m 0644 "${project_root}/build/libremotelink_streaming.so" "${install_root}/lib/"
+if [[ -f "${project_root}/build/libremotelink_core.so" ]]; then
+  install -m 0644 "${project_root}/build/libremotelink_core.so" "${install_root}/lib/"
 fi
 shopt -s nullglob
 mapfile -t datachannel_libraries < <(find "${project_root}/build" -name 'libdatachannel.so*' -print)
@@ -152,8 +152,8 @@ elif [[ -n "${provided_certificate}" || -n "${provided_private_key}" ]]; then
   [[ "${certificate_public_key}" == "${private_public_key}" ]] || {
     echo "The supplied TLS certificate and private key do not match" >&2; exit 1;
   }
-  install -o root -g remote-gateway -m 0644 "${provided_certificate}" "${certificate_path}"
-  install -o root -g remote-gateway -m 0640 "${provided_private_key}" "${private_key_path}"
+  install -o root -g remotelink -m 0644 "${provided_certificate}" "${certificate_path}"
+  install -o root -g remotelink -m 0640 "${provided_private_key}" "${private_key_path}"
   certificate_status="provided"
 elif [[ ! -s "${certificate_path}" || ! -s "${private_key_path}" ]]; then
   gateway_name="$(hostname -f 2>/dev/null || hostname)"
@@ -163,7 +163,7 @@ elif [[ ! -s "${certificate_path}" || ! -s "${private_key_path}" ]]; then
   openssl req -x509 -newkey rsa:3072 -sha256 -nodes -days 825 \
     -subj "/CN=${gateway_name}" -addext "subjectAltName=${san},IP:127.0.0.1,DNS:localhost" \
     -keyout "${private_key_path}" -out "${certificate_path}"
-  chown root:remote-gateway "${certificate_path}" "${private_key_path}"
+  chown root:remotelink "${certificate_path}" "${private_key_path}"
   chmod 0644 "${certificate_path}"; chmod 0640 "${private_key_path}"
   certificate_status="generated"
 fi
@@ -173,31 +173,31 @@ if [[ ${preserve_config} -eq 0 ]]; then
   python3 - "${config_root}/targets.json" <<'PY'
 import json, os, sys
 data={"targets":[{"id":"primary","name":os.environ["TARGET_HOST"],"host":os.environ["TARGET_HOST"],
-"port":3389,"username":os.environ["TARGET_USER"],"passwordFile":"/run/credentials/remote-gateway.service/rdp-password",
+"port":3389,"username":os.environ["TARGET_USER"],"passwordFile":"/run/credentials/remotelink.service/rdp-password",
 "domain":os.environ["TARGET_DOMAIN"],"width":1920,"height":1080,"ignoreCertificate":True}]}
 with open(sys.argv[1],"w",encoding="utf-8") as stream: json.dump(data,stream,ensure_ascii=False,indent=2)
 PY
-  chown root:remote-gateway "${config_root}/targets.json"; chmod 0640 "${config_root}/targets.json"
+  chown root:remotelink "${config_root}/targets.json"; chmod 0640 "${config_root}/targets.json"
 
   access_token="$(openssl rand -hex 32)"
   printf '%s' "${access_token}" | systemd-creds encrypt --name=access-token - \
-    "${credential_root}/remote-gateway-access-token" >/dev/null
+    "${credential_root}/remotelink-access-token" >/dev/null
   printf '%s' "${target_password}" | systemd-creds encrypt --name=rdp-password - \
-    "${credential_root}/remote-gateway-rdp-password" >/dev/null
+    "${credential_root}/remotelink-rdp-password" >/dev/null
   printf '%s' "${admin_password}" | systemd-creds encrypt --name=admin-password - \
-    "${credential_root}/remote-gateway-admin-password" >/dev/null
-  chmod 0600 "${credential_root}/remote-gateway-"*
+    "${credential_root}/remotelink-admin-password" >/dev/null
+  chmod 0600 "${credential_root}/remotelink-"*
 fi
 
 if [[ "${tls_mode}" == "off" ]]; then
-  tls_environment="Environment=RG_TLS_CERTIFICATE=
-Environment=RG_TLS_PRIVATE_KEY=
-Environment=RG_BEHIND_TLS_PROXY=1"
+  tls_environment="Environment=REMOTELINK_TLS_CERTIFICATE=
+Environment=REMOTELINK_TLS_PRIVATE_KEY=
+Environment=REMOTELINK_BEHIND_TLS_PROXY=1"
   public_scheme="http"
 else
-  tls_environment="Environment=RG_BEHIND_TLS_PROXY=
-Environment=RG_TLS_CERTIFICATE=${certificate_path}
-Environment=RG_TLS_PRIVATE_KEY=${private_key_path}"
+  tls_environment="Environment=REMOTELINK_BEHIND_TLS_PROXY=
+Environment=REMOTELINK_TLS_CERTIFICATE=${certificate_path}
+Environment=REMOTELINK_TLS_PRIVATE_KEY=${private_key_path}"
   public_scheme="https"
 fi
 
@@ -227,26 +227,26 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=remote-gateway
-Group=remote-gateway
+User=remotelink
+Group=remotelink
 WorkingDirectory=${install_root}
-ExecStart=${install_root}/bin/remote-gateway
+ExecStart=${install_root}/bin/remotelink
 Restart=on-failure
 RestartSec=2
 UMask=0077
-StateDirectory=remote-gateway
+StateDirectory=remotelink
 StateDirectoryMode=0750
 Environment=LD_LIBRARY_PATH=${install_root}/lib
-Environment=RG_WEB_ROOT=${install_root}/web
-Environment=RG_STATE_DIR=${state_root}
-Environment=RG_ACCESS_TOKEN_FILE=%d/access-token
-Environment=RG_INITIAL_ADMIN_PASSWORD_FILE=%d/admin-password
-Environment=RG_TARGETS_FILE=${config_root}/targets.json
-Environment="RG_ALLOWED_HOSTS=${allowed_hosts}"
+Environment=REMOTELINK_WEB_ROOT=${install_root}/web
+Environment=REMOTELINK_STATE_DIR=${state_root}
+Environment=REMOTELINK_ACCESS_TOKEN_FILE=%d/access-token
+Environment=REMOTELINK_INITIAL_ADMIN_PASSWORD_FILE=%d/admin-password
+Environment=REMOTELINK_TARGETS_FILE=${config_root}/targets.json
+Environment="REMOTELINK_ALLOWED_HOSTS=${allowed_hosts}"
 ${tls_environment}
-LoadCredentialEncrypted=access-token:${credential_root}/remote-gateway-access-token
-LoadCredentialEncrypted=admin-password:${credential_root}/remote-gateway-admin-password
-LoadCredentialEncrypted=rdp-password:${credential_root}/remote-gateway-rdp-password
+LoadCredentialEncrypted=access-token:${credential_root}/remotelink-access-token
+LoadCredentialEncrypted=admin-password:${credential_root}/remotelink-admin-password
+LoadCredentialEncrypted=rdp-password:${credential_root}/remotelink-rdp-password
 NoNewPrivileges=true
 PrivateTmp=true
 PrivateDevices=true

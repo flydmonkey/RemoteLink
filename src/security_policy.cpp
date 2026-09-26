@@ -1,11 +1,11 @@
-#include "remote_gateway/security_policy.hpp"
+#include "remotelink/security_policy.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstdint>
 
-namespace remote_gateway {
+namespace remotelink {
 namespace {
 
 std::string_view trim(std::string_view value) {
@@ -123,4 +123,4 @@ std::optional<std::size_t> access_token_identity(
     return identity;
 }
 
-}  // namespace remote_gateway
+}  // namespace remotelink

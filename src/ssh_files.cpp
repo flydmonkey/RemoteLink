@@ -1,4 +1,4 @@
-#include "remote_gateway/ssh_files.hpp"
+#include "remotelink/ssh_files.hpp"
 
 #include <libssh2.h>
 #include <libssh2_sftp.h>
@@ -14,7 +14,7 @@
 #include <mutex>
 #include <sstream>
 
-namespace remote_gateway {
+namespace remotelink {
 namespace {
 
 int connect_tcp(const std::string& hostname, std::uint16_t port) {
@@ -174,4 +174,4 @@ bool SshFiles::remove(const SshBridgeOptions& options, const std::string& path, 
     return true;
 }
 
-}  // namespace remote_gateway
+}  // namespace remotelink

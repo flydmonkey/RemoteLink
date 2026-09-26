@@ -1,8 +1,8 @@
 #pragma once
 
-#include "remote_gateway/frame.hpp"
+#include "remotelink/frame.hpp"
 
-namespace remote_gateway {
+namespace remotelink {
 
 class FrameSink {
 public:
@@ -10,5 +10,5 @@ public:
     virtual void consume(const Frame& frame) = 0;
 };
 
-}  // namespace remote_gateway
+}  // namespace remotelink
 

@@ -1,4 +1,4 @@
-#include "remote_gateway/http_server.hpp"
+#include "remotelink/http_server.hpp"
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -24,7 +24,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace remote_gateway {
+namespace remotelink {
 
 HttpServer::HttpServer(std::string bind_address, std::uint16_t port,
                        std::string certificate_file, std::string key_file)
@@ -593,9 +593,9 @@ void HttpServer::run() {
         else if (root_request || admin_request || session_request || settings_request ||
                  vnc_request || vnc_session_request || vnc_admin_request || vnc_permissions_request ||
                  users_request || ssh_request || ssh_session_request || icon_request || i18n_request || novnc_request || xterm_request) {
-            const char* configured_web_root = std::getenv("RG_WEB_ROOT");
+            const char* configured_web_root = std::getenv("REMOTELINK_WEB_ROOT");
             const std::string web_root = configured_web_root && *configured_web_root
-                ? configured_web_root : REMOTE_GATEWAY_WEB_ROOT;
+                ? configured_web_root : REMOTELINK_WEB_ROOT;
             std::string page = icon_request ? "/remotelink-icon.png" :
                                      i18n_request ? "/i18n.js" :
                                      admin_request ? "/admin.html" :
@@ -683,4 +683,4 @@ void HttpServer::run() {
     }
 }
 
-}  // namespace remote_gateway
+}  // namespace remotelink

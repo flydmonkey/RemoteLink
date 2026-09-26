@@ -95,7 +95,7 @@ ctest --test-dir build --output-on-failure
 使用 WSL2 开发：
 
 ```bash
-cd /mnt/c/Users/Administrator/Projects/apache/remote-gateway
+cd /mnt/c/Users/Administrator/Projects/apache/remotelink
 npm ci
 bash ./scripts/copy-novnc-core.sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
@@ -105,30 +105,30 @@ ctest --test-dir build --output-on-failure
 
 ## 配置
 
-首次登录后，管理员在各协议的“管理”页面维护 RDP、VNC、SSH 连接，并在“用户管理”中分配连接权限。连接密码、SSH 私钥和 VNC CA 证书保存在 `RG_STATE_DIR` 下仅服务账户可读的文件中，管理接口不会回显，并支持替换或清除。`RG_TARGETS_FILE` 仅用于兼容导入旧版 RDP 目标，首次启动后会自动迁移为受管理连接。
+首次登录后，管理员在各协议的“管理”页面维护 RDP、VNC、SSH 连接，并在“用户管理”中分配连接权限。连接密码、SSH 私钥和 VNC CA 证书保存在 `REMOTELINK_STATE_DIR` 下仅服务账户可读的文件中，管理接口不会回显，并支持替换或清除。`REMOTELINK_TARGETS_FILE` 仅用于兼容导入旧版 RDP 目标，首次启动后会自动迁移为受管理连接。
 
 | 变量 | 用途 |
 | --- | --- |
-| `RG_TARGETS_FILE` | 可选的旧版 RDP 目标导入文件 |
-| `RG_ALLOWED_HOSTS` | 主机/CIDR 白名单；默认为 `*`（允许所有域名和 IP 地址） |
-| `RG_ACCESS_TOKEN_FILE` | 主管理员受保护的恢复凭据 |
-| `RG_TLS_CERTIFICATE` | TLS 证书链 |
-| `RG_TLS_PRIVATE_KEY` | TLS 私钥 |
-| `RG_STATE_DIR` | 用户、文件、打印任务和审计数据目录 |
-| `RG_USER_FILE_QUOTA_BYTES` | 可选的单用户文件配额 |
-| `RG_BLOCKED_FILE_EXTENSIONS` | 可选的上传扩展名黑名单 |
+| `REMOTELINK_TARGETS_FILE` | 可选的旧版 RDP 目标导入文件 |
+| `REMOTELINK_ALLOWED_HOSTS` | 主机/CIDR 白名单；默认为 `*`（允许所有域名和 IP 地址） |
+| `REMOTELINK_ACCESS_TOKEN_FILE` | 主管理员受保护的恢复凭据 |
+| `REMOTELINK_TLS_CERTIFICATE` | TLS 证书链 |
+| `REMOTELINK_TLS_PRIVATE_KEY` | TLS 私钥 |
+| `REMOTELINK_STATE_DIR` | 用户、文件、打印任务和审计数据目录 |
+| `REMOTELINK_USER_FILE_QUOTA_BYTES` | 可选的单用户文件配额 |
+| `REMOTELINK_BLOCKED_FILE_EXTENSIONS` | 可选的上传扩展名黑名单 |
 
 ```bash
-export RG_TARGETS_FILE=/etc/remote-gateway/targets.json
-export RG_ALLOWED_HOSTS='*'
-export RG_ACCESS_TOKEN_FILE=/run/credentials/remote-gateway.service/access-token
-export RG_TLS_CERTIFICATE=/etc/remote-gateway/tls/fullchain.pem
-export RG_TLS_PRIVATE_KEY=/etc/remote-gateway/tls/privkey.pem
-export RG_STATE_DIR=/var/lib/remote-gateway
-./build/remote-gateway
+export REMOTELINK_TARGETS_FILE=/etc/remotelink/targets.json
+export REMOTELINK_ALLOWED_HOSTS='*'
+export REMOTELINK_ACCESS_TOKEN_FILE=/run/credentials/remotelink.service/access-token
+export REMOTELINK_TLS_CERTIFICATE=/etc/remotelink/tls/fullchain.pem
+export REMOTELINK_TLS_PRIVATE_KEY=/etc/remotelink/tls/privkey.pem
+export REMOTELINK_STATE_DIR=/var/lib/remotelink
+./build/remotelink
 ```
 
-仅限本机开发时可使用 `RG_ALLOW_INSECURE_HTTP=1`。局域网或互联网访问时不要使用不安全 HTTP。
+仅限本机开发时可使用 `REMOTELINK_ALLOW_INSECURE_HTTP=1`。局域网或互联网访问时不要使用不安全 HTTP。
 
 ## 部署
 
@@ -218,7 +218,7 @@ sudo ./scripts/rollback-linux.sh
 ./scripts/package-linux.sh
 ```
 
-为兼容已有安装，部署仍保留内部服务标识 `remote-gateway`；产品名称和浏览器界面使用 **RemoteLink**。
+产品名称、可执行文件、系统服务、安装路径、配置变量和浏览器界面均统一使用 **RemoteLink**。
 
 部署后访问 `https://网关地址:18080`。如果使用弱初始密码，请立即在“管理 → 用户管理”中修改。
 
@@ -257,7 +257,7 @@ gpupdate /force
 - 连接密码、SSH 私钥和 VNC CA 证书只保存在服务端，不会返回浏览器。
 - 确认 SSH 信任前，应通过其他可信渠道核对 SHA-256 指纹；设备重装或主机密钥变化后需要重置信任并重新确认。
 - 恢复令牌应保存在密码管理系统或 systemd 加密凭据中。
-- `RG_ALLOWED_HOSTS` 默认为 `*`，允许所有域名以及 IPv4/IPv6 地址；如部署策略需要限制目标，可设置明确的逗号分隔主机/CIDR 列表。
+- `REMOTELINK_ALLOWED_HOSTS` 默认为 `*`，允许所有域名以及 IPv4/IPv6 地址；如部署策略需要限制目标，可设置明确的逗号分隔主机/CIDR 列表。
 - 用户文件和打印任务按稳定用户身份隔离。
 - 持久化用户注册表仅允许服务账户访问。
 

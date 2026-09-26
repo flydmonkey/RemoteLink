@@ -13,7 +13,7 @@ using json = nlohmann::json;
 
 int main(int argc, char** argv) {
     if (argc < 2 || argc > 3) {
-        std::cerr << "usage: remote_gateway_webrtc_smoke ACCESS_TOKEN [TARGET_ID]\n";
+        std::cerr << "usage: remotelink_webrtc_smoke ACCESS_TOKEN [TARGET_ID]\n";
         return 2;
     }
 

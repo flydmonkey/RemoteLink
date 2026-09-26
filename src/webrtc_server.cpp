@@ -1,5 +1,5 @@
-#include "remote_gateway/webrtc_server.hpp"
-#include "remote_gateway/security_policy.hpp"
+#include "remotelink/webrtc_server.hpp"
+#include "remotelink/security_policy.hpp"
 
 #include <rtc/rtc.hpp>
 #include <nlohmann/json.hpp>
@@ -12,7 +12,7 @@
 #include <iostream>
 #include <stdexcept>
 
-namespace remote_gateway {
+namespace remotelink {
 using json = nlohmann::json;
 
 struct WebRtcServer::Peer {
@@ -320,11 +320,11 @@ void WebRtcServer::handle_message(const std::shared_ptr<Peer>& peer,
 
         rtc::Description::Video video("video", rtc::Description::Direction::SendOnly);
         video.addH264Codec(102);
-        video.addSSRC(1, "remote-gateway", "desktop", "desktop");
+        video.addSSRC(1, "remotelink", "desktop", "desktop");
         peer->video = peer->connection->addTrack(video);
 
         auto rtp = std::make_shared<rtc::RtpPacketizationConfig>(
-            1, "remote-gateway", 102, rtc::H264RtpPacketizer::ClockRate);
+            1, "remotelink", 102, rtc::H264RtpPacketizer::ClockRate);
         auto packetizer = std::make_shared<rtc::H264RtpPacketizer>(
             rtc::NalUnit::Separator::LongStartSequence, rtp);
         auto sender_report = std::make_shared<rtc::RtcpSrReporter>(rtp);
@@ -346,10 +346,10 @@ void WebRtcServer::handle_message(const std::shared_ptr<Peer>& peer,
 
         rtc::Description::Audio audio("audio", rtc::Description::Direction::SendOnly);
         audio.addOpusCodec(111);
-        audio.addSSRC(2, "remote-gateway", "desktop-audio", "desktop-audio");
+        audio.addSSRC(2, "remotelink", "desktop-audio", "desktop-audio");
         peer->audio = peer->connection->addTrack(audio);
         auto audio_rtp = std::make_shared<rtc::RtpPacketizationConfig>(
-            2, "remote-gateway", 111, rtc::OpusRtpPacketizer::DefaultClockRate);
+            2, "remotelink", 111, rtc::OpusRtpPacketizer::DefaultClockRate);
         auto audio_packetizer = std::make_shared<rtc::OpusRtpPacketizer>(audio_rtp);
         audio_packetizer->addToChain(std::make_shared<rtc::RtcpSrReporter>(audio_rtp));
         peer->audio->setMediaHandler(audio_packetizer);
@@ -554,4 +554,4 @@ bool WebRtcServer::disconnect_peer(const std::string& peer_id) {
     return true;
 }
 
-}  // namespace remote_gateway
+}  // namespace remotelink

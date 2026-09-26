@@ -18,10 +18,10 @@ cmake --build "${build_dir}" -j"$(nproc)"
 ctest --test-dir "${build_dir}" --output-on-failure
 bash "${project_root}/scripts/copy-novnc-core.sh"
 package_root="${stage}/RemoteLink"
-install -D -m 0755 "${build_dir}/remote-gateway" "${package_root}/bin/remote-gateway"
-install -D -m 0755 "${build_dir}/libremote_gateway_streaming.so" "${package_root}/lib/libremote_gateway_streaming.so"
-if [[ -f "${build_dir}/libremote_gateway_core.so" ]]; then
-  install -m 0755 "${build_dir}/libremote_gateway_core.so" "${package_root}/lib/libremote_gateway_core.so"
+install -D -m 0755 "${build_dir}/remotelink" "${package_root}/bin/remotelink"
+install -D -m 0755 "${build_dir}/libremotelink_streaming.so" "${package_root}/lib/libremotelink_streaming.so"
+if [[ -f "${build_dir}/libremotelink_core.so" ]]; then
+  install -m 0755 "${build_dir}/libremotelink_core.so" "${package_root}/lib/libremotelink_core.so"
 fi
 shopt -s nullglob
 mapfile -t datachannel_libraries < <(find "${build_dir}" -name 'libdatachannel.so*' -print)
@@ -31,9 +31,9 @@ shopt -u nullglob
 cp -a "${project_root}/web" "${package_root}/web"
 find "${package_root}/web" -type f -name '*.html' -exec \
   sed -i "s/__REMOTELINK_VERSION__/${version}/g" {} +
-install -D -m 0644 "${project_root}/config/remote-gateway.service.example" \
-  "${package_root}/config/remote-gateway.service.example"
-install -m 0644 "${project_root}/config/remote-gateway.env.example" \
+install -D -m 0644 "${project_root}/config/remotelink.service.example" \
+  "${package_root}/config/remotelink.service.example"
+install -m 0644 "${project_root}/config/remotelink.env.example" \
   "${project_root}/config/targets.example.json" \
   "${project_root}/config/targets.systemd.example.json" "${package_root}/config/"
 cp -a "${project_root}/scripts" "${package_root}/scripts"

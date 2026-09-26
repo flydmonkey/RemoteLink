@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace remote_gateway {
+namespace remotelink {
 
 /** A complete desktop frame in tightly-packed BGRA8 format. */
 struct Frame {
@@ -17,5 +17,5 @@ struct Frame {
     std::vector<std::byte> pixels;
 };
 
-}  // namespace remote_gateway
+}  // namespace remotelink
 
