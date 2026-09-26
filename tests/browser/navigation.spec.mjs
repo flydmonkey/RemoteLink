@@ -291,9 +291,7 @@ test("VNC administrators add connections from management only", async ({
     "line-height",
     "20px",
   );
-  await expect(page.locator("#account-name")).toHaveText(
-    "Administrator · admin",
-  );
+  await expect(page.locator("#account-name")).toHaveText("admin");
   await expect(
     page.getByRole("link", { name: "管理", exact: true }),
   ).toHaveAttribute("href", "/vnc.html?admin=1");
@@ -468,6 +466,12 @@ test("SSH and user management use the shared English interface vocabulary", asyn
   ).toBeVisible();
   await expect(page.getByText("Select a computer and connect")).toBeVisible();
   await expect(page.getByRole("link", { name: "Manage" })).toBeVisible();
+  await page.locator("#account-trigger").click();
+  await expect(page.locator("#account-summary")).toHaveText("admin");
+  await expect(page.locator('.account-language label')).toHaveText("Language");
+  await expect(page.locator("#account-menu")).not.toContainText(
+    "Administrator",
+  );
 
   await page.route("**/api/admin/users", (route) =>
     route.fulfill({ json: { items: [] } }),

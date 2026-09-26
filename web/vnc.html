@@ -681,7 +681,7 @@
             <div class="account-menu" id="account-menu" hidden>
               <div id="account-name">当前账户</div>
               <div class="account-language">
-                <label for="account-language">界面语言</label>
+                <label for="account-language">语言</label>
                 <span class="account-language-value" id="account-language-value"></span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
                 <select id="account-language">
@@ -866,9 +866,7 @@
           name = account.name || account.username || "账户",
           targets = data.targets || [];
         document.querySelector("#account-name").textContent =
-          account.username && account.username !== name
-            ? `${name} · ${account.username}`
-            : name;
+          account.username || name;
         document.querySelector("#users-link").hidden = !account.admin;
         manageToggle.hidden = !account.admin;
         updateProtocolTabs(account, targets);

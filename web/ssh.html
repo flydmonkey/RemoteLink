@@ -579,7 +579,7 @@
             <div id="account-menu" class="account-menu" hidden>
               <div id="account-summary" class="account-summary">当前账户</div>
               <div class="account-language">
-                <label for="account-language">界面语言</label>
+                <label for="account-language">语言</label>
                 <span class="account-language-value" id="account-language-value"></span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
                 <select id="account-language">
@@ -760,9 +760,7 @@
         document.querySelector("#manage").hidden = !me.admin;
         document.querySelector("#users-link").hidden = !me.admin;
         document.querySelector("#account-summary").textContent =
-          me.username && me.username !== me.name
-            ? `${me.name} · ${me.username}`
-            : me.name;
+          me.username || me.name;
         const data = await api("/api/ssh/targets");
         const availableTargets = data.targets || [];
         updateProtocolTabs(me, availableTargets);

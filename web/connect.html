@@ -569,7 +569,7 @@
             <div class="account-menu" id="account-menu" role="menu" hidden>
               <div class="account-summary" id="account-summary">当前账户</div>
               <div class="account-language">
-                <label for="account-language">界面语言</label>
+                <label for="account-language">语言</label>
                 <span class="account-language-value" id="account-language-value"></span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
                 <select id="account-language">
@@ -908,10 +908,7 @@
       function showAccount(account) {
         const name = account.name || account.username || "账户",
           userManagement = document.querySelector(".account-admin");
-        accountSummary.textContent =
-          account.username && account.username !== name
-            ? `${name} · ${account.username}`
-            : name;
+        accountSummary.textContent = account.username || name;
         userManagement.href = "/users";
         userManagement.hidden = !account.admin;
         updateProtocolTabs(account);
