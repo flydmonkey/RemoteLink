@@ -1,6 +1,6 @@
 services:
   remotelink:
-    image: remotelink:latest
+    image: ${REMOTELINK_IMAGE:-flydmonkey/remotelink}:${REMOTELINK_VERSION:-latest}
     build:
       context: .
       args:

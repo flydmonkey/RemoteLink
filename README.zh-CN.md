@@ -6,6 +6,51 @@ RemoteLink 是一款可自行部署、通过浏览器使用的 RDP、VNC 和 SSH
 
 网关以单个 Linux 服务运行。用户只需要现代浏览器，不需要浏览器扩展或桌面客户端。
 
+## Docker 快速开始
+
+官方镜像已发布到 Docker Hub，同时支持 `linux/amd64` 和 `linux/arm64`，
+Docker 会自动拉取与当前主机匹配的架构：
+
+```bash
+docker volume create remotelink-state
+docker run -d \
+  --name remotelink \
+  --restart unless-stopped \
+  -p 18080:18080 \
+  -e REMOTELINK_ADMIN_PASSWORD='请替换为安全密码' \
+  -e REMOTELINK_BEHIND_TLS_PROXY=1 \
+  -e REMOTELINK_ALLOWED_HOSTS='*' \
+  -v remotelink-state:/var/lib/remotelink \
+  flydmonkey/remotelink:latest
+```
+
+打开 <http://localhost:18080>，使用用户名 `admin` 和
+`REMOTELINK_ADMIN_PASSWORD` 中设置的密码登录。登录后进入“管理”添加
+RDP、VNC 或 SSH 连接，再通过“用户管理”分配连接权限。
+
+管理员密码只用于初始化全新的数据卷。数据卷已创建后，修改环境变量不会
+覆盖现有管理员密码。`remotelink-state` 会保存用户、连接、加密凭据、文件、
+打印任务和审计记录，升级前请备份该数据卷。
+
+如果已经克隆本仓库，也可使用 Docker Compose：
+
+```bash
+export REMOTELINK_ADMIN_PASSWORD='请替换为安全密码'
+docker compose up -d
+```
+
+升级镜像时保留原有数据：
+
+```bash
+docker pull flydmonkey/remotelink:latest
+docker rm -f remotelink
+# 使用上方 docker run 命令重新创建容器，并继续挂载同一 remotelink-state 卷。
+```
+
+上述快速开始通过明文 HTTP 服务，仅适合本机试用或放在可信 TLS 反向代理后方。
+局域网或公网部署时，对外只暴露反向代理的 HTTPS 端口，并将 `18080` 保持为内网端口。
+需要可重现部署时，建议使用 `flydmonkey/remotelink:0.3.2` 等明确版本，而不是 `latest`。
+
 ## 功能
 
 - 基于 WebRTC 的低延迟 H.264 画面和 Opus 声音
@@ -134,11 +179,13 @@ export REMOTELINK_STATE_DIR=/var/lib/remotelink
 
 ### Docker 镜像
 
-执行脚本即可构建带版本号的本地镜像（默认读取 `VERSION`）：
+最快的安装方式是直接使用已发布的 `flydmonkey/remotelink` 镜像，请参阅
+[Docker 快速开始](#docker-快速开始)。如需在本地构建带版本号的镜像
+（默认读取 `VERSION`）：
 
 ```bash
 bash ./scripts/build-docker.sh
-REMOTELINK_ADMIN_PASSWORD='请修改为安全密码' docker compose up -d
+REMOTELINK_IMAGE=remotelink REMOTELINK_ADMIN_PASSWORD='请修改为安全密码' docker compose up -d
 ```
 
 服务监听 `18080` 端口，Compose 使用 `remotelink-state` 卷持久化用户、连接、凭据和审计数据。

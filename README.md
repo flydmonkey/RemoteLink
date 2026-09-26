@@ -6,6 +6,54 @@ RemoteLink is a self-hosted, browser-based remote connection tool for RDP, VNC, 
 
 The gateway runs as a single Linux service. Users only need a modern browser—no extension or desktop client is required.
 
+## Quick start with Docker
+
+The official image is published to Docker Hub for both `linux/amd64` and
+`linux/arm64`. Docker automatically pulls the correct architecture:
+
+```bash
+docker volume create remotelink-state
+docker run -d \
+  --name remotelink \
+  --restart unless-stopped \
+  -p 18080:18080 \
+  -e REMOTELINK_ADMIN_PASSWORD='replace-with-a-strong-password' \
+  -e REMOTELINK_BEHIND_TLS_PROXY=1 \
+  -e REMOTELINK_ALLOWED_HOSTS='*' \
+  -v remotelink-state:/var/lib/remotelink \
+  flydmonkey/remotelink:latest
+```
+
+Open <http://localhost:18080> and sign in with username `admin` and the password
+set in `REMOTELINK_ADMIN_PASSWORD`. Then open **Management** to add RDP, VNC,
+or SSH connections, and use **User management** to grant access.
+
+The administrator password initializes a new data volume only. Changing the
+environment variable later does not overwrite an existing administrator
+password. The `remotelink-state` volume contains users, connections, encrypted
+credentials, files, print jobs, and audit history; back it up before upgrades.
+
+To use Docker Compose from this repository:
+
+```bash
+export REMOTELINK_ADMIN_PASSWORD='replace-with-a-strong-password'
+docker compose up -d
+```
+
+To upgrade the container while preserving its data:
+
+```bash
+docker pull flydmonkey/remotelink:latest
+docker rm -f remotelink
+# Run the docker command above again with the same remotelink-state volume.
+```
+
+This quick-start configuration serves plain HTTP for local evaluation or use
+behind a trusted TLS reverse proxy. For LAN or Internet access, expose only the
+proxy's HTTPS endpoint and keep port `18080` private. Pin a release such as
+`flydmonkey/remotelink:0.3.2` instead of `latest` when reproducible deployments
+are required.
+
 ## Features
 
 - Low-latency H.264 remote desktop streaming and Opus audio over WebRTC
@@ -105,11 +153,13 @@ export REMOTELINK_STATE_DIR=/var/lib/remotelink
 
 ### Docker image
 
-Build a versioned local image (the version defaults to `VERSION`):
+The fastest installation uses the published `flydmonkey/remotelink` image; see
+[Quick start with Docker](#quick-start-with-docker). To build a versioned image
+locally instead (the version defaults to `VERSION`):
 
 ```bash
 bash ./scripts/build-docker.sh
-REMOTELINK_ADMIN_PASSWORD='change-this-password' docker compose up -d
+REMOTELINK_IMAGE=remotelink REMOTELINK_ADMIN_PASSWORD='change-this-password' docker compose up -d
 ```
 
 The service is available on port `18080`. The Compose configuration persists all users,
