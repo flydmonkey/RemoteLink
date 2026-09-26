@@ -74,6 +74,7 @@ are required.
 - Configurable resolution, bitrate, audio, printing, and experimental hardware acceleration
 - HTTPS/WSS, encrypted systemd credentials, and isolated per-user storage
 - Responsive desktop and mobile browser interface
+- Automatic gzip compression for HTML, JavaScript, CSS, JSON, and other text responses
 - Standalone VNC support using noVNC Core and a one-time-ticket WSS-to-RFB proxy
 - Native RemoteLink VNC device, session toolbar, administration, and user-permission UI
 - VNC password, username/password, and CA-certificate authentication modes with automatic reconnect

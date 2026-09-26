@@ -10,12 +10,14 @@
 #include <openssl/ssl.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
+#include <zlib.h>
 
 #include <cerrno>
 #include <cstring>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <algorithm>
@@ -86,6 +88,68 @@ void HttpServer::set_ssh_control_handler(
 }
 
 namespace {
+std::string lower(std::string value);
+
+bool accepts_gzip(const std::string& value) {
+    std::istringstream encodings(lower(value));
+    std::string encoding;
+    while (std::getline(encodings, encoding, ',')) {
+        const auto separator = encoding.find(';');
+        auto name = encoding.substr(0, separator);
+        name.erase(name.begin(), std::find_if(name.begin(), name.end(), [](unsigned char ch) {
+            return !std::isspace(ch);
+        }));
+        name.erase(std::find_if(name.rbegin(), name.rend(), [](unsigned char ch) {
+            return !std::isspace(ch);
+        }).base(), name.end());
+        if (name != "gzip") continue;
+        if (separator == std::string::npos) return true;
+        const auto parameters = encoding.substr(separator + 1);
+        const auto quality = parameters.find("q=");
+        if (quality == std::string::npos) return true;
+        try {
+            return std::stod(parameters.substr(quality + 2)) > 0.0;
+        } catch (...) {
+            return false;
+        }
+    }
+    return false;
+}
+
+bool compressible_content_type(const std::string& content_type) {
+    return content_type.starts_with("text/") ||
+           content_type.starts_with("application/javascript") ||
+           content_type.starts_with("application/json") ||
+           content_type.starts_with("application/xml") ||
+           content_type.starts_with("image/svg+xml");
+}
+
+std::optional<std::string> gzip_compress(const std::string& input) {
+    if (input.size() > std::numeric_limits<uInt>::max()) return std::nullopt;
+    z_stream stream{};
+    if (deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, MAX_WBITS + 16,
+                     8, Z_DEFAULT_STRATEGY) != Z_OK)
+        return std::nullopt;
+
+    const auto bound = deflateBound(&stream, static_cast<uLong>(input.size()));
+    if (bound > std::numeric_limits<uInt>::max()) {
+        deflateEnd(&stream);
+        return std::nullopt;
+    }
+    std::string output;
+    output.resize(bound);
+    stream.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(input.data()));
+    stream.avail_in = static_cast<uInt>(input.size());
+    stream.next_out = reinterpret_cast<Bytef*>(output.data());
+    stream.avail_out = static_cast<uInt>(output.size());
+    const int result = deflate(&stream, Z_FINISH);
+    const auto size = stream.total_out;
+    deflateEnd(&stream);
+    if (result != Z_STREAM_END) return std::nullopt;
+    output.resize(size);
+    return output;
+}
+
 std::string status_text(int status) {
     switch (status) {
         case 200: return "200 OK";
@@ -486,6 +550,7 @@ void HttpServer::run() {
                 else if (name == "x-destination") parsed.destination = std::move(value);
                 else if (name == "x-upload-offset") parsed.upload_offset = std::move(value);
                 else if (name == "x-upload-total") parsed.upload_total = std::move(value);
+                else if (name == "accept-encoding") parsed.accept_encoding = std::move(value);
             }
             parsed.body = raw_request.substr(headers_end + 4);
         }
@@ -639,11 +704,22 @@ void HttpServer::run() {
             ? (versioned_resource ? "public, max-age=31536000, immutable"
                                   : "public, max-age=3600, must-revalidate")
             : (html_document ? "no-cache" : "no-store");
+        const bool compression_candidate = body.size() >= 1024 &&
+            compressible_content_type(content_type);
+        bool gzip_encoded = false;
+        if (compression_candidate && accepts_gzip(parsed.accept_encoding)) {
+            if (auto compressed = gzip_compress(body); compressed && compressed->size() < body.size()) {
+                body = std::move(*compressed);
+                gzip_encoded = true;
+            }
+        }
         std::ostringstream response;
         response << "HTTP/1.1 " << status_text(status_code) << "\r\n"
                  << "Content-Type: " << content_type << "\r\n"
                  << "Content-Length: " << body.size() << "\r\n"
                  << "Cache-Control: " << cache_control << "\r\n"
+                 << (compression_candidate ? "Vary: Accept-Encoding\r\n" : "")
+                 << (gzip_encoded ? "Content-Encoding: gzip\r\n" : "")
                  << "Content-Security-Policy: default-src 'self'; connect-src 'self' ws: wss:; "
                     "img-src 'self' data:; script-src 'self' 'unsafe-inline'; "
                     "style-src 'self' 'unsafe-inline'\r\n"

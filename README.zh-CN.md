@@ -71,6 +71,7 @@ docker rm -f remotelink
 - 可配置分辨率、码率、声音、打印和实验性硬件加速
 - HTTPS/WSS、systemd 加密凭据和用户数据隔离
 - 适配桌面与移动浏览器
+- 自动对 HTML、JavaScript、CSS、JSON 等文本响应启用 gzip 压缩
 - 独立 VNC 支持：使用 noVNC Core，通过一次性票据建立 WSS 到 RFB 的代理连接
 - RemoteLink 自有 VNC 设备页、会话工具栏、连接管理和用户授权界面
 - VNC 支持密码、用户名密码和 CA 证书三种认证模式，并按 RDP 策略自动重连

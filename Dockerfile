@@ -7,7 +7,7 @@ ARG REMOTELINK_VERSION=dev
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential ca-certificates cmake git ninja-build npm pkg-config python3 \
       freerdp3-dev libwinpr3-dev libopenh264-dev libopus-dev libyuv-dev \
-      libssl-dev libssh2-1-dev nlohmann-json3-dev \
+      libssl-dev libssh2-1-dev nlohmann-json3-dev zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
@@ -42,7 +42,7 @@ LABEL org.opencontainers.image.title="RemoteLink" \
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl tini \
       freerdp3-dev libwinpr3-dev libopenh264-dev libopus-dev libyuv-dev \
-      libssl-dev libssh2-1-dev \
+      libssl-dev libssh2-1-dev zlib1g \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --user-group --home-dir /nonexistent \
       --shell /usr/sbin/nologin remotelink \

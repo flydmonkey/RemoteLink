@@ -22,6 +22,7 @@ struct HttpRequest {
     std::string destination;
     std::string upload_offset;
     std::string upload_total;
+    std::string accept_encoding;
     std::string body;
 };
 

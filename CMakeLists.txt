@@ -34,6 +34,7 @@ if(REMOTELINK_ENABLE_STREAMING)
     find_path(LIBYUV_INCLUDE_DIR libyuv/convert.h REQUIRED)
     find_library(LIBYUV_LIBRARY yuv REQUIRED)
     find_package(OpenSSL REQUIRED)
+    find_package(ZLIB REQUIRED)
 
     set(WITH_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(WITH_TESTS OFF CACHE BOOL "" FORCE)
@@ -91,7 +92,7 @@ if(REMOTELINK_ENABLE_STREAMING)
     target_compile_features(remotelink_streaming PUBLIC cxx_std_20)
     target_link_libraries(remotelink_streaming
         PUBLIC remotelink_core
-        PRIVATE LibDataChannel::LibDataChannel PkgConfig::OPENH264 PkgConfig::OPUS OpenSSL::SSL OpenSSL::Crypto
+        PRIVATE LibDataChannel::LibDataChannel PkgConfig::OPENH264 PkgConfig::OPUS OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB
                 PkgConfig::FREERDP PkgConfig::LIBSSH2 Threads::Threads ${LIBYUV_LIBRARY} vncclient vncserver
     )
     target_compile_definitions(remotelink_streaming PRIVATE
