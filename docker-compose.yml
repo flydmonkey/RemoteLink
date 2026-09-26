@@ -1,0 +1,19 @@
+services:
+  remotelink:
+    image: remotelink:latest
+    build:
+      context: .
+      args:
+        REMOTELINK_VERSION: ${REMOTELINK_VERSION:-dev}
+    restart: unless-stopped
+    ports:
+      - "18080:18080"
+    environment:
+      REMOTELINK_ADMIN_PASSWORD: ${REMOTELINK_ADMIN_PASSWORD:?set REMOTELINK_ADMIN_PASSWORD}
+      RG_BEHIND_TLS_PROXY: "1"
+      RG_ALLOWED_HOSTS: ${RG_ALLOWED_HOSTS:-*}
+    volumes:
+      - remotelink-state:/var/lib/remote-gateway
+
+volumes:
+  remotelink-state:

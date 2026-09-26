@@ -1,0 +1,12 @@
+.git
+.github
+.idea
+.vscode
+build
+dist
+node_modules
+test-results
+playwright-report
+*.log
+*.tar.gz
+*.sha256

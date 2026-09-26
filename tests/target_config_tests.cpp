@@ -40,7 +40,8 @@ int main() {
     const auto file_targets = remote_gateway::load_targets(path.string(), "10.0.0.1");
     assert(file_targets[0].rdp.password == "file-secret");
 
-    assert(rejected(path, R"({"targets":[]})"));
+    std::ofstream(path) << R"({"targets":[]})";
+    assert(remote_gateway::load_targets(path.string(), "*").empty());
     assert(rejected(path, R"({"targets":[{"id":"bad id","name":"Bad","host":"10.0.0.1","username":"admin","passwordEnv":"RG_TEST_TARGET_PASSWORD"}]})"));
     assert(rejected(path, R"({"targets":[{"id":"a","name":"A","host":"10.0.0.2","username":"admin","passwordEnv":"RG_TEST_TARGET_PASSWORD"}]})"));
     assert(rejected(path, R"({"targets":[{"id":"a","name":"A","host":"10.0.0.1","port":70000,"username":"admin","passwordEnv":"RG_TEST_TARGET_PASSWORD"}]})"));

@@ -79,7 +79,6 @@ std::vector<TargetConfig> load_targets(const std::string& path,
         }
         result.push_back(std::move(target));
     }
-    if (result.empty()) throw std::runtime_error("at least one target is required");
     return result;
 }
 

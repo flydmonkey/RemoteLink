@@ -132,6 +132,27 @@ export RG_STATE_DIR=/var/lib/remote-gateway
 
 ## 部署
 
+### Docker 镜像
+
+执行脚本即可构建带版本号的本地镜像（默认读取 `VERSION`）：
+
+```bash
+bash ./scripts/build-docker.sh
+REMOTELINK_ADMIN_PASSWORD='请修改为安全密码' docker compose up -d
+```
+
+服务监听 `18080` 端口，Compose 使用 `remotelink-state` 卷持久化用户、连接、凭据和审计数据。
+默认配置假定 HTTPS 由可信反向代理终止，请勿把明文 HTTP 端口直接暴露到不受信任的网络。
+如需指定镜像仓库、版本并通过 Buildx 推送：
+
+```bash
+REMOTELINK_IMAGE=ghcr.io/example/remotelink REMOTELINK_VERSION=0.3.1 \
+  REMOTELINK_PUSH=1 bash ./scripts/build-docker.sh
+```
+
+分支推送和 Pull Request 会自动验证镜像构建；推送 `v*` 版本标签时，会同时发布版本镜像和
+`latest` 到 `ghcr.io/<仓库所有者>/remotelink`。
+
 ### GitHub Actions 一键打包
 
 打开 **Actions → Package RemoteLink for Linux → Run workflow**，即可构建并下载带版本号的

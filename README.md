@@ -103,6 +103,28 @@ export RG_STATE_DIR=/var/lib/remote-gateway
 
 ## Deployment
 
+### Docker image
+
+Build a versioned local image (the version defaults to `VERSION`):
+
+```bash
+bash ./scripts/build-docker.sh
+REMOTELINK_ADMIN_PASSWORD='change-this-password' docker compose up -d
+```
+
+The service is available on port `18080`. The Compose configuration persists all users,
+connections, credentials, and audit data in the `remotelink-state` volume. It assumes TLS is
+terminated by a trusted reverse proxy. Do not expose the plain HTTP port directly to an
+untrusted network. To build another repository/tag or push with Buildx:
+
+```bash
+REMOTELINK_IMAGE=ghcr.io/example/remotelink REMOTELINK_VERSION=0.3.1 \
+  REMOTELINK_PUSH=1 bash ./scripts/build-docker.sh
+```
+
+Pushes and pull requests automatically verify the image build. A `v*` Git tag also publishes
+the versioned image and `latest` to `ghcr.io/<repository-owner>/remotelink`.
+
 ### GitHub Actions package
 
 Open **Actions → Package RemoteLink for Linux → Run workflow** to build and
