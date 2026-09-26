@@ -56,7 +56,7 @@ jobs:
             -e REMOTELINK_ADMIN_PASSWORD=ci-test-password "$IMAGE"
           trap 'docker rm -f remotelink-smoke >/dev/null 2>&1 || true' EXIT
           for attempt in {1..30}; do
-            if curl -fsS http://127.0.0.1:18080/healthz; then exit 0; fi
+            if curl -kfsS https://127.0.0.1:18080/healthz; then exit 0; fi
             sleep 1
           done
           docker logs remotelink-smoke

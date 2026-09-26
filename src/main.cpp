@@ -463,17 +463,18 @@ int main() {
         auto parsed = remotelink::parse_access_tokens(additional);
         access_tokens.insert(access_tokens.end(), parsed.begin(), parsed.end());
     }
-    const char* certificate = std::getenv("REMOTELINK_TLS_CERTIFICATE");
-    const char* private_key = std::getenv("REMOTELINK_TLS_PRIVATE_KEY");
-    const bool tls_enabled = certificate != nullptr && *certificate != '\0' &&
-                             private_key != nullptr && *private_key != '\0';
     const char* tls_proxy_environment = std::getenv("REMOTELINK_BEHIND_TLS_PROXY");
-    const bool tls_proxy = tls_proxy_environment != nullptr && *tls_proxy_environment != '\0';
-    if (!tls_enabled && !tls_proxy && std::getenv("REMOTELINK_ALLOW_INSECURE_HTTP") == nullptr) {
-        throw std::runtime_error(
-            "REMOTELINK_TLS_CERTIFICATE and REMOTELINK_TLS_PRIVATE_KEY are required "
-            "(set REMOTELINK_BEHIND_TLS_PROXY=1 behind a TLS reverse proxy, or "
-            "REMOTELINK_ALLOW_INSECURE_HTTP=1 only for localhost development)");
+    const char* insecure_http = std::getenv("REMOTELINK_ALLOW_INSECURE_HTTP");
+    const bool plain_http =
+        (tls_proxy_environment != nullptr && tls_proxy_environment[0] == '1' && tls_proxy_environment[1] == '\0') ||
+        (insecure_http != nullptr && *insecure_http != '\0');
+    const char* certificate = nullptr;
+    const char* private_key = nullptr;
+    if (!plain_http) {
+        certificate = std::getenv("REMOTELINK_TLS_CERTIFICATE");
+        private_key = std::getenv("REMOTELINK_TLS_PRIVATE_KEY");
+        if (certificate == nullptr || *certificate == '\0') certificate = "/etc/remotelink/tls/fullchain.pem";
+        if (private_key == nullptr || *private_key == '\0') private_key = "/etc/remotelink/tls/privkey.pem";
     }
     const char* targets_file = std::getenv("REMOTELINK_TARGETS_FILE");
     const char* allowed_hosts_environment = std::getenv("REMOTELINK_ALLOWED_HOSTS");

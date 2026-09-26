@@ -4,6 +4,7 @@ set -euo pipefail
 state_dir="${REMOTELINK_STATE_DIR:-/var/lib/remotelink}"
 umask 077
 mkdir -p "${state_dir}"
+/usr/local/bin/remotelink-generate-certificate
 
 if [[ -z "${REMOTELINK_ACCESS_TOKEN:-}" && -z "${REMOTELINK_ACCESS_TOKEN_FILE:-}" ]]; then
   token_file="${state_dir}/access-token"

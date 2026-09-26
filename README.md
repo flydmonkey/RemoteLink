@@ -19,15 +19,14 @@ docker run -d \
   -p 18080:18080 \
   -p 50000-50019:50000-50019/udp \
   -e REMOTELINK_ADMIN_PASSWORD='replace-with-a-strong-password' \
-  -e REMOTELINK_BEHIND_TLS_PROXY=1 \
   -e REMOTELINK_ALLOWED_HOSTS='*' \
   -v remotelink-state:/var/lib/remotelink \
   flydmonkey/remotelink:latest
 ```
 
-The image publishes two ports: TCP `18080` for the UI, API, and WebSocket signaling, and UDP `50000-50019` for RDP WebRTC media. Publish each UDP port with the same host and container port number.
+The image publishes two ports: TCP `18080` for the HTTPS UI, API, and WebSocket signaling, and UDP `50000-50019` for RDP WebRTC media. Publish each UDP port with the same host and container port number. The image includes a self-signed certificate at `REMOTELINK_TLS_CERTIFICATE=/etc/remotelink/tls/fullchain.pem` and `REMOTELINK_TLS_PRIVATE_KEY=/etc/remotelink/tls/privkey.pem`.
 
-Open <http://localhost:18080> and sign in with username `admin` and the password
+Open <https://localhost:18080> and sign in with username `admin` and the password
 set in `REMOTELINK_ADMIN_PASSWORD`. Then open **Management** to add RDP, VNC,
 or SSH connections, and use **User management** to grant access.
 
@@ -55,7 +54,6 @@ docker run -d \
   -p 18080:18080 \
   -p 50000-50019:50000-50019/udp \
   -e REMOTELINK_ADMIN_PASSWORD='replace-with-a-strong-password' \
-  -e REMOTELINK_BEHIND_TLS_PROXY=1 \
   -e REMOTELINK_ALLOWED_HOSTS='*' \
   -e REMOTELINK_ICE_ADVERTISED_ADDRESS='192.0.2.10' \
   -e REMOTELINK_ICE_UDP_PORT_MIN=50000 \
@@ -64,7 +62,7 @@ docker run -d \
   flydmonkey/remotelink:latest
 ```
 
-Replace `192.0.2.10` with the Docker host's reachable IP. Compose reads the same
+Replace `192.0.2.10` with the Docker host's reachable IP. Startup adds that address to the default certificate. Open `https://THAT-ADDRESS:18080` and trust the self-signed certificate. Compose reads the same
 address from `REMOTELINK_ICE_ADVERTISED_ADDRESS` and already publishes UDP
 50000-50019. On Linux, `network_mode: host` is an alternative that lets
 candidates use the host's own addresses; do not combine it with published ports.
@@ -77,11 +75,9 @@ docker rm -f remotelink
 # Run the docker command above again with the same remotelink-state volume.
 ```
 
-This quick-start configuration serves plain HTTP for local evaluation or use
-behind a trusted TLS reverse proxy. The proxy forwards the UI and WebSocket on
-TCP `18080`; browsers still need direct access to UDP `50000-50019` for RDP
-media. Pin a release such as
-`flydmonkey/remotelink:0.3.4` instead of `latest` when reproducible deployments
+The image serves HTTPS with a self-signed certificate. Trust that certificate in the browser on first visit so the origin becomes a secure context.
+Set `REMOTELINK_BEHIND_TLS_PROXY=1` to serve plain HTTP instead; the default certificate is then unused. Browsers still need direct access to UDP `50000-50019` for RDP
+media. Pin a release such as `flydmonkey/remotelink:0.3.5` instead of `latest` when reproducible deployments
 are required.
 
 ## Features
@@ -164,7 +160,7 @@ After first login, administrators manage RDP, VNC, and SSH connections from each
 | `REMOTELINK_ACCESS_TOKEN_FILE` | Protected primary-administrator recovery credential |
 | `REMOTELINK_TLS_CERTIFICATE` | TLS certificate chain |
 | `REMOTELINK_TLS_PRIVATE_KEY` | TLS private key |
-| `REMOTELINK_BEHIND_TLS_PROXY` | Set to `1` only when a trusted reverse proxy terminates HTTPS/WSS. RemoteLink then serves unencrypted HTTP/WebSocket traffic on its backend port, which must not be exposed directly to untrusted networks. |
+| `REMOTELINK_BEHIND_TLS_PROXY` | Set to `1` to serve plain HTTP on port `18080` and ignore TLS certificates. When unset, RemoteLink serves HTTPS with the default certificate. This does not configure a proxy, and that port must not be exposed directly to untrusted networks. |
 | `REMOTELINK_STATE_DIR` | Persistent users, files, print jobs, and audit state |
 | `REMOTELINK_USER_FILE_QUOTA_BYTES` | Optional per-user file quota |
 | `REMOTELINK_BLOCKED_FILE_EXTENSIONS` | Optional blocked upload extensions |
@@ -184,9 +180,10 @@ export REMOTELINK_STATE_DIR=/var/lib/remotelink
 
 `REMOTELINK_ALLOW_INSECURE_HTTP=1` may be used for localhost-only development. Never use insecure HTTP for LAN or Internet access.
 
-`REMOTELINK_BEHIND_TLS_PROXY=1` does not enable TLS or configure a proxy. It only
-tells RemoteLink that TLS is terminated upstream and permits the backend to run
-without certificate files. The proxy must forward both HTTP requests and
+`REMOTELINK_BEHIND_TLS_PROXY=1` serves plain HTTP on port `18080` and ignores the TLS certificate.
+Otherwise RemoteLink serves HTTPS. When the certificate paths are unset, it uses
+`/etc/remotelink/tls/fullchain.pem` and `/etc/remotelink/tls/privkey.pem`.
+This variable does not configure a proxy. The proxy must forward both HTTP requests and
 WebSocket upgrades, and port `18080` must remain reachable only by that proxy.
 
 ## Deployment
@@ -203,9 +200,9 @@ REMOTELINK_IMAGE=remotelink REMOTELINK_ADMIN_PASSWORD='change-this-password' doc
 ```
 
 The service publishes TCP `18080` and UDP `50000-50019`. The Compose configuration persists all users,
-connections, credentials, and audit data in the `remotelink-state` volume. It assumes TLS is
-terminated by a trusted reverse proxy. Do not expose the plain HTTP port directly to an
-untrusted network. To build another repository/tag or push with Buildx:
+connections, credentials, and audit data in the `remotelink-state` volume. The default
+certificate is `/etc/remotelink/tls/fullchain.pem` with its key at `/etc/remotelink/tls/privkey.pem`.
+To build another repository/tag or push with Buildx:
 
 ```bash
 REMOTELINK_IMAGE=ghcr.io/example/remotelink REMOTELINK_VERSION=0.3.1 \

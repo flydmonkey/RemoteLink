@@ -1,5 +1,10 @@
 # RemoteLink changelog
 
+## 0.3.5
+
+- Ship a self-signed TLS certificate in the Docker image at `/etc/remotelink/tls/fullchain.pem` and `/etc/remotelink/tls/privkey.pem`.
+- Serve plain HTTP when `REMOTELINK_BEHIND_TLS_PROXY=1`, and HTTPS with that certificate otherwise.
+
 ## 0.3.4
 
 - Advertise a configured host address on ICE candidates so browsers outside a Docker network can receive RDP media.

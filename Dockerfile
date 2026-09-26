@@ -40,7 +40,7 @@ LABEL org.opencontainers.image.title="RemoteLink" \
       org.opencontainers.image.source="https://github.com/flydmonkey/RemoteLink"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl tini \
+      ca-certificates curl openssl tini \
       freerdp3-dev libwinpr3-dev libopenh264-dev libopus-dev libyuv-dev \
       libssl-dev libssh2-1-dev zlib1g \
     && rm -rf /var/lib/apt/lists/* \
@@ -48,26 +48,32 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       --shell /usr/sbin/nologin remotelink \
     && install -d -o remotelink -g remotelink -m 0750 /var/lib/remotelink \
     && install -d -o root -g remotelink -m 0750 /etc/remotelink \
+    && install -d -o remotelink -g remotelink -m 0750 /etc/remotelink/tls \
     && printf '{"targets":[]}\n' > /etc/remotelink/targets.json
 
 COPY --from=builder /stage/ /opt/remotelink/
 COPY --from=builder /src/web /opt/remotelink/web
 COPY docker/entrypoint.sh /usr/local/bin/remotelink-entrypoint
+COPY docker/generate-default-certificate.sh /usr/local/bin/remotelink-generate-certificate
 
 ENV LD_LIBRARY_PATH=/opt/remotelink/lib \
     REMOTELINK_WEB_ROOT=/opt/remotelink/web \
     REMOTELINK_STATE_DIR=/var/lib/remotelink \
     REMOTELINK_TARGETS_FILE=/etc/remotelink/targets.json \
     REMOTELINK_ALLOWED_HOSTS=* \
-    REMOTELINK_BEHIND_TLS_PROXY=1 \
+    REMOTELINK_TLS_CERTIFICATE=/etc/remotelink/tls/fullchain.pem \
+    REMOTELINK_TLS_PRIVATE_KEY=/etc/remotelink/tls/privkey.pem \
     REMOTELINK_ICE_UDP_PORT_MIN=50000 \
     REMOTELINK_ICE_UDP_PORT_MAX=50019
 
 VOLUME ["/var/lib/remotelink"]
 EXPOSE 18080/tcp
 EXPOSE 50000-50019/udp
+RUN chmod 0755 /usr/local/bin/remotelink-entrypoint /usr/local/bin/remotelink-generate-certificate \
+    && remotelink-generate-certificate \
+    && chown -R remotelink:remotelink /etc/remotelink/tls
 USER remotelink
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/remotelink-entrypoint"]
 CMD ["/opt/remotelink/bin/remotelink"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD curl --fail --silent http://127.0.0.1:18080/healthz || exit 1
+  CMD curl --fail --silent --insecure https://127.0.0.1:18080/healthz || curl --fail --silent http://127.0.0.1:18080/healthz || exit 1

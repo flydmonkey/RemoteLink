@@ -19,15 +19,14 @@ docker run -d \
   -p 18080:18080 \
   -p 50000-50019:50000-50019/udp \
   -e REMOTELINK_ADMIN_PASSWORD='请替换为安全密码' \
-  -e REMOTELINK_BEHIND_TLS_PROXY=1 \
   -e REMOTELINK_ALLOWED_HOSTS='*' \
   -v remotelink-state:/var/lib/remotelink \
   flydmonkey/remotelink:latest
 ```
 
-镜像需要对外发布两个端口：TCP `18080` 提供页面、接口和 WebSocket 信令，UDP `50000-50019` 提供 RDP 的 WebRTC 媒体。宿主机和容器必须使用相同的 UDP 端口号。
+镜像需要对外发布两个端口：TCP `18080` 提供 HTTPS 页面、接口和 WebSocket 信令，UDP `50000-50019` 提供 RDP 的 WebRTC 媒体。宿主机和容器必须使用相同的 UDP 端口号。镜像自带自签名证书，路径是 `REMOTELINK_TLS_CERTIFICATE=/etc/remotelink/tls/fullchain.pem` 和 `REMOTELINK_TLS_PRIVATE_KEY=/etc/remotelink/tls/privkey.pem`。
 
-打开 <http://localhost:18080>，使用用户名 `admin` 和
+打开 <https://localhost:18080>，使用用户名 `admin` 和
 `REMOTELINK_ADMIN_PASSWORD` 中设置的密码登录。登录后进入“管理”添加
 RDP、VNC 或 SSH 连接，再通过“用户管理”分配连接权限。
 
@@ -53,7 +52,6 @@ docker run -d \
   -p 18080:18080 \
   -p 50000-50019:50000-50019/udp \
   -e REMOTELINK_ADMIN_PASSWORD='请替换为安全密码' \
-  -e REMOTELINK_BEHIND_TLS_PROXY=1 \
   -e REMOTELINK_ALLOWED_HOSTS='*' \
   -e REMOTELINK_ICE_ADVERTISED_ADDRESS='192.0.2.10' \
   -e REMOTELINK_ICE_UDP_PORT_MIN=50000 \
@@ -62,7 +60,7 @@ docker run -d \
   flydmonkey/remotelink:latest
 ```
 
-把 `192.0.2.10` 换成 Docker 宿主机上浏览器能够到达的地址。Compose 会读取
+把 `192.0.2.10` 换成 Docker 宿主机上浏览器能够到达的地址。容器启动时会把这个地址写进默认证书。用 `https://该地址:18080` 打开，并在浏览器里信任这张自签名证书。Compose 会读取
 `REMOTELINK_ICE_ADVERTISED_ADDRESS`，并已经发布 UDP 50000-50019。Linux 上也可以
 改用 `network_mode: host`，让候选地址直接使用宿主机网卡；不要同时再发布端口。
 
@@ -74,9 +72,9 @@ docker rm -f remotelink
 # 使用上方 docker run 命令重新创建容器，并继续挂载同一 remotelink-state 卷。
 ```
 
-上述快速开始通过明文 HTTP 服务，仅适合本机试用或放在可信 TLS 反向代理后方。
-反向代理只转发 TCP `18080` 上的页面和 WebSocket；RDP 媒体仍要求浏览器能够直接访问 UDP `50000-50019`。
-需要可重现部署时，建议使用 `flydmonkey/remotelink:0.3.4` 等明确版本，而不是 `latest`。
+镜像默认使用自签名证书提供 HTTPS。浏览器第一次打开时需要信任该证书，之后这个地址才是安全上下文。
+设置 `REMOTELINK_BEHIND_TLS_PROXY=1` 时改为明文 HTTP，默认证书不会被使用。RDP 媒体仍要求浏览器能够直接访问 UDP `50000-50019`。
+需要可重现部署时，建议使用 `flydmonkey/remotelink:0.3.5` 等明确版本，而不是 `latest`。
 
 ## 功能
 
@@ -187,7 +185,7 @@ ctest --test-dir build --output-on-failure
 | `REMOTELINK_ACCESS_TOKEN_FILE` | 主管理员受保护的恢复凭据 |
 | `REMOTELINK_TLS_CERTIFICATE` | TLS 证书链 |
 | `REMOTELINK_TLS_PRIVATE_KEY` | TLS 私钥 |
-| `REMOTELINK_BEHIND_TLS_PROXY` | 仅在可信反向代理终止 HTTPS/WSS 时设为 `1`。RemoteLink 会在后端端口提供未加密的 HTTP/WebSocket，不得将该端口直接暴露给不可信网络。 |
+| `REMOTELINK_BEHIND_TLS_PROXY` | 设为 `1` 时在 `18080` 提供明文 HTTP，并忽略 TLS 证书。未设置时使用 HTTPS 和默认证书。不会配置反向代理，该端口不得直接暴露给不可信网络。 |
 | `REMOTELINK_STATE_DIR` | 用户、文件、打印任务和审计数据目录 |
 | `REMOTELINK_USER_FILE_QUOTA_BYTES` | 可选的单用户文件配额 |
 | `REMOTELINK_BLOCKED_FILE_EXTENSIONS` | 可选的上传扩展名黑名单 |
@@ -207,9 +205,9 @@ export REMOTELINK_STATE_DIR=/var/lib/remotelink
 
 仅限本机开发时可使用 `REMOTELINK_ALLOW_INSECURE_HTTP=1`。局域网或互联网访问时不要使用不安全 HTTP。
 
-`REMOTELINK_BEHIND_TLS_PROXY=1` 不会开启 TLS，也不会自动配置反向代理。
-它只是告诉 RemoteLink：TLS 已由上游终止，因此后端可以在未配置证书文件时启动。
-反向代理必须同时转发 HTTP 请求和 WebSocket 升级，且 `18080` 端口只能对该代理可达。
+`REMOTELINK_BEHIND_TLS_PROXY=1` 时，`18080` 提供明文 HTTP，已配置的证书不会启用。
+未设置该变量时使用 HTTPS。未另行指定证书路径时，使用 `/etc/remotelink/tls/fullchain.pem` 和 `/etc/remotelink/tls/privkey.pem`。
+这个变量不会配置反向代理。反向代理必须同时转发 HTTP 请求和 WebSocket 升级，且 `18080` 端口只能对该代理可达。
 
 ## 部署
 
@@ -225,7 +223,7 @@ REMOTELINK_IMAGE=remotelink REMOTELINK_ADMIN_PASSWORD='请修改为安全密码'
 ```
 
 服务发布 TCP `18080` 和 UDP `50000-50019`。Compose 使用 `remotelink-state` 卷持久化用户、连接、凭据和审计数据。
-默认配置假定 HTTPS 由可信反向代理终止，请勿把明文 HTTP 端口直接暴露到不受信任的网络。
+默认证书位于 `/etc/remotelink/tls/fullchain.pem` 与 `/etc/remotelink/tls/privkey.pem`。
 如需指定镜像仓库、版本并通过 Buildx 推送：
 
 ```bash
