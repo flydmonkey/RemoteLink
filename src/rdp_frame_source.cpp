@@ -17,6 +17,7 @@
 #include <freerdp/settings.h>
 #include <freerdp/settings_keys.h>
 #include <nlohmann/json.hpp>
+#include <openssl/ssl.h>
 #include <winpr/synch.h>
 
 #include <algorithm>
@@ -578,6 +579,13 @@ void RdpFrameSource::run(std::stop_token stop_token, FrameHandler on_frame) {
     freerdp_settings_set_bool(settings, FreeRDP_SurfaceFrameMarkerEnabled, TRUE);
     freerdp_settings_set_bool(settings, FreeRDP_IgnoreCertificate,
                               options_.ignore_certificate ? TRUE : FALSE);
+    /* FreeRDP 3.27+ and Ubuntu's OpenSSL 3 default to TLS 1.2 with security
+     * level 2. Windows hosts that still offer TLS 1.0/1.1 or SHA-1 certificates
+     * then fail with ERRCONNECT_TLS_CONNECT_FAILED. Allow those versions on this
+     * outbound RDP connection only; the gateway HTTPS listener is unchanged.
+     * Stronger versions remain available when the server offers them. */
+    freerdp_settings_set_uint32(settings, FreeRDP_TlsSecLevel, 0);
+    freerdp_settings_set_uint16(settings, FreeRDP_TLSMinVersion, TLS1_VERSION);
     if (options_.audio_playback) {
         const char* audio_channel[] = { RDPSND_CHANNEL_NAME, "sys:gateway" };
         if (!freerdp_client_add_static_channel(settings,

@@ -1,5 +1,9 @@
 # RemoteLink changelog
 
+## 0.3.7
+
+- Allow outbound RDP connections to negotiate TLS 1.0 and SHA-1 certificates. The gateway HTTPS listener still requires TLS 1.2 or newer.
+
 ## 0.3.6
 
 - Fix the release build so the Docker image serves HTTPS by default. Tag `v0.3.5` did not publish because `tls_enabled` was left undeclared.
