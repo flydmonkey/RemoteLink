@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(remotelink VERSION 0.3.1 LANGUAGES C CXX)
+project(remotelink VERSION 0.3.2 LANGUAGES C CXX)
 
 option(REMOTELINK_BUILD_TESTS "Build unit tests" ON)
 option(REMOTELINK_ENABLE_STREAMING "Build WebRTC/H.264 streaming support" ON)

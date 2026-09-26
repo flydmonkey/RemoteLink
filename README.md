@@ -123,10 +123,15 @@ REMOTELINK_IMAGE=ghcr.io/example/remotelink REMOTELINK_VERSION=0.3.1 \
 ```
 
 Pushes and pull requests automatically verify the image build. A `v*` Git tag publishes the
-versioned image and `latest` to both GHCR and Docker Hub. Before creating a release tag, add
+multi-platform `linux/amd64` and `linux/arm64` image under the versioned and `latest` tags to
+both GHCR and Docker Hub. Docker automatically selects the matching architecture when pulling.
+Before creating a release tag, add
 the repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`. Use a Docker Hub personal
 access token with read/write permission; the target repository is
 `DOCKERHUB_USERNAME/remotelink` (create that repository in Docker Hub first).
+
+For a manual multi-platform Buildx publication, set
+`REMOTELINK_PLATFORM=linux/amd64,linux/arm64` together with `REMOTELINK_PUSH=1`.
 
 ### GitHub Actions package
 

@@ -1,5 +1,9 @@
 # RemoteLink changelog
 
+## 0.3.2
+
+- Publish Docker release images for both AMD64 and ARM64 under the same version tags.
+
 ## 0.3.1
 
 - Unified all product, service, executable, configuration, and container naming as RemoteLink.

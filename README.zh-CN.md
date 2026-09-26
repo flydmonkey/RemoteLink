@@ -150,11 +150,15 @@ REMOTELINK_IMAGE=ghcr.io/example/remotelink REMOTELINK_VERSION=0.3.1 \
   REMOTELINK_PUSH=1 bash ./scripts/build-docker.sh
 ```
 
-分支推送和 Pull Request 会自动验证镜像构建；推送 `v*` 版本标签时，会同时将版本镜像和
-`latest` 发布到 GHCR 与 Docker Hub。创建版本标签前，请在 GitHub 仓库 Secrets 中配置
+分支推送和 Pull Request 会自动验证镜像构建；推送 `v*` 版本标签时，会同时将支持
+`linux/amd64` 和 `linux/arm64` 的多架构版本镜像与 `latest` 发布到 GHCR 与 Docker Hub，
+拉取时 Docker 会自动选择当前机器的架构。创建版本标签前，请在 GitHub 仓库 Secrets 中配置
 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN`。Token 应使用具有读写权限的 Docker Hub
 Personal Access Token，目标仓库为 `DOCKERHUB_USERNAME/remotelink`。
 请先在 Docker Hub 中创建名为 `remotelink` 的仓库。
+
+手工使用 Buildx 发布多架构镜像时，可同时设置
+`REMOTELINK_PLATFORM=linux/amd64,linux/arm64` 和 `REMOTELINK_PUSH=1`。
 
 ### GitHub Actions 一键打包
 
