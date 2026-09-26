@@ -27,12 +27,15 @@ public:
     bool set_bitrate(std::uint32_t bitrate);
 
 private:
+    void configure(std::uint32_t width, std::uint32_t height);
+    void shutdown();
     void convert_bgra_to_i420(const Frame& frame);
 
     ISVCEncoder* encoder_ = nullptr;
-    std::uint32_t width_;
-    std::uint32_t height_;
+    std::uint32_t width_ = 0;
+    std::uint32_t height_ = 0;
     std::uint32_t fps_;
+    std::uint32_t bitrate_;
     std::vector<std::uint8_t> i420_;
     std::atomic_bool key_frame_requested_ = false;
     std::mutex mutex_;

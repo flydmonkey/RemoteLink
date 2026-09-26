@@ -81,7 +81,7 @@ docker rm -f remotelink
 ```
 
 RDP 媒体仍要求浏览器能够直接访问 UDP `50000-50019`。
-从 `0.3.6` 起，镜像默认提供 HTTPS。`0.3.4` 及更早的镜像会设置 `REMOTELINK_BEHIND_TLS_PROXY=1`，因此仍是明文 HTTP。`0.3.7` 起，连接旧版 Windows 时允许协商 TLS 1.0。需要可重现部署时，建议使用 `flydmonkey/remotelink:0.3.7`。
+从 `0.3.6` 起，镜像默认提供 HTTPS。`0.3.4` 及更早的镜像会设置 `REMOTELINK_BEHIND_TLS_PROXY=1`，因此仍是明文 HTTP。`0.3.7` 起，连接旧版 Windows 时允许协商 TLS 1.0。需要可重现部署时，建议使用 `flydmonkey/remotelink:0.3.8`。
 
 ## 功能
 

@@ -173,9 +173,14 @@ BOOL publish_pointer(rdpContext* context, UINT16 cache_index, UINT16 hotspot_x,
                      UINT16 hotspot_y, UINT16 width, UINT16 height,
                      const BYTE* xor_mask, UINT32 xor_length,
                      const BYTE* and_mask, UINT32 and_length, UINT32 xor_bpp) {
-    if (width == 0 || height == 0 || width > 256 || height > 256 ||
-        xor_mask == nullptr || (xor_bpp != 15 && xor_bpp != 16 &&
-        xor_bpp != 24 && xor_bpp != 32)) return TRUE;
+    if (width == 0 || height == 0 || width > 256 || height > 256 || xor_mask == nullptr)
+        return TRUE;
+    /* Windows 7 and older send monochrome (1 bpp) and paletted (8 bpp) cursors
+     * for the I-beam, wait, and resize shapes. Dropping those updates leaves
+     * the previously rendered cursor on screen. */
+    const bool supported_bpp = xor_bpp == 1 || xor_bpp == 8 || xor_bpp == 16 ||
+                               xor_bpp == 24 || xor_bpp == 32;
+    if (!supported_bpp) return TRUE;
     std::vector<std::uint8_t> rgba(static_cast<std::size_t>(width) * height * 4);
     const auto* palette = context->gdi ? &context->gdi->palette : nullptr;
     if (!freerdp_image_copy_from_pointer_data(

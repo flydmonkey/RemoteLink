@@ -1,5 +1,12 @@
 # RemoteLink changelog
 
+## 0.3.8
+
+- Recreate the H.264 encoder when the Windows desktop size differs from the requested resolution.
+- Draw 1-bit and 8-bit cursors sent by older Windows hosts.
+- Use 1920×1080 when connection display settings have not been saved.
+- Require a username and password when creating an RDP connection.
+
 ## 0.3.7
 
 - Allow outbound RDP connections to negotiate TLS 1.0 and SHA-1 certificates. The gateway HTTPS listener still requires TLS 1.2 or newer.

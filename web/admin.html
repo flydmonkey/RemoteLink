@@ -1344,7 +1344,7 @@
     <dialog id="connection-dialog">
       <form id="connection-form">
         <h2>添加连接</h2>
-        <p>添加由管理员维护的 RDP 连接。用户连接时可以覆盖默认凭据。</p>
+        <p id="connection-description">添加由管理员维护的 RDP 连接。</p>
         <label for="connection-name">连接名称</label
         ><input id="connection-name" maxlength="128" required /><label
           for="connection-host"
@@ -1359,15 +1359,16 @@
           max="65535"
           value="3389"
           required
-        /><label for="connection-username">默认用户名（可选）</label
-        ><input id="connection-username" maxlength="256" /><label
+        /><label for="connection-username">用户名</label
+        ><input id="connection-username" maxlength="256" required /><label
           for="connection-password"
-          >默认密码（可选）</label
+          >密码</label
         ><input
           id="connection-password"
           type="password"
           maxlength="4096"
           autocomplete="new-password"
+          required
         />
         <div id="connection-error" role="alert"></div>
         <div class="dialog-actions">
@@ -1626,11 +1627,11 @@
         connectionForm.querySelector("h2").textContent = target
           ? "编辑连接"
           : "添加连接";
-        connectionForm.querySelector("p").textContent = target
+        connectionForm.querySelector("#connection-description").textContent = target
           ? target.hasPassword
             ? "凭据已配置（不回显）。密码留空将保留当前密码。"
-            : "尚未配置密码；保存新密码后只显示配置状态。"
-          : "添加由管理员维护的 RDP 连接。用户连接时可以覆盖默认凭据。";
+            : "请填写 Windows 用户名和密码。"
+          : "添加由管理员维护的 RDP 连接。";
         connectionForm.querySelector('button[type="submit"]').textContent =
           target ? "保存修改" : "添加连接";
         document.querySelector("#connection-name").value = target?.name || "";
@@ -1638,6 +1639,8 @@
         document.querySelector("#connection-port").value = target?.port || 3389;
         document.querySelector("#connection-username").value =
           target?.username || "";
+        document.querySelector("#connection-password").required =
+          !target?.hasPassword;
         document.querySelector("#connection-error").textContent = "";
         connectionDialog.showModal();
       }

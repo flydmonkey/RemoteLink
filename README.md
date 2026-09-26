@@ -84,7 +84,7 @@ docker rm -f remotelink
 ```
 
 Browsers still need direct access to UDP `50000-50019` for RDP media.
-From `0.3.6`, the image serves HTTPS by default. Releases through `0.3.4` set `REMOTELINK_BEHIND_TLS_PROXY=1` and still serve plain HTTP. From `0.3.7`, outbound RDP can negotiate TLS 1.0 with older Windows hosts. Pin `flydmonkey/remotelink:0.3.7` for a reproducible deployment.
+From `0.3.6`, the image serves HTTPS by default. Releases through `0.3.4` set `REMOTELINK_BEHIND_TLS_PROXY=1` and still serve plain HTTP. From `0.3.7`, outbound RDP can negotiate TLS 1.0 with older Windows hosts. Pin `flydmonkey/remotelink:0.3.8` for a reproducible deployment.
 
 ## Features
 

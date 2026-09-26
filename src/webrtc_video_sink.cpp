@@ -1,5 +1,7 @@
 #include "remotelink/webrtc_video_sink.hpp"
 
+#include <iostream>
+
 namespace remotelink {
 
 WebRtcVideoSink::WebRtcVideoSink(WebRtcServer& server, std::string peer_id, std::uint32_t width,
@@ -8,11 +10,16 @@ WebRtcVideoSink::WebRtcVideoSink(WebRtcServer& server, std::string peer_id, std:
     : server_(server), peer_id_(std::move(peer_id)), encoder_(width, height, fps, bitrate) {}
 
 void WebRtcVideoSink::consume(const Frame& frame) {
-    EncodedFrame encoded = encoder_.encode(frame);
-    if (!encoded.annex_b.empty()) {
-        ++encoded_frames_;
-        sent_bytes_ += encoded.annex_b.size();
-        server_.send(peer_id_, encoded);
+    try {
+        EncodedFrame encoded = encoder_.encode(frame);
+        if (!encoded.annex_b.empty()) {
+            ++encoded_frames_;
+            sent_bytes_ += encoded.annex_b.size();
+            server_.send(peer_id_, encoded);
+        }
+    }
+    catch (const std::exception& error) {
+        std::cerr << "frame encode skipped: " << error.what() << '\n';
     }
 }
 

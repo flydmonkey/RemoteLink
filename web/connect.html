@@ -1054,13 +1054,27 @@
           const host = selected.host;
           localStorage.setItem("remotelink-last-target", selected.id);
           let settings = {};
+          let savedResolution = false;
           try {
             settings = JSON.parse(
               localStorage.getItem("remotelink-settings") || "{}",
             );
+            savedResolution =
+              Number(settings.width) > 0 && Number(settings.height) > 0;
           } catch {}
-          if (!(Number(settings.width) > 0 && Number(settings.height) > 0))
-            Object.assign(settings, automaticResolution());
+          if (!savedResolution) {
+            const stored = localStorage.getItem("remotelink-settings");
+            const explicitAuto =
+              stored &&
+              Number(settings.width) === 0 &&
+              Number(settings.height) === 0;
+            Object.assign(
+              settings,
+              explicitAuto
+                ? automaticResolution()
+                : { width: 1920, height: 1080 },
+            );
+          }
           settings.bitrate = Number(settings.bitrate) || 4000000;
           const network =
             navigator.connection ||
