@@ -9,7 +9,7 @@ The gateway runs as a single Linux service. Users only need a modern browser—n
 ## Quick start with Docker
 
 The official image is published to Docker Hub for both `linux/amd64` and
-`linux/arm64`. Docker automatically pulls the correct architecture:
+`linux/arm64`. Docker automatically pulls the correct architecture. The quick start uses HTTPS:
 
 ```bash
 docker volume create remotelink-state
@@ -20,11 +20,17 @@ docker run -d \
   -p 50000-50019:50000-50019/udp \
   -e REMOTELINK_ADMIN_PASSWORD='replace-with-a-strong-password' \
   -e REMOTELINK_ALLOWED_HOSTS='*' \
+  -e REMOTELINK_TLS_CERTIFICATE=/etc/remotelink/tls/fullchain.pem \
+  -e REMOTELINK_TLS_PRIVATE_KEY=/etc/remotelink/tls/privkey.pem \
   -v remotelink-state:/var/lib/remotelink \
   flydmonkey/remotelink:latest
 ```
 
-The image publishes two ports: TCP `18080` for the HTTPS UI, API, and WebSocket signaling, and UDP `50000-50019` for RDP WebRTC media. Publish each UDP port with the same host and container port number. The image includes a self-signed certificate at `REMOTELINK_TLS_CERTIFICATE=/etc/remotelink/tls/fullchain.pem` and `REMOTELINK_TLS_PRIVATE_KEY=/etc/remotelink/tls/privkey.pem`.
+Port `18080` serves the UI, API, and WebSocket signaling over HTTPS. The image includes a self-signed certificate at the two paths above, `/etc/remotelink/tls/fullchain.pem` and `/etc/remotelink/tls/privkey.pem`. The certificate covers `localhost` and `127.0.0.1`. Trust it in the browser on first visit so the origin becomes a secure context. Opening an IP address over `http://` is not a secure context, so WebRTC cannot start and RDP video and audio never appear. Leave the default on HTTPS.
+
+Set `REMOTELINK_BEHIND_TLS_PROXY=1` only when a reverse proxy already terminates HTTPS. The container then serves plain HTTP and ignores the certificate. The variable does not configure a proxy, and port `18080` must stay reachable only by that proxy.
+
+UDP `50000-50019` carries RDP WebRTC media. Publish each UDP port with the same host and container port number.
 
 Open <https://localhost:18080> and sign in with username `admin` and the password
 set in `REMOTELINK_ADMIN_PASSWORD`. Then open **Management** to add RDP, VNC,
@@ -55,6 +61,8 @@ docker run -d \
   -p 50000-50019:50000-50019/udp \
   -e REMOTELINK_ADMIN_PASSWORD='replace-with-a-strong-password' \
   -e REMOTELINK_ALLOWED_HOSTS='*' \
+  -e REMOTELINK_TLS_CERTIFICATE=/etc/remotelink/tls/fullchain.pem \
+  -e REMOTELINK_TLS_PRIVATE_KEY=/etc/remotelink/tls/privkey.pem \
   -e REMOTELINK_ICE_ADVERTISED_ADDRESS='192.0.2.10' \
   -e REMOTELINK_ICE_UDP_PORT_MIN=50000 \
   -e REMOTELINK_ICE_UDP_PORT_MAX=50019 \
@@ -62,8 +70,8 @@ docker run -d \
   flydmonkey/remotelink:latest
 ```
 
-Replace `192.0.2.10` with the Docker host's reachable IP. Startup adds that address to the default certificate. Open `https://THAT-ADDRESS:18080` and trust the self-signed certificate. Compose reads the same
-address from `REMOTELINK_ICE_ADVERTISED_ADDRESS` and already publishes UDP
+Replace `192.0.2.10` with the Docker host's reachable IP. Startup adds that IP to the default certificate. Open `https://THAT-ADDRESS:18080` and trust the self-signed certificate again after the address changes. Compose also defaults to HTTPS, reads the same
+address from `REMOTELINK_ICE_ADVERTISED_ADDRESS`, and already publishes UDP
 50000-50019. On Linux, `network_mode: host` is an alternative that lets
 candidates use the host's own addresses; do not combine it with published ports.
 
@@ -75,10 +83,8 @@ docker rm -f remotelink
 # Run the docker command above again with the same remotelink-state volume.
 ```
 
-The image serves HTTPS with a self-signed certificate. Trust that certificate in the browser on first visit so the origin becomes a secure context.
-Set `REMOTELINK_BEHIND_TLS_PROXY=1` to serve plain HTTP instead; the default certificate is then unused. Browsers still need direct access to UDP `50000-50019` for RDP
-media. Pin a release such as `flydmonkey/remotelink:0.3.5` instead of `latest` when reproducible deployments
-are required.
+Browsers still need direct access to UDP `50000-50019` for RDP media.
+From `0.3.6`, the image serves HTTPS by default. Releases through `0.3.4` set `REMOTELINK_BEHIND_TLS_PROXY=1` and still serve plain HTTP. Pin `flydmonkey/remotelink:0.3.6` rather than `latest` until that tag has been published.
 
 ## Features
 

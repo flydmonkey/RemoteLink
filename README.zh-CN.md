@@ -9,7 +9,7 @@ RemoteLink 是一款可自行部署、通过浏览器使用的 RDP、VNC 和 SSH
 ## Docker 快速开始
 
 官方镜像已发布到 Docker Hub，同时支持 `linux/amd64` 和 `linux/arm64`，
-Docker 会自动拉取与当前主机匹配的架构：
+Docker 会自动拉取与当前主机匹配的架构。快速开始默认使用 HTTPS：
 
 ```bash
 docker volume create remotelink-state
@@ -20,11 +20,17 @@ docker run -d \
   -p 50000-50019:50000-50019/udp \
   -e REMOTELINK_ADMIN_PASSWORD='请替换为安全密码' \
   -e REMOTELINK_ALLOWED_HOSTS='*' \
+  -e REMOTELINK_TLS_CERTIFICATE=/etc/remotelink/tls/fullchain.pem \
+  -e REMOTELINK_TLS_PRIVATE_KEY=/etc/remotelink/tls/privkey.pem \
   -v remotelink-state:/var/lib/remotelink \
   flydmonkey/remotelink:latest
 ```
 
-镜像需要对外发布两个端口：TCP `18080` 提供 HTTPS 页面、接口和 WebSocket 信令，UDP `50000-50019` 提供 RDP 的 WebRTC 媒体。宿主机和容器必须使用相同的 UDP 端口号。镜像自带自签名证书，路径是 `REMOTELINK_TLS_CERTIFICATE=/etc/remotelink/tls/fullchain.pem` 和 `REMOTELINK_TLS_PRIVATE_KEY=/etc/remotelink/tls/privkey.pem`。
+`18080` 上的页面、接口和 WebSocket 信令走 HTTPS。镜像自带自签名证书，就是上面两条环境变量指向的 `/etc/remotelink/tls/fullchain.pem` 和 `/etc/remotelink/tls/privkey.pem`。证书包含 `localhost` 和 `127.0.0.1`。浏览器第一次打开时需要信任这张证书，之后这个地址才是安全上下文。用 IP 访问时，`http://` 不是安全上下文，WebRTC 无法建立，RDP 的画面和声音都不会出来，所以默认不要改成明文 HTTP。
+
+只有前面已经有反向代理负责 HTTPS 时，才额外设置 `REMOTELINK_BEHIND_TLS_PROXY=1`。这时容器改为明文 HTTP，并忽略证书。这个变量不会配置反向代理，`18080` 只能给那台代理访问。
+
+UDP `50000-50019` 提供 RDP 的 WebRTC 媒体。宿主机和容器必须使用相同的 UDP 端口号。
 
 打开 <https://localhost:18080>，使用用户名 `admin` 和
 `REMOTELINK_ADMIN_PASSWORD` 中设置的密码登录。登录后进入“管理”添加
@@ -53,6 +59,8 @@ docker run -d \
   -p 50000-50019:50000-50019/udp \
   -e REMOTELINK_ADMIN_PASSWORD='请替换为安全密码' \
   -e REMOTELINK_ALLOWED_HOSTS='*' \
+  -e REMOTELINK_TLS_CERTIFICATE=/etc/remotelink/tls/fullchain.pem \
+  -e REMOTELINK_TLS_PRIVATE_KEY=/etc/remotelink/tls/privkey.pem \
   -e REMOTELINK_ICE_ADVERTISED_ADDRESS='192.0.2.10' \
   -e REMOTELINK_ICE_UDP_PORT_MIN=50000 \
   -e REMOTELINK_ICE_UDP_PORT_MAX=50019 \
@@ -60,7 +68,7 @@ docker run -d \
   flydmonkey/remotelink:latest
 ```
 
-把 `192.0.2.10` 换成 Docker 宿主机上浏览器能够到达的地址。容器启动时会把这个地址写进默认证书。用 `https://该地址:18080` 打开，并在浏览器里信任这张自签名证书。Compose 会读取
+把 `192.0.2.10` 换成 Docker 宿主机上浏览器能够到达的地址。容器启动时会把这个 IP 写进默认证书。用 `https://该地址:18080` 打开，并在浏览器里信任这张自签名证书。地址变了之后需要重新信任一次。Compose 同样默认使用 HTTPS，会读取
 `REMOTELINK_ICE_ADVERTISED_ADDRESS`，并已经发布 UDP 50000-50019。Linux 上也可以
 改用 `network_mode: host`，让候选地址直接使用宿主机网卡；不要同时再发布端口。
 
@@ -72,9 +80,8 @@ docker rm -f remotelink
 # 使用上方 docker run 命令重新创建容器，并继续挂载同一 remotelink-state 卷。
 ```
 
-镜像默认使用自签名证书提供 HTTPS。浏览器第一次打开时需要信任该证书，之后这个地址才是安全上下文。
-设置 `REMOTELINK_BEHIND_TLS_PROXY=1` 时改为明文 HTTP，默认证书不会被使用。RDP 媒体仍要求浏览器能够直接访问 UDP `50000-50019`。
-需要可重现部署时，建议使用 `flydmonkey/remotelink:0.3.5` 等明确版本，而不是 `latest`。
+RDP 媒体仍要求浏览器能够直接访问 UDP `50000-50019`。
+从 `0.3.6` 起，镜像默认提供 HTTPS。`0.3.4` 及更早的镜像会设置 `REMOTELINK_BEHIND_TLS_PROXY=1`，因此仍是明文 HTTP。需要可重现部署时，建议使用 `flydmonkey/remotelink:0.3.6`，不要继续用尚未更新的 `latest`。
 
 ## 功能
 

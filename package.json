@@ -1,6 +1,6 @@
 {
   "name": "remotelink-browser-tests",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "private": true,
   "scripts": {
     "test:browser": "playwright test",

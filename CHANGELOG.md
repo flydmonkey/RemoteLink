@@ -1,5 +1,9 @@
 # RemoteLink changelog
 
+## 0.3.6
+
+- Fix the release build so the Docker image serves HTTPS by default. Tag `v0.3.5` did not publish because `tls_enabled` was left undeclared.
+
 ## 0.3.5
 
 - Ship a self-signed TLS certificate in the Docker image at `/etc/remotelink/tls/fullchain.pem` and `/etc/remotelink/tls/privkey.pem`.

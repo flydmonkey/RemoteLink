@@ -468,6 +468,7 @@ int main() {
     const bool plain_http =
         (tls_proxy_environment != nullptr && tls_proxy_environment[0] == '1' && tls_proxy_environment[1] == '\0') ||
         (insecure_http != nullptr && *insecure_http != '\0');
+    const bool tls_enabled = !plain_http;
     const char* certificate = nullptr;
     const char* private_key = nullptr;
     if (!plain_http) {
