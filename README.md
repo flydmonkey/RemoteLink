@@ -122,8 +122,11 @@ REMOTELINK_IMAGE=ghcr.io/example/remotelink REMOTELINK_VERSION=0.3.1 \
   REMOTELINK_PUSH=1 bash ./scripts/build-docker.sh
 ```
 
-Pushes and pull requests automatically verify the image build. A `v*` Git tag also publishes
-the versioned image and `latest` to `ghcr.io/<repository-owner>/remotelink`.
+Pushes and pull requests automatically verify the image build. A `v*` Git tag publishes the
+versioned image and `latest` to both GHCR and Docker Hub. Before creating a release tag, add
+the repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`. Use a Docker Hub personal
+access token with read/write permission; the target repository is
+`DOCKERHUB_USERNAME/remotelink` (create that repository in Docker Hub first).
 
 ### GitHub Actions package
 
