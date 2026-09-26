@@ -1,5 +1,10 @@
 # RemoteLink changelog
 
+## 0.3.4
+
+- Compress eligible HTTP text responses with gzip when the client accepts gzip.
+- Serve a multi-size favicon and stamp HTML asset URLs with the running version.
+
 ## 0.3.3
 
 - Added Docker Hub quick-start documentation for the published AMD64 and ARM64 images.

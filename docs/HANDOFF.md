@@ -11,16 +11,13 @@ with the English and Chinese README files, `CHANGELOG.md`, and
 - Repository: `git@github.com:flydmonkey/RemoteLink.git`
 - Local checkout: `C:\Users\Administrator\Projects\apache\remote-gateway`
 - Main branch: `main`
-- Current handoff base: `f636569`
-- Latest release tag: `v0.3.3`
-- Version files currently contain `0.3.3`.
-- The working tree was clean before this handoff document was added.
-
-Important: `v0.3.3` points to `037a055`. The gzip response compression commit
-`d958370` and favicon/runtime asset-version commit `f636569` were made after
-that tag. Do not move or overwrite `v0.3.3`. Prepare `0.3.4` for the next
-release if those changes need to be published as versioned Docker and Linux
-artifacts.
+- Current source version: `0.3.4`
+- Published tag that must stay unchanged: `v0.3.3` at `037a055`
+- `0.3.4` packages the gzip response compression commit `d958370`, the
+  favicon and runtime asset-version commit `f636569`, and the maintainer
+  handoff commit `8068823`.
+- Do not move or overwrite `v0.3.3`. Create a new annotated tag `v0.3.4`
+  from the release-preparation commit.
 
 ## Product scope
 
@@ -69,7 +66,8 @@ avatar menus, button dimensions, labels, management navigation, and i18n.
   `/remotelink-icon.png`.
 - HTML asset placeholders are replaced by the compiled project version at
   request time. Direct systemd/WSL deployments must return URLs such as
-  `/i18n.js?v=0.3.3`, never `__REMOTELINK_VERSION__`.
+  `/i18n.js?v=0.3.4`, never `__REMOTELINK_VERSION__`. The WSL service still
+  returns `0.3.3` until that binary is replaced and restarted.
 
 ## Important source locations
 
@@ -168,9 +166,9 @@ Current deployment verification for the most recent changes:
 
 ```bash
 curl -kfsS https://127.0.0.1:18080/favicon.ico -o /tmp/favicon.ico
-curl -kfsS https://127.0.0.1:18080/ | grep 'i18n.js?v=0.3.3'
+curl -kfsS https://127.0.0.1:18080/ | grep 'i18n.js?v=0.3.4'
 curl -kfsS --raw -H 'Accept-Encoding: gzip' -D - \
-  'https://127.0.0.1:18080/i18n.js?v=0.3.3' -o /tmp/i18n.js.gz
+  'https://127.0.0.1:18080/i18n.js?v=0.3.4' -o /tmp/i18n.js.gz
 gzip -t /tmp/i18n.js.gz
 ```
 
@@ -198,8 +196,7 @@ rotated if that has not already been done.
 Release checklist:
 
 1. Ensure `main` is clean and CI is green.
-2. Choose the next version; the next version after this handoff should normally
-   be `0.3.4` because `v0.3.3` already exists.
+2. Choose the next version. `v0.3.3` already exists, so do not reuse it.
 3. Update `VERSION`, `project(... VERSION ...)` in `CMakeLists.txt`,
    `package.json`, both version fields in `package-lock.json`, and
    `CHANGELOG.md`.
@@ -229,10 +226,17 @@ Do not reuse or force-update a published tag.
 
 ## Immediate follow-up
 
-1. Wait for or inspect the latest `main` CI runs triggered by `f636569`.
-2. Confirm whether the Docker Hub token shown during setup was rotated.
-3. Prepare `v0.3.4` when the gzip and favicon/runtime-version fixes are ready
-   for a public release.
+1. `f636569` CI on `main` succeeded for both Browser compatibility and the
+   Docker image build. Re-check the `v0.3.4` tag workflows after the tag is
+   pushed.
+2. Docker Hub token rotation still has to be confirmed by the operator. The
+   repository does not record whether the token shown during setup was
+   revoked. Do not print secret values. Tag publication logs in to Docker Hub
+   with `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`.
+3. Version files and `CHANGELOG.md` are prepared for `0.3.4`. Local CTest
+   (4/4) and Chromium Playwright (16/16) passed. Next: commit, create
+   annotated tag `v0.3.4`, push `main`, then push the tag. Confirm the Docker
+   and Linux package workflows, including an AMD64 and ARM64 manifest.
 4. Before further UI work, use the existing Playwright screenshots/tests and
    compare RDP, VNC, and SSH together rather than adjusting one tab in
    isolation.
