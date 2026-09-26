@@ -79,6 +79,7 @@ if(REMOTE_GATEWAY_ENABLE_STREAMING)
         src/rdp_frame_source.cpp
         src/session_manager.cpp
         src/ssh_bridge.cpp
+        src/ssh_files.cpp
         src/target_config.cpp
         src/vnc_bridge.cpp
         src/vnc_ticket_store.cpp

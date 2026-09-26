@@ -12,6 +12,7 @@
 #include "remote_gateway/vnc_ticket_store.hpp"
 #include "remote_gateway/vnc_bridge.hpp"
 #include "remote_gateway/ssh_bridge.hpp"
+#include "remote_gateway/ssh_files.hpp"
 #endif
 
 #include <atomic>
@@ -775,6 +776,66 @@ int main() {
             }
             response.body=json{{"targets",std::move(targets)}}.dump(); return response;
         }
+        if (request.path.starts_with("/api/ssh/files")) {
+            const std::string target_id = request.target_id;
+            std::vector<std::string> allowed; bool administrator = false;
+            { std::lock_guard lock(users_mutex); administrator = *user_identity == 0;
+              allowed = users[*user_identity].allowed_targets; }
+            if (target_id.empty() || (!administrator &&
+                std::find(allowed.begin(), allowed.end(), target_id) == allowed.end())) {
+                response.status = 403; response.body = json{{"error", "target not authorized"}}.dump(); return response;
+            }
+            SshConnection selected;
+            { std::lock_guard lock(ssh_connections_mutex);
+              const auto found = std::find_if(ssh_connections.begin(), ssh_connections.end(),
+                  [&](const auto& item) { return item.id == target_id; });
+              if (found == ssh_connections.end()) {
+                  response.status = 404; response.body = json{{"error", "SSH target not found"}}.dump(); return response;
+              }
+              selected = *found; }
+            if (selected.host_key_sha256.empty()) {
+                response.status = 409; response.body = json{{"error", "SSH 主机指纹尚未由管理员确认"}}.dump(); return response;
+            }
+            const remote_gateway::SshBridgeOptions options{.hostname=selected.hostname,
+                .port=selected.port,.username=selected.username,.password=selected.password,
+                .private_key=selected.private_key,.passphrase=selected.passphrase,
+                .host_key_sha256=selected.host_key_sha256};
+            const auto remote_path = percent_decode(request.file_name);
+            std::string error;
+            if (request.method == "GET" && request.path == "/api/ssh/files") {
+                remote_gateway::SshDirectoryListing listing;
+                if (!remote_gateway::SshFiles::list(options, remote_path, listing, error)) {
+                    response.status = 502; response.body = json{{"error", error}}.dump(); return response;
+                }
+                json items = json::array();
+                for (const auto& item : listing.entries) items.push_back({{"name",item.name},{"path",item.path},
+                    {"directory",item.directory},{"size",item.size},{"modified",item.modified}});
+                response.body = json{{"home",listing.home},{"path",listing.path},{"items",std::move(items)}}.dump(); return response;
+            }
+            if (request.method == "POST" && request.path == "/api/ssh/files/upload") {
+                if (request.body.size() > 64ULL * 1024 * 1024) {
+                    response.status = 413; response.body = json{{"error", "上传文件不能超过 64 MB"}}.dump(); return response;
+                }
+                if (!remote_gateway::SshFiles::upload(options, remote_path, request.body, error)) {
+                    response.status = 502; response.body = json{{"error",error}}.dump(); return response;
+                }
+                response.body = json{{"status","uploaded"}}.dump(); return response;
+            }
+            if (request.method == "POST" && request.path == "/api/ssh/files/download") {
+                std::string data;
+                if (!remote_gateway::SshFiles::download(options, remote_path, data, error)) {
+                    response.status = 502; response.body = json{{"error",error}}.dump(); return response;
+                }
+                response.content_type = "application/octet-stream"; response.body = std::move(data); return response;
+            }
+            if (request.method == "POST" && request.path == "/api/ssh/files/delete") {
+                if (!remote_gateway::SshFiles::remove(options, remote_path, error)) {
+                    response.status = 502; response.body = json{{"error",error}}.dump(); return response;
+                }
+                response.body = json{{"status","deleted"}}.dump(); return response;
+            }
+            response.status = 404; response.body = json{{"error","not found"}}.dump(); return response;
+        }
         if (request.method == "POST" && request.path == "/api/ssh/sessions") {
             const auto payload=json::parse(request.body,nullptr,false);
             const auto target_id=payload.is_object()?payload.value("targetId",""):"";
@@ -801,7 +862,8 @@ int main() {
                 .username=gateway_username,.hostname="127.0.0.1",.port=bridge->port()});
             {std::lock_guard bridge_lock(ssh_bridges_mutex);ssh_bridges.emplace(ticket,SshBridgeLease{
                 std::move(bridge),std::chrono::steady_clock::now()+std::chrono::seconds(30)});}
-            response.body=json{{"ticket",ticket},{"websocketUrl","/ssh/ws?ticket="+ticket},{"expiresIn",30}}.dump();return response;
+            response.body=json{{"ticket",ticket},{"targetId",connection->id},
+                {"websocketUrl","/ssh/ws?ticket="+ticket},{"expiresIn",30}}.dump();return response;
         }
         if (request.method == "GET" && request.path == "/api/vnc/targets") {
             std::vector<std::string> allowed;

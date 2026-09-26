@@ -127,6 +127,56 @@
           sans-serif;
         color: #9d9d9d;
       }
+      .file-dialog {
+        width: min(860px, calc(100vw - 32px));
+        height: min(620px, calc(100vh - 32px));
+        padding: 0;
+        border: 1px solid #ffffff2e;
+        border-radius: 8px;
+        color: #eee;
+        background: #292929;
+        box-shadow: 0 20px 60px #000a;
+        font: 14px/1.45 "Segoe UI", sans-serif;
+      }
+      .file-dialog::backdrop { background: #0009; backdrop-filter: blur(3px); }
+      .file-shell { display: flex; flex-direction: column; height: 100%; }
+      .file-header, .file-actions {
+        display: flex; align-items: center; gap: 8px; padding: 14px 16px;
+        border-bottom: 1px solid #ffffff1c;
+      }
+      .file-header h2 { flex: 1; margin: 0; font-size: 18px; font-weight: 600; }
+      .file-actions { padding: 10px 16px; }
+      .file-path {
+        flex: 1; min-width: 0; padding: 8px 10px; overflow: hidden;
+        border: 1px solid #ffffff24; border-radius: 4px; color: #ccc;
+        background: #1c1c1c; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .file-dialog button {
+        min-height: 34px; padding: 0 12px; border: 1px solid #ffffff2a;
+        border-radius: 4px; color: #f5f5f5; background: #333; cursor: pointer;
+      }
+      .file-dialog button:hover { background: #3c3c3c; }
+      .file-dialog .primary { border-color: #73bee8; color: #111; background: #73bee8; }
+      .file-list { flex: 1; overflow: auto; padding: 8px 16px 16px; }
+      .file-row {
+        display: grid; grid-template-columns: minmax(180px, 1fr) 110px 155px 128px;
+        align-items: center; min-height: 45px; gap: 12px; padding: 0 10px;
+        border-bottom: 1px solid #ffffff12;
+      }
+      .file-row.header { min-height: 36px; color: #999; font-size: 12px; }
+      .file-name { overflow: hidden; color: #eee; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+      button.file-name { padding: 0; border: 0; background: transparent; }
+      .file-name.directory { color: #8ac9ed; }
+      .file-buttons { display: flex; justify-content: flex-end; gap: 6px; }
+      .file-buttons button { min-height: 30px; padding: 0 9px; }
+      .file-empty { padding: 50px 12px; color: #999; text-align: center; }
+      .file-notice { min-height: 22px; padding: 0 16px 10px; color: #e5a7a7; }
+      @media (max-width: 650px) {
+        .file-row { grid-template-columns: minmax(140px, 1fr) 90px 120px; }
+        .file-modified { display: none; }
+        .file-actions { flex-wrap: wrap; }
+        .file-path { flex-basis: 100%; order: -1; }
+      }
     </style>
   </head>
   <body>
@@ -161,6 +211,11 @@
             d="M16 5h2a2 2 0 0 1 2 2v13H4V7a2 2 0 0 1 2-2h2M8 12h8M8 16h5"
           /></svg
         ><span class="toolbar-tooltip">粘贴</span>
+      </button>
+      <button id="files" aria-label="文件管理">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2h6.5A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z" />
+        </svg><span class="toolbar-tooltip">文件管理</span>
       </button>
       <button id="fullscreen" aria-label="全屏">
         <svg
@@ -207,6 +262,22 @@
       </button>
     </aside>
     <div id="terminal"></div>
+    <dialog class="file-dialog" id="file-dialog">
+      <div class="file-shell">
+        <div class="file-header"><h2>文件管理</h2><button id="file-close" aria-label="关闭">关闭</button></div>
+        <div class="file-actions">
+          <button id="file-home">家目录</button><button id="file-up">上一级</button>
+          <div class="file-path" id="file-path"></div>
+          <button id="file-refresh">刷新</button><button class="primary" id="file-upload">上传</button>
+          <input id="file-input" type="file" hidden />
+        </div>
+        <div class="file-list">
+          <div class="file-row header"><span>名称</span><span>大小</span><span class="file-modified">修改时间</span><span>操作</span></div>
+          <div id="file-items"></div>
+        </div>
+        <div class="file-notice" id="file-notice" aria-live="polite"></div>
+      </div>
+    </dialog>
     <script src="/vendor/xterm/xterm.js?v=__REMOTELINK_VERSION__"></script>
     <script>
       const terminalElement = document.querySelector("#terminal"),
@@ -284,6 +355,90 @@
         } catch {
           status.textContent = "浏览器未授予剪贴板权限";
         }
+      };
+      const fileDialog = document.querySelector("#file-dialog"),
+        fileItems = document.querySelector("#file-items"),
+        filePath = document.querySelector("#file-path"),
+        fileNotice = document.querySelector("#file-notice"),
+        fileInput = document.querySelector("#file-input"),
+        accessToken = sessionStorage.getItem("remote-gateway-access-token") || "";
+      let currentPath = "", homePath = "";
+      const formatSize = (size) => {
+        if (!size) return "—";
+        const units = ["B", "KB", "MB", "GB"];
+        let value = size, unit = 0;
+        while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1; }
+        return `${value < 10 && unit ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
+      };
+      async function fileRequest(path, remotePath, options = {}) {
+        const response = await fetch(path, {
+          ...options,
+          headers: { Authorization: `Bearer ${accessToken}`, "X-Target-Id": saved?.targetId || "",
+            "X-File-Name": encodeURIComponent(remotePath || ""), ...(options.headers || {}) },
+        });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.error || `HTTP ${response.status}`);
+        }
+        return response;
+      }
+      function parentPath(path) {
+        if (!path || path === "/") return "/";
+        const value = path.replace(/\/+$/, "");
+        return value.slice(0, value.lastIndexOf("/")) || "/";
+      }
+      async function loadFiles(path = currentPath) {
+        fileNotice.textContent = "正在读取文件…";
+        try {
+          const data = await (await fileRequest("/api/ssh/files", path)).json();
+          currentPath = data.path; homePath = data.home; filePath.textContent = currentPath;
+          fileItems.replaceChildren();
+          const entries = [...data.items].sort((a, b) => Number(b.directory) - Number(a.directory) || a.name.localeCompare(b.name));
+          if (!entries.length) fileItems.innerHTML = '<div class="file-empty">此目录为空</div>';
+          for (const item of entries) {
+            const row = document.createElement("div"); row.className = "file-row";
+            const nameButton = document.createElement("button");
+            nameButton.className = `file-name${item.directory ? " directory" : ""}`;
+            nameButton.textContent = `${item.directory ? "▸ " : ""}${item.name}`;
+            if (item.directory) nameButton.onclick = () => loadFiles(item.path);
+            const size = document.createElement("span"); size.textContent = item.directory ? "—" : formatSize(item.size);
+            const modified = document.createElement("span"); modified.className = "file-modified";
+            modified.textContent = item.modified ? new Date(item.modified * 1000).toLocaleString() : "—";
+            const buttons = document.createElement("span"); buttons.className = "file-buttons";
+            if (!item.directory) {
+              const download = document.createElement("button"); download.textContent = "下载";
+              download.onclick = async () => {
+                fileNotice.textContent = "正在下载…";
+                try {
+                  const blob = await (await fileRequest("/api/ssh/files/download", item.path, { method: "POST" })).blob();
+                  const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = item.name; link.click();
+                  setTimeout(() => URL.revokeObjectURL(link.href), 1000); fileNotice.textContent = "";
+                } catch (error) { fileNotice.textContent = error.message; }
+              }; buttons.append(download);
+            }
+            const remove = document.createElement("button"); remove.textContent = "删除";
+            remove.onclick = async () => {
+              if (!confirm(`删除“${item.name}”？`)) return;
+              try { await fileRequest("/api/ssh/files/delete", item.path, { method: "POST" }); await loadFiles(); }
+              catch (error) { fileNotice.textContent = error.message; }
+            }; buttons.append(remove); row.append(nameButton, size, modified, buttons); fileItems.append(row);
+          }
+          fileNotice.textContent = "";
+        } catch (error) { fileNotice.textContent = error.message; }
+      }
+      document.querySelector("#files").onclick = () => { fileDialog.showModal(); loadFiles(""); };
+      document.querySelector("#file-close").onclick = () => fileDialog.close();
+      document.querySelector("#file-home").onclick = () => loadFiles(homePath);
+      document.querySelector("#file-up").onclick = () => loadFiles(parentPath(currentPath));
+      document.querySelector("#file-refresh").onclick = () => loadFiles();
+      document.querySelector("#file-upload").onclick = () => fileInput.click();
+      fileInput.onchange = async () => {
+        const file = fileInput.files?.[0]; if (!file) return;
+        const destination = `${currentPath === "/" ? "" : currentPath}/${file.name}`;
+        fileNotice.textContent = "正在上传…";
+        try { await fileRequest("/api/ssh/files/upload", destination, { method: "POST", body: file }); await loadFiles(); }
+        catch (error) { fileNotice.textContent = error.message; }
+        finally { fileInput.value = ""; }
       };
       document.querySelector("#fullscreen").onclick = async () => {
         if (document.fullscreenElement) await document.exitFullscreen();

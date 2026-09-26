@@ -654,3 +654,44 @@ test("user management exposes the complete account lifecycle", async ({
   await expect(page.locator("#permissions").getByText("Desktop")).toBeVisible();
   await expect(page.locator("#permissions").getByText("Linux")).toBeVisible();
 });
+
+test("SSH session file manager opens in home and supports file actions", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem("remote-gateway-access-token", "test-token");
+    sessionStorage.setItem(
+      "remotelink-ssh-session",
+      JSON.stringify({ targetId: "ssh-1", websocketUrl: "/unavailable" }),
+    );
+  });
+  const requests = [];
+  await page.route("**/api/ssh/files*", async (route) => {
+    const request = route.request();
+    requests.push({ url: request.url(), method: request.method(), headers: request.headers() });
+    if (request.url().endsWith("/download"))
+      return route.fulfill({ contentType: "application/octet-stream", body: "hello" });
+    if (request.method() === "GET")
+      return route.fulfill({
+        json: {
+          home: "/home/test",
+          path: "/home/test",
+          items: [
+            { name: "docs", path: "/home/test/docs", directory: true, size: 0, modified: 1 },
+            { name: "hello.txt", path: "/home/test/hello.txt", directory: false, size: 5, modified: 1 },
+          ],
+        },
+      });
+    return route.fulfill({ json: { status: "ok" } });
+  });
+  page.on("dialog", (dialog) => dialog.accept());
+  await page.goto("/ssh-session.html");
+  await page.locator("#files").click();
+  await expect(page.locator("#file-dialog")).toBeVisible();
+  await expect(page.locator("#file-path")).toHaveText("/home/test");
+  await expect(page.getByRole("button", { name: "docs" })).toBeVisible();
+  await expect(page.locator("#file-upload")).toBeVisible();
+  await expect(page.getByRole("button", { name: "下载" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "删除" })).toHaveCount(2);
+  expect(requests.every((item) => item.headers["x-target-id"] === "ssh-1")).toBeTruthy();
+});

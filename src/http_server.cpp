@@ -481,6 +481,7 @@ void HttpServer::run() {
                 auto value = header.substr(separator + 1);
                 while (!value.empty() && std::isspace(static_cast<unsigned char>(value.front()))) value.erase(value.begin());
                 if (name == "authorization") parsed.authorization = std::move(value);
+                else if (name == "x-target-id") parsed.target_id = std::move(value);
                 else if (name == "x-file-name") parsed.file_name = std::move(value);
                 else if (name == "x-destination") parsed.destination = std::move(value);
                 else if (name == "x-upload-offset") parsed.upload_offset = std::move(value);

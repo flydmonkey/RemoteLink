@@ -17,6 +17,7 @@ struct HttpRequest {
     std::string method;
     std::string path;
     std::string authorization;
+    std::string target_id;
     std::string file_name;
     std::string destination;
     std::string upload_offset;

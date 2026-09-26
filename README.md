@@ -29,7 +29,7 @@ The gateway runs as a single Linux service. Users only need a modern browser—n
 - Standalone VNC support using noVNC Core and a one-time-ticket WSS-to-RFB proxy
 - Native RemoteLink VNC device, session toolbar, administration, and user-permission UI
 - VNC password, username/password, and CA-certificate authentication modes with automatic reconnect
-- Native SSH terminal with password or private-key credentials and administrator-confirmed host fingerprints
+- Native SSH terminal with password or private-key credentials, administrator-confirmed host fingerprints, and SFTP file management for browse/upload/download/delete operations
 - Unified RDP, VNC, and SSH active-session and recent-activity audit views
 - Non-revealing credential status with replace and clear operations for every protocol
 

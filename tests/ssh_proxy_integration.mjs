@@ -70,6 +70,41 @@ try {
   );
   if (!fingerprint.startsWith("SHA256:"))
     throw new Error("SSH host fingerprint was not confirmed");
+  const sftpResult = await page.evaluate(
+    async ({ headers, targetId }) => {
+      const fileHeaders = { ...headers, "X-Target-Id": targetId };
+      const listed = await fetch("/api/ssh/files", { headers: fileHeaders });
+      if (!listed.ok) throw new Error(await listed.text());
+      const home = (await listed.json()).home;
+      const path = `${home}/remotelink-sftp-integration.txt`;
+      const upload = await fetch("/api/ssh/files/upload", {
+        method: "POST",
+        headers: { ...fileHeaders, "X-File-Name": encodeURIComponent(path) },
+        body: "REMOTELINK_SFTP_OK",
+      });
+      if (!upload.ok) throw new Error(await upload.text());
+      const verifyList = await fetch("/api/ssh/files", {
+        headers: { ...fileHeaders, "X-File-Name": encodeURIComponent(home) },
+      });
+      const item = (await verifyList.json()).items.find((entry) => entry.path === path);
+      if (!item) throw new Error("uploaded SFTP file is missing");
+      const download = await fetch("/api/ssh/files/download", {
+        method: "POST",
+        headers: { ...fileHeaders, "X-File-Name": encodeURIComponent(path) },
+      });
+      if (!download.ok || (await download.text()) !== "REMOTELINK_SFTP_OK")
+        throw new Error("downloaded SFTP content differs");
+      const removed = await fetch("/api/ssh/files/delete", {
+        method: "POST",
+        headers: { ...fileHeaders, "X-File-Name": encodeURIComponent(path) },
+      });
+      if (!removed.ok) throw new Error(await removed.text());
+      return { home, path };
+    },
+    { headers, targetId },
+  );
+  if (!sftpResult.home || !sftpResult.path)
+    throw new Error("SSH file manager did not resolve the home directory");
   const session = await page.evaluate(
     async ({ headers, targetId }) => {
       const response = await fetch("/api/ssh/sessions", {
