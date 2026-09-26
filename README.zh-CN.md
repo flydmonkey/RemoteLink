@@ -159,6 +159,7 @@ ctest --test-dir build --output-on-failure
 | `REMOTELINK_ACCESS_TOKEN_FILE` | 主管理员受保护的恢复凭据 |
 | `REMOTELINK_TLS_CERTIFICATE` | TLS 证书链 |
 | `REMOTELINK_TLS_PRIVATE_KEY` | TLS 私钥 |
+| `REMOTELINK_BEHIND_TLS_PROXY` | 仅在可信反向代理终止 HTTPS/WSS 时设为 `1`。RemoteLink 会在后端端口提供未加密的 HTTP/WebSocket，不得将该端口直接暴露给不可信网络。 |
 | `REMOTELINK_STATE_DIR` | 用户、文件、打印任务和审计数据目录 |
 | `REMOTELINK_USER_FILE_QUOTA_BYTES` | 可选的单用户文件配额 |
 | `REMOTELINK_BLOCKED_FILE_EXTENSIONS` | 可选的上传扩展名黑名单 |
@@ -174,6 +175,10 @@ export REMOTELINK_STATE_DIR=/var/lib/remotelink
 ```
 
 仅限本机开发时可使用 `REMOTELINK_ALLOW_INSECURE_HTTP=1`。局域网或互联网访问时不要使用不安全 HTTP。
+
+`REMOTELINK_BEHIND_TLS_PROXY=1` 不会开启 TLS，也不会自动配置反向代理。
+它只是告诉 RemoteLink：TLS 已由上游终止，因此后端可以在未配置证书文件时启动。
+反向代理必须同时转发 HTTP 请求和 WebSocket 升级，且 `18080` 端口只能对该代理可达。
 
 ## 部署
 

@@ -133,6 +133,7 @@ After first login, administrators manage RDP, VNC, and SSH connections from each
 | `REMOTELINK_ACCESS_TOKEN_FILE` | Protected primary-administrator recovery credential |
 | `REMOTELINK_TLS_CERTIFICATE` | TLS certificate chain |
 | `REMOTELINK_TLS_PRIVATE_KEY` | TLS private key |
+| `REMOTELINK_BEHIND_TLS_PROXY` | Set to `1` only when a trusted reverse proxy terminates HTTPS/WSS. RemoteLink then serves unencrypted HTTP/WebSocket traffic on its backend port, which must not be exposed directly to untrusted networks. |
 | `REMOTELINK_STATE_DIR` | Persistent users, files, print jobs, and audit state |
 | `REMOTELINK_USER_FILE_QUOTA_BYTES` | Optional per-user file quota |
 | `REMOTELINK_BLOCKED_FILE_EXTENSIONS` | Optional blocked upload extensions |
@@ -148,6 +149,11 @@ export REMOTELINK_STATE_DIR=/var/lib/remotelink
 ```
 
 `REMOTELINK_ALLOW_INSECURE_HTTP=1` may be used for localhost-only development. Never use insecure HTTP for LAN or Internet access.
+
+`REMOTELINK_BEHIND_TLS_PROXY=1` does not enable TLS or configure a proxy. It only
+tells RemoteLink that TLS is terminated upstream and permits the backend to run
+without certificate files. The proxy must forward both HTTP requests and
+WebSocket upgrades, and port `18080` must remain reachable only by that proxy.
 
 ## Deployment
 
