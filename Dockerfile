@@ -21,7 +21,14 @@ RUN bash ./scripts/copy-novnc-core.sh \
       -DREMOTE_GATEWAY_BUILD_TESTS=OFF \
     && cmake --build build --parallel "$(nproc)" \
     && find web -type f -name '*.html' -exec \
-      sed -i "s/__REMOTELINK_VERSION__/${REMOTELINK_VERSION}/g" {} +
+      sed -i "s/__REMOTELINK_VERSION__/${REMOTELINK_VERSION}/g" {} + \
+    && install -D -m 0755 build/remote-gateway /stage/bin/remote-gateway \
+    && install -D -m 0755 build/libremote_gateway_streaming.so /stage/lib/libremote_gateway_streaming.so \
+    && find build -name 'libdatachannel.so*' -exec cp -a {} /stage/lib/ \; \
+    && find build -name 'libvncclient.so*' -exec cp -a {} /stage/lib/ \; \
+    && find build -name 'libvncserver.so*' -exec cp -a {} /stage/lib/ \; \
+    && test -e /stage/lib/libdatachannel.so \
+    && test -e /stage/lib/libvncclient.so
 
 FROM ubuntu:24.04 AS runtime
 
@@ -43,11 +50,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && install -d -o root -g remotelink -m 0750 /etc/remote-gateway \
     && printf '{"targets":[]}\n' > /etc/remote-gateway/targets.json
 
-COPY --from=builder /src/build/remote-gateway /opt/remotelink/bin/remote-gateway
-COPY --from=builder /src/build/libremote_gateway_streaming.so /opt/remotelink/lib/libremote_gateway_streaming.so
-COPY --from=builder /src/build/third_party/libdatachannel/libdatachannel.so* /opt/remotelink/lib/
-COPY --from=builder /src/build/_deps/libvncserver-build/libvncclient.so* /opt/remotelink/lib/
-COPY --from=builder /src/build/_deps/libvncserver-build/libvncserver.so* /opt/remotelink/lib/
+COPY --from=builder /stage/ /opt/remotelink/
 COPY --from=builder /src/web /opt/remotelink/web
 COPY docker/entrypoint.sh /usr/local/bin/remotelink-entrypoint
 
