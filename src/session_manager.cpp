@@ -86,12 +86,11 @@ bool SessionManager::start(const std::string& peer_id, const std::string& target
     rdp.menu_animations = menu_animations;
     rdp.desktop_composition = desktop_composition;
     rdp.redirect_clipboard = redirect_clipboard && template_target.rdp.redirect_clipboard;
-    // The stock FreeRDP CUPS backend runs all jobs as the single service
-    // account and provides no authenticated application-user identity. Until
-    // a session-aware backend can be kept outside the RDP connect path, only
-    // the primary administrator may use this compatibility printer. This
-    // prevents one non-admin user from receiving another user's PDF.
-    rdp.redirect_printers = redirect_printers && template_target.allow_printing && user_identity == 0;
+    // Each session uses RemoteLink's in-process printer backend and writes
+    // directly into the authenticated user's private print directory. Avoid
+    // the stock CUPS backend, which cannot associate jobs with application
+    // users when all sessions run under the same service account.
+    rdp.redirect_printers = redirect_printers && template_target.allow_printing;
     const char* state_root = std::getenv("REMOTELINK_STATE_DIR");
     const auto user_root = std::filesystem::path(state_root && *state_root
         ? state_root : "/var/lib/remotelink") / "users" /

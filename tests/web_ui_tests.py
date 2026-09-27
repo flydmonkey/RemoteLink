@@ -95,6 +95,14 @@ docker_workflow = docker_workflow_path.read_text(encoding="utf-8") if docker_wor
 guacd_unit = (root / "deploy" / "remotelink-guacd.service").read_text(encoding="utf-8")
 assert "REMOTELINK_GUACD_HOST: 127.0.0.1" in compose
 assert "guacd libguac-client-rdp0t64" in dockerfile
+assert "ghostscript" in dockerfile
+assert "ghostscript podman" in (
+    root / "scripts" / "install-remotelink.sh").read_text(encoding="utf-8")
+assert "print-smoke.pdf" in docker_workflow if docker_workflow else True
+assert "if (options_.redirect_printers && !options_.print_jobs_path.empty())" in (
+    root / "src" / "rdp_frame_source.cpp").read_text(encoding="utf-8")
+assert "&& user_identity == 0" not in (
+    root / "src" / "session_manager.cpp").read_text(encoding="utf-8")
 assert "/usr/sbin/guacd -f -b 127.0.0.1" in (root / "docker" / "entrypoint.sh").read_text(encoding="utf-8")
 assert "ctest --test-dir build --output-on-failure" in dockerfile
 if docker_workflow:

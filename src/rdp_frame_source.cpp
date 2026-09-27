@@ -798,7 +798,7 @@ void RdpFrameSource::run(std::stop_token stop_token, FrameHandler on_frame) {
     freerdp_settings_set_bool(settings, FreeRDP_RedirectPrinters,
                               options_.redirect_printers ? TRUE : FALSE);
     std::string isolated_printer_name;
-    if (false && options_.redirect_printers && !options_.print_jobs_path.empty()) {
+    if (options_.redirect_printers && !options_.print_jobs_path.empty()) {
         isolated_printer_name = "RemoteLink Printer " +
             std::to_string(gateway_printer_sequence.fetch_add(1));
         {

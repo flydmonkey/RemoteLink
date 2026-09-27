@@ -1,5 +1,11 @@
 # RemoteLink changelog
 
+## 0.3.11
+
+- Restore the session-aware FreeRDP printer so every authenticated user receives PDFs in their own print directory.
+- Install Ghostscript in Docker and bare-metal deployments so FreeRDP and Guacamole print streams are converted into non-empty PDF files.
+- Exercise PostScript-to-PDF conversion during the Docker image smoke test.
+
 ## 0.3.10
 
 - Keep Docker image tests compatible with the intentionally reduced build context while retaining workflow-policy checks in repository CI.

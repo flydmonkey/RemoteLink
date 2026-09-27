@@ -45,7 +45,7 @@ LABEL org.opencontainers.image.title="RemoteLink" \
       org.opencontainers.image.source="https://github.com/flydmonkey/RemoteLink"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl openssl tini \
+      ca-certificates curl ghostscript openssl tini \
       guacd libguac-client-rdp0t64 \
       freerdp3-dev libwinpr3-dev libopenh264-dev libopus-dev libyuv-dev \
       libssl-dev libssh2-1-dev zlib1g \
