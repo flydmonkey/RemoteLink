@@ -1,5 +1,9 @@
 # RemoteLink changelog
 
+## 0.3.12
+
+- Prevent duplicate Guacamole print-stream acknowledgements that could create an empty first PDF and block later print jobs.
+
 ## 0.3.11
 
 - Restore the session-aware FreeRDP printer so every authenticated user receives PDFs in their own print directory.

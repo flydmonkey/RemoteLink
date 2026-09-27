@@ -84,7 +84,8 @@ for parameter in ("enable-printing", "enable-drive", "drive-path", "RemoteLink P
     assert parameter in http_server, f"Guacamole handshake is missing {parameter}"
 assert "download_streams" in http_server and http_server.count(
     '{"ack", (*instruction)[1], "OK", "0"}'
-) >= 2, "Guacamole file streams must ACK both the initial file instruction and each blob"
+) == 1, "Only the initial Guacamole file instruction may be ACKed by the gateway"
+assert "duplicate ACKs" in http_server
 readme_zh = (root / "README.zh-CN.md").read_text(encoding="utf-8")
 assert "无需为 Guacamole 开放 UDP 端口" in readme_zh
 assert "无需为 guacd 单独申请、安装或配置 TLS 证书" in readme_zh
