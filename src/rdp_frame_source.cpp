@@ -7,6 +7,7 @@
 #include <freerdp/client.h>
 #include <freerdp/client/cmdline.h>
 #include <freerdp/client/rdpsnd.h>
+#include <freerdp/client/printer.h>
 #include <freerdp/codec/color.h>
 #include <freerdp/gdi/gdi.h>
 #include <freerdp/gdi/gfx.h>
@@ -21,14 +22,23 @@
 #include <winpr/synch.h>
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <cerrno>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <new>
 #include <stdexcept>
+#include <sstream>
 #include <thread>
 #include <unordered_map>
 #include <utility>
+#include <sys/wait.h>
+#include <unistd.h>
 
 namespace remotelink {
 
@@ -86,6 +96,174 @@ struct GatewayAudioDevice {
 };
 
 FREERDP_LOAD_CHANNEL_ADDIN_ENTRY_FN fallback_addin_provider = nullptr;
+std::mutex gateway_printer_directories_mutex;
+std::unordered_map<std::string, std::string> gateway_printer_directories;
+std::atomic_uint64_t gateway_printer_sequence { 1 };
+
+struct GatewayPrinterDriver {
+    rdpPrinterDriver driver {};
+    std::atomic_size_t references { 1 };
+    std::atomic_size_t next_id { 1 };
+    std::string directory;
+};
+
+struct GatewayPrinter {
+    rdpPrinter printer {};
+    std::atomic_size_t references { 1 };
+    GatewayPrinterDriver* driver = nullptr;
+    rdpPrintJob* current_job = nullptr;
+};
+
+struct GatewayPrintJob {
+    rdpPrintJob job {};
+    GatewayPrinter* printer = nullptr;
+    std::filesystem::path spool_path;
+    std::filesystem::path pdf_path;
+    std::ofstream output;
+};
+
+void gateway_printer_driver_add_ref(rdpPrinterDriver* driver) {
+    ++reinterpret_cast<GatewayPrinterDriver*>(driver)->references;
+}
+
+void gateway_printer_driver_release(rdpPrinterDriver* driver) {
+    auto* gateway = reinterpret_cast<GatewayPrinterDriver*>(driver);
+    if (gateway->references.fetch_sub(1) == 1) delete gateway;
+}
+
+void gateway_printer_add_ref(rdpPrinter* printer) {
+    ++reinterpret_cast<GatewayPrinter*>(printer)->references;
+}
+
+void gateway_printer_release(rdpPrinter* printer) {
+    auto* gateway = reinterpret_cast<GatewayPrinter*>(printer);
+    if (gateway->references.fetch_sub(1) != 1) return;
+    gateway_printer_driver_release(&gateway->driver->driver);
+    std::free(printer->name);
+    std::free(printer->driver);
+    delete gateway;
+}
+
+std::filesystem::path unique_print_path(const std::filesystem::path& directory) {
+    const auto now = std::chrono::system_clock::now();
+    const std::time_t time = std::chrono::system_clock::to_time_t(now);
+    std::tm local {};
+    localtime_r(&time, &local);
+    std::ostringstream name;
+    name << std::put_time(&local, "%Y-%m-%d_%H-%M-%S");
+    std::error_code error;
+    auto path = directory / (name.str() + ".pdf");
+    for (unsigned suffix = 1; std::filesystem::exists(path, error); ++suffix)
+        path = directory / (name.str() + " (" + std::to_string(suffix) + ").pdf");
+    return path;
+}
+
+UINT gateway_print_write(rdpPrintJob* job, const BYTE* data, size_t size) {
+    auto* gateway = reinterpret_cast<GatewayPrintJob*>(job);
+    gateway->output.write(reinterpret_cast<const char*>(data),
+                          static_cast<std::streamsize>(size));
+    return gateway->output ? CHANNEL_RC_OK : ERROR_WRITE_FAULT;
+}
+
+void gateway_print_close(rdpPrintJob* job) {
+    auto* gateway = reinterpret_cast<GatewayPrintJob*>(job);
+    gateway->output.close();
+    const pid_t child = fork();
+    if (child == 0) {
+        execl("/usr/bin/gs", "gs", "-q", "-dCompatibilityLevel=1.4",
+              "-dNOPAUSE", "-dBATCH", "-dSAFER", "-sDEVICE=pdfwrite",
+              ("-sOutputFile=" + gateway->pdf_path.string()).c_str(),
+              gateway->spool_path.c_str(), static_cast<char*>(nullptr));
+        _exit(127);
+    }
+    int status = -1;
+    if (child > 0) {
+        while (waitpid(child, &status, 0) < 0 && errno == EINTR) {}
+    }
+    std::error_code error;
+    std::filesystem::remove(gateway->spool_path, error);
+    if (child <= 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        std::filesystem::remove(gateway->pdf_path, error);
+        std::cerr << "unable to convert redirected print job to PDF\n";
+    }
+    gateway->printer->current_job = nullptr;
+    delete gateway;
+}
+
+rdpPrintJob* gateway_print_create(rdpPrinter* printer, UINT32 id) {
+    auto* gateway_printer = reinterpret_cast<GatewayPrinter*>(printer);
+    if (gateway_printer->current_job != nullptr) return nullptr;
+    std::error_code error;
+    std::filesystem::create_directories(gateway_printer->driver->directory, error);
+    if (error) return nullptr;
+    auto* gateway = new (std::nothrow) GatewayPrintJob;
+    if (gateway == nullptr) return nullptr;
+    gateway->printer = gateway_printer;
+    gateway->pdf_path = unique_print_path(gateway_printer->driver->directory);
+    gateway->spool_path = gateway->pdf_path;
+    gateway->spool_path += ".spool";
+    gateway->output.open(gateway->spool_path, std::ios::binary | std::ios::trunc);
+    if (!gateway->output) { delete gateway; return nullptr; }
+    gateway->job.id = id;
+    gateway->job.printer = printer;
+    gateway->job.Write = gateway_print_write;
+    gateway->job.Close = gateway_print_close;
+    gateway_printer->current_job = &gateway->job;
+    return &gateway->job;
+}
+
+rdpPrintJob* gateway_print_find(rdpPrinter* printer, UINT32 id) {
+    auto* gateway = reinterpret_cast<GatewayPrinter*>(printer);
+    return gateway->current_job != nullptr && gateway->current_job->id == id
+        ? gateway->current_job : nullptr;
+}
+
+rdpPrinter* gateway_get_printer(rdpPrinterDriver* driver, const char* name,
+                                const char* driver_name, BOOL is_default) {
+    auto* gateway_driver = reinterpret_cast<GatewayPrinterDriver*>(driver);
+    if (name == nullptr) return nullptr;
+    {
+        std::lock_guard lock(gateway_printer_directories_mutex);
+        const auto found = gateway_printer_directories.find(name);
+        if (found == gateway_printer_directories.end()) return nullptr;
+        gateway_driver->directory = found->second;
+    }
+    auto* gateway = new (std::nothrow) GatewayPrinter;
+    if (gateway == nullptr) return nullptr;
+    gateway->driver = gateway_driver;
+    gateway_printer_driver_add_ref(driver);
+    gateway->printer.id = gateway_driver->next_id++;
+    gateway->printer.name = _strdup(name && *name ? name : "RemoteLink Printer");
+    gateway->printer.driver = _strdup(driver_name && *driver_name
+        ? driver_name : "MS Publisher Imagesetter");
+    if (gateway->printer.name == nullptr || gateway->printer.driver == nullptr) {
+        gateway_printer_release(&gateway->printer);
+        return nullptr;
+    }
+    gateway->printer.is_default = is_default;
+    gateway->printer.backend = driver;
+    gateway->printer.CreatePrintJob = gateway_print_create;
+    gateway->printer.FindPrintJob = gateway_print_find;
+    gateway->printer.AddRef = gateway_printer_add_ref;
+    gateway->printer.ReleaseRef = gateway_printer_release;
+    return &gateway->printer;
+}
+
+rdpPrinter** gateway_enum_printers(rdpPrinterDriver*) { return nullptr; }
+void gateway_release_printers(rdpPrinter** printers) { std::free(printers); }
+
+UINT VCAPITYPE gateway_printer_entry(rdpPrinterDriver** output) {
+    if (output == nullptr) return ERROR_INVALID_PARAMETER;
+    auto* gateway = new (std::nothrow) GatewayPrinterDriver;
+    if (gateway == nullptr) return CHANNEL_RC_NO_MEMORY;
+    gateway->driver.EnumPrinters = gateway_enum_printers;
+    gateway->driver.ReleaseEnumPrinters = gateway_release_printers;
+    gateway->driver.GetPrinter = gateway_get_printer;
+    gateway->driver.AddRef = gateway_printer_driver_add_ref;
+    gateway->driver.ReleaseRef = gateway_printer_driver_release;
+    *output = &gateway->driver;
+    return CHANNEL_RC_OK;
+}
 
 BOOL audio_format_supported(rdpsndDevicePlugin*, const AUDIO_FORMAT* format) {
     return format != nullptr && format->wFormatTag == WAVE_FORMAT_PCM &&
@@ -141,6 +319,11 @@ PVIRTUALCHANNELENTRY gateway_addin_provider(LPCSTR name, LPCSTR subsystem,
         std::strcmp(name, RDPSND_CHANNEL_NAME) == 0 &&
         std::strcmp(subsystem, "gateway") == 0) {
         return reinterpret_cast<PVIRTUALCHANNELENTRY>(gateway_rdpsnd_entry);
+    }
+    if (name != nullptr && subsystem != nullptr &&
+        std::strcmp(name, "printer") == 0 &&
+        std::strcmp(subsystem, "gateway") == 0) {
+        return reinterpret_cast<PVIRTUALCHANNELENTRY>(gateway_printer_entry);
     }
     return fallback_addin_provider
         ? fallback_addin_provider(name, subsystem, type, flags) : nullptr;
@@ -570,6 +753,19 @@ void RdpFrameSource::run(std::stop_token stop_token, FrameHandler on_frame) {
     freerdp_settings_set_uint32(settings, FreeRDP_ColorDepth, 32);
     freerdp_settings_set_bool(settings, FreeRDP_SoftwareGdi, TRUE);
     freerdp_set_connection_type(settings, CONNECTION_TYPE_LAN);
+    freerdp_settings_set_bool(settings, FreeRDP_RedirectClipboard,
+                              options_.redirect_clipboard ? TRUE : FALSE);
+    freerdp_settings_set_bool(settings, FreeRDP_DisableWallpaper,
+                              options_.show_wallpaper ? FALSE : TRUE);
+    freerdp_settings_set_bool(settings, FreeRDP_AllowFontSmoothing,
+                              options_.font_smoothing ? TRUE : FALSE);
+    freerdp_settings_set_bool(settings, FreeRDP_DisableFullWindowDrag,
+                              options_.full_window_drag ? FALSE : TRUE);
+    freerdp_settings_set_bool(settings, FreeRDP_DisableMenuAnims,
+                              options_.menu_animations ? FALSE : TRUE);
+    freerdp_settings_set_bool(settings, FreeRDP_AllowDesktopComposition,
+                              options_.desktop_composition ? TRUE : FALSE);
+    freerdp_performance_flags_make(settings);
     freerdp_settings_set_bool(settings, FreeRDP_NetworkAutoDetect, TRUE);
     freerdp_settings_set_bool(settings, FreeRDP_SupportGraphicsPipeline, TRUE);
     freerdp_settings_set_bool(settings, FreeRDP_GfxProgressive, TRUE);
@@ -601,6 +797,24 @@ void RdpFrameSource::run(std::stop_token stop_token, FrameHandler on_frame) {
     }
     freerdp_settings_set_bool(settings, FreeRDP_RedirectPrinters,
                               options_.redirect_printers ? TRUE : FALSE);
+    std::string isolated_printer_name;
+    if (false && options_.redirect_printers && !options_.print_jobs_path.empty()) {
+        isolated_printer_name = "RemoteLink Printer " +
+            std::to_string(gateway_printer_sequence.fetch_add(1));
+        {
+            std::lock_guard lock(gateway_printer_directories_mutex);
+            gateway_printer_directories[isolated_printer_name] = options_.print_jobs_path;
+        }
+        const char* printer_channel[] = { "printer", isolated_printer_name.c_str(),
+            "MS Publisher Imagesetter:gateway", "default" };
+        if (!freerdp_client_add_device_channel(
+                settings, std::size(printer_channel), printer_channel)) {
+            std::lock_guard lock(gateway_printer_directories_mutex);
+            gateway_printer_directories.erase(isolated_printer_name);
+            freerdp_client_context_free(context);
+            throw std::runtime_error("unable to configure isolated RDP printer");
+        }
+    }
     if (!options_.shared_files_path.empty()) {
         const char* drive_channel[] = { "drive", "Gateway Files", options_.shared_files_path.c_str() };
         if (!freerdp_client_add_device_channel(
@@ -612,6 +826,10 @@ void RdpFrameSource::run(std::stop_token stop_token, FrameHandler on_frame) {
     if (!freerdp_connect(instance)) {
         const UINT32 error = freerdp_get_last_error(instance->context);
         freerdp_client_context_free(context);
+        if (!isolated_printer_name.empty()) {
+            std::lock_guard lock(gateway_printer_directories_mutex);
+            gateway_printer_directories.erase(isolated_printer_name);
+        }
         const auto delay = reconnect_delay(++consecutive_failures);
         std::cerr << "RDP connection failed with error " << error
                   << "; retrying in " << delay.count() << " seconds\n";
@@ -647,6 +865,10 @@ void RdpFrameSource::run(std::stop_token stop_token, FrameHandler on_frame) {
 
     freerdp_disconnect(instance);
     freerdp_client_context_free(context);
+    if (!isolated_printer_name.empty()) {
+        std::lock_guard lock(gateway_printer_directories_mutex);
+        gateway_printer_directories.erase(isolated_printer_name);
+    }
     if (!stop_token.stop_requested()) {
         if (std::chrono::steady_clock::now() - connected_at >= std::chrono::seconds(30)) {
             consecutive_failures = 0;

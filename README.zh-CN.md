@@ -30,7 +30,7 @@ docker run -d \
 
 只有前面已经有反向代理负责 HTTPS 时，才额外设置 `REMOTELINK_BEHIND_TLS_PROXY=1`。这时容器改为明文 HTTP，并忽略证书。这个变量不会配置反向代理，`18080` 只能给那台代理访问。
 
-UDP `50000-50019` 提供 RDP 的 WebRTC 媒体。宿主机和容器必须使用相同的 UDP 端口号。
+UDP `50000-50019` 仅用于 FreeRDP 后端的 WebRTC 媒体。宿主机和容器必须使用相同的 UDP 端口号。选择 Guacamole 后端时，远程画面通过已有的 HTTPS/WSS `18080` 连接传输，不需要开放这组 UDP 端口。
 
 打开 <https://localhost:18080>，使用用户名 `admin` 和
 `REMOTELINK_ADMIN_PASSWORD` 中设置的密码登录。登录后进入“管理”添加
@@ -46,6 +46,8 @@ RDP、VNC 或 SSH 连接，再通过“用户管理”分配连接权限。
 export REMOTELINK_ADMIN_PASSWORD='请替换为安全密码'
 docker compose up -d
 ```
+
+官方 RemoteLink 镜像已经包含 guacd。容器入口会分别启动 `remotelink` 和 `guacd` 两个进程，并在任一进程异常退出时结束容器，由 Docker 的重启策略统一恢复。guacd 仅监听容器内的 `127.0.0.1:4822`，不会发布宿主机端口；因此单容器 `docker run` 和 Compose 都能直接使用 Guacamole 后端。
 
 浏览器和 Docker 在同一台机器上时，打开已发布的 TCP 端口即可。另一台机器上的浏览器
 无法访问容器网桥地址，需要把 `REMOTELINK_ICE_ADVERTISED_ADDRESS` 设成浏览器能够
@@ -80,7 +82,7 @@ docker rm -f remotelink
 # 使用上方 docker run 命令重新创建容器，并继续挂载同一 remotelink-state 卷。
 ```
 
-RDP 媒体仍要求浏览器能够直接访问 UDP `50000-50019`。
+FreeRDP 后端仍要求浏览器能够直接访问 UDP `50000-50019`；Guacamole 后端不需要。
 从 `0.3.6` 起，镜像默认提供 HTTPS。`0.3.4` 及更早的镜像会设置 `REMOTELINK_BEHIND_TLS_PROXY=1`，因此仍是明文 HTTP。`0.3.7` 起，连接旧版 Windows 时允许协商 TLS 1.0。需要可重现部署时，建议使用 `flydmonkey/remotelink:0.3.8`。
 
 ## 功能
@@ -100,7 +102,7 @@ RDP 媒体仍要求浏览器能够直接访问 UDP `50000-50019`。
 - 普通用户不能访问管理员状态和断开操作
 - 支持简体中文、繁体中文、英语、日语和韩语
 - 默认跟随系统语言，也可手动选择并持久保存
-- 可配置分辨率、码率、声音、打印和实验性硬件加速
+- 在主页面“连接设置”中配置分辨率、视觉效果、FreeRDP 码率/帧率、Guacamole 图像格式/DPI，以及声音、打印、文件和剪贴板
 - HTTPS/WSS、systemd 加密凭据和用户数据隔离
 - 适配桌面与移动浏览器
 - 自动对 HTML、JavaScript、CSS、JSON 等文本响应启用 gzip 压缩
@@ -145,11 +147,23 @@ SSH 同样使用 30 秒有效的一次性 WSS 票据。密码、私钥和私钥�
 ```text
 浏览器（纯 HTML/CSS/JavaScript）
   ├─ RDP：WSS 信令 + WebRTC H.264/Opus/数据 ── RemoteLink ── FreeRDP ── Windows
+  ├─ RDP：HTTPS/WSS Guacamole 协议 ────────── RemoteLink ── 本机 guacd ── Windows
   ├─ VNC：一次性票据 WSS ───────────────────── RemoteLink ── TCP/RFB ─── VNC 服务
   └─ SSH：一次性票据 WSS + xterm.js ────────── RemoteLink ── libssh2 ─── SSH 服务
 ```
 
 每个浏览器连接拥有独立的 RDP、画面捕获、编码器、声音和输入生命周期。不同用户之间不会广播画面或输入。
+
+### RDP 后端与网络要求
+
+管理员可为每条 RDP 连接选择后端：
+
+- **FreeRDP**：推荐用于现代 Windows。RemoteLink 将桌面编码为 H.264 并通过 WebRTC 发送，因此浏览器需要访问 HTTPS/WSS `18080` 和配置的 UDP ICE 端口（默认 `50000-50019`）。浏览器仍必须信任 RemoteLink 网关的 HTTPS 证书。
+- **Guacamole**：适合旧版 Windows 或 FreeRDP 图形兼容性不佳的主机。浏览器只连接 RemoteLink 已有的 HTTPS/WSS `18080`，RemoteLink 再通过本机回环地址连接受管理的独立 `guacd` 进程（官方容器镜像内置该进程，裸机部署使用独立 systemd 服务）。**无需为 Guacamole 开放 UDP 端口，也无需为 guacd 单独申请、安装或配置 TLS 证书。** 浏览器访问 RemoteLink 本身时仍需使用并信任网关的 HTTPS 证书。
+
+不要把 `guacd` 端口暴露到局域网或互联网。它是 RemoteLink 的本机内部组件，安装/部署脚本会创建并管理 `remotelink-guacd.service`。
+
+主页面的“连接设置”按用户保存在浏览器中，并在下一次新建会话时生效。共有设置包括分辨率、背景、字体平滑、窗口拖动、动画、桌面组合、声音、打印、文件和剪贴板；FreeRDP 另有 H.264 码率和最大帧率，Guacamole 另有图像格式、DPI 和窗口调整方式。修改设置后需要断开并重新连接，现有会话不会动态改变。
 
 ## 环境要求
 
@@ -158,7 +172,7 @@ SSH 同样使用 30 秒有效的一次性 WSS 票据。密码、私钥和私钥�
 - FreeRDP 3 和 WinPR 3 开发包
 - OpenH264、Opus、libyuv、OpenSSL、libssh2 和 libdatachannel
 - 客户端浏览器信任的 TLS 证书
-- TCP 18080 以及 WebRTC UDP ICE 网络连通。Docker bridge 部署必须发布配置的 UDP 端口范围，并设置 `REMOTELINK_ICE_ADVERTISED_ADDRESS`（`18081` 仅供本机内部使用）
+- TCP 18080。使用 FreeRDP 后端时还需要 WebRTC UDP ICE 网络连通；Docker bridge 部署必须发布配置的 UDP 端口范围，并设置 `REMOTELINK_ICE_ADVERTISED_ADDRESS`（`18081` 仅供本机内部使用）。仅使用 Guacamole 后端时不需要开放 UDP ICE 端口
 
 ## 编译
 
@@ -229,6 +243,8 @@ bash ./scripts/build-docker.sh
 REMOTELINK_IMAGE=remotelink REMOTELINK_ADMIN_PASSWORD='请修改为安全密码' docker compose up -d
 ```
 
+不要发布 guacd 端口。RemoteLink 的 `18080/tcp` 是浏览器唯一需要访问的 Guacamole 入口；UDP 映射仅供 FreeRDP/WebRTC 使用，Guacamole-only 部署可以删除该 UDP 映射。裸机/systemd 部署仍将 guacd 作为独立的 `remotelink-guacd.service` 管理。
+
 服务发布 TCP `18080` 和 UDP `50000-50019`。Compose 使用 `remotelink-state` 卷持久化用户、连接、凭据和审计数据。
 默认证书位于 `/etc/remotelink/tls/fullchain.pem` 与 `/etc/remotelink/tls/privkey.pem`。
 如需指定镜像仓库、版本并通过 Buildx 推送：
@@ -257,8 +273,9 @@ Linux x86_64 压缩包及 SHA-256 校验文件。推送 `v0.3.0` 这类版本标
 重新验证，同时对带版本号的静态资源启用一年不可变缓存，升级后不会继续使用旧前端文件。
 
 在全新的 Ubuntu/Debian 主机上，可从仓库目录运行交互式一键安装脚本。脚本会安装
-编译依赖、编译并测试 RemoteLink、创建加密凭据和自签名 TLS 证书，并启动 systemd
-服务。再次运行时会更新程序文件，同时保留已有配置、凭据和用户数据。
+编译依赖与 Podman、编译并测试 RemoteLink、创建加密凭据和自签名 TLS 证书，并启动
+`remotelink.service` 和独立的 `remotelink-guacd.service`。再次运行时会更新程序文件，
+同时保留已有配置、凭据和用户数据。
 
 ```bash
 sudo bash ./scripts/install-remotelink.sh

@@ -1333,7 +1333,7 @@
         </div>
       </form>
     </dialog>
-    <script src="/i18n.js?v=__REMOTELINK_VERSION__"></script>
+    <script src="/i18n.js?v=__REMOTELINK_VERSION__&rev=2"></script>
     <script>
       const status = document.querySelector("#status");
       document.querySelector(".brand h1").textContent = "RemoteLink";
@@ -1682,14 +1682,17 @@
       );
       const opT = (value) => operationDictionary[value] || value;
       function translationRoot(node) {
-        if (!node || typeof node.nodeType !== "number") return null;
-        if (
+        if (!(node instanceof Node)) return null;
+        const root =
           node.nodeType === Node.ELEMENT_NODE ||
           node.nodeType === Node.DOCUMENT_NODE ||
           node.nodeType === Node.DOCUMENT_FRAGMENT_NODE
-        )
-          return node;
-        return node.parentElement || null;
+            ? node
+            : node.parentElement;
+        if (!(root instanceof Node)) return null;
+        if (root.nodeType === Node.DOCUMENT_NODE)
+          return root === document ? root : null;
+        return root.ownerDocument === document ? root : null;
       }
       function translateOperation(root = document) {
         const target = translationRoot(root);
@@ -1713,10 +1716,22 @@
           }
       }
       translateOperation();
-      new MutationObserver((records) => {
-        for (const record of records)
-          for (const node of record.addedNodes) translateOperation(node);
-      }).observe(document.body, { childList: true, subtree: true });
+      const operationObserver = new MutationObserver((records) => {
+        operationObserver.disconnect();
+        try {
+          for (const record of records)
+            for (const node of record.addedNodes) translateOperation(node);
+        } finally {
+          operationObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+          });
+        }
+      });
+      operationObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
       const video = document.querySelector("#desktop");
       const sessionLoading = document.querySelector("#session-loading");
       const sessionLoadingText = document.querySelector(
@@ -1784,10 +1799,16 @@
         width: 1920,
         height: 1080,
         bitrate: 4000000,
+        maxFps: 30,
+        wallpaper: true,
+        fontSmoothing: true,
+        fullWindowDrag: true,
+        menuAnimations: false,
+        desktopComposition: true,
+        clipboard: true,
         sound: true,
         printer: true,
         files: false,
-        encoder: "auto",
       };
       function automaticResolution() {
         const scale = Math.max(1, window.devicePixelRatio || 1);
@@ -2301,10 +2322,16 @@
             width,
             height,
             bitrate: sessionOptions.bitrate,
+            maxFps: sessionOptions.maxFps,
+            wallpaper: sessionOptions.wallpaper,
+            fontSmoothing: sessionOptions.fontSmoothing,
+            fullWindowDrag: sessionOptions.fullWindowDrag,
+            menuAnimations: sessionOptions.menuAnimations,
+            desktopComposition: sessionOptions.desktopComposition,
+            clipboard: sessionOptions.clipboard,
             sound: sessionOptions.sound,
             printer: sessionOptions.printer,
             files: sessionOptions.files,
-            encoder: sessionOptions.encoder,
           }),
         );
       }
@@ -2507,14 +2534,16 @@
           width: Number(pendingSession.width) || automaticSize.width,
           height: Number(pendingSession.height) || automaticSize.height,
           bitrate: Number(pendingSession.bitrate) || 4000000,
+          maxFps: Number(pendingSession.maxFps) || 30,
+          wallpaper: pendingSession.wallpaper !== false,
+          fontSmoothing: pendingSession.fontSmoothing !== false,
+          fullWindowDrag: pendingSession.fullWindowDrag !== false,
+          menuAnimations: pendingSession.menuAnimations === true,
+          desktopComposition: pendingSession.desktopComposition !== false,
+          clipboard: pendingSession.clipboard !== false,
           sound: pendingSession.sound !== false,
           printer: pendingSession.printer !== false,
           files: pendingSession.files === true,
-          encoder: ["auto", "software", "hardware"].includes(
-            pendingSession.encoder,
-          )
-            ? pendingSession.encoder
-            : "auto",
         };
         showFiles.hidden = !sessionOptions.files;
         downloadPrint.hidden = !sessionOptions.printer;

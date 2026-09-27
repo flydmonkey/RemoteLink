@@ -32,6 +32,7 @@ std::vector<TargetConfig> load_targets(const std::string& path,
         target.id = item.value("id", "");
         target.name = item.value("name", "");
         target.group = item.value("group", "默认分组");
+        target.rdp_backend = item.value("rdpBackend", "freerdp");
         target.rdp.hostname = item.value("host", "");
         const int port = item.value("port", 3389);
         target.rdp.username = item.value("username", "");
@@ -39,16 +40,40 @@ std::vector<TargetConfig> load_targets(const std::string& path,
         target.rdp.width = item.value("width", 1280);
         target.rdp.height = item.value("height", 720);
         target.rdp.ignore_certificate = item.value("ignoreCertificate", false);
+        target.performance_preset = item.value("performancePreset", "balanced");
+        target.allow_audio = item.value("allowAudio", true);
+        target.allow_printing = item.value("allowPrinting", true);
+        target.allow_files = item.value("allowFiles", true);
+        target.rdp.redirect_clipboard = item.value("clipboard", true);
+        target.rdp.show_wallpaper = item.value("wallpaper", true);
+        target.rdp.font_smoothing = item.value("fontSmoothing", true);
+        target.rdp.full_window_drag = item.value("fullWindowDrag", true);
+        target.rdp.menu_animations = item.value("menuAnimations", false);
+        target.rdp.desktop_composition = item.value("desktopComposition", true);
+        target.rdp.video_bitrate = item.value("videoBitrate", 4000000U);
+        target.rdp.max_fps = item.value("maxFps", 30U);
+        target.guacamole_dpi = item.value("guacamoleDpi", 96U);
+        target.guacamole_image_format = item.value("guacamoleImageFormat", "webp");
+        target.guacamole_resize_method = item.value("guacamoleResizeMethod", "display-update");
         const std::string password_env = item.value("passwordEnv", "");
         const std::string password_file = item.value("passwordFile", "");
         const std::regex valid_env("^[A-Za-z_][A-Za-z0-9_]*$");
         if (!std::regex_match(target.id, valid_id) || target.name.empty() ||
             target.name.size() > 128 || target.rdp.hostname.empty() ||
             target.rdp.username.empty() ||
+            (target.rdp_backend != "freerdp" && target.rdp_backend != "guacamole") ||
             (password_env.empty() == password_file.empty()) ||
             (!password_env.empty() && !std::regex_match(password_env, valid_env)) ||
             port < 1 || port > 65535) {
             throw std::runtime_error("invalid or incomplete target entry: " + target.id);
+        }
+        if (target.rdp.max_fps < 10 || target.rdp.max_fps > 60 ||
+            target.rdp.video_bitrate < 500000 || target.rdp.video_bitrate > 20000000 ||
+            target.guacamole_dpi < 72 || target.guacamole_dpi > 240 ||
+            !std::set<std::string>{"smooth", "balanced", "quality", "custom"}.contains(target.performance_preset) ||
+            !std::set<std::string>{"webp", "png", "jpeg"}.contains(target.guacamole_image_format) ||
+            !std::set<std::string>{"display-update", "reconnect", "none"}.contains(target.guacamole_resize_method)) {
+            throw std::runtime_error("invalid display settings for target: " + target.id);
         }
         target.rdp.port = static_cast<std::uint16_t>(port);
         if (!ids.insert(target.id).second) {

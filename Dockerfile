@@ -3,6 +3,7 @@ FROM ubuntu:24.04 AS builder
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG REMOTELINK_VERSION=dev
+ARG REMOTELINK_REVISION=unknown
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential ca-certificates cmake git ninja-build npm pkg-config python3 \
@@ -18,8 +19,9 @@ RUN bash ./scripts/copy-novnc-core.sh \
     && cmake -S . -B build -G Ninja \
       -DCMAKE_BUILD_TYPE=Release \
       -DREMOTELINK_ENABLE_STREAMING=ON \
-      -DREMOTELINK_BUILD_TESTS=OFF \
+      -DREMOTELINK_BUILD_TESTS=ON \
     && cmake --build build --parallel "$(nproc)" \
+    && ctest --test-dir build --output-on-failure \
     && find web -type f -name '*.html' -exec \
       sed -i "s/__REMOTELINK_VERSION__/${REMOTELINK_VERSION}/g" {} + \
     && install -D -m 0755 build/remotelink /stage/bin/remotelink \
@@ -34,19 +36,25 @@ FROM ubuntu:24.04 AS runtime
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG REMOTELINK_VERSION=dev
+ARG REMOTELINK_REVISION=unknown
 LABEL org.opencontainers.image.title="RemoteLink" \
       org.opencontainers.image.description="Self-hosted RDP, VNC and SSH remote access gateway" \
       org.opencontainers.image.version="${REMOTELINK_VERSION}" \
+      org.opencontainers.image.revision="${REMOTELINK_REVISION}" \
+      org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.source="https://github.com/flydmonkey/RemoteLink"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl openssl tini \
+      guacd libguac-client-rdp0t64 \
       freerdp3-dev libwinpr3-dev libopenh264-dev libopus-dev libyuv-dev \
       libssl-dev libssh2-1-dev zlib1g \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --user-group --home-dir /nonexistent \
       --shell /usr/sbin/nologin remotelink \
     && install -d -o remotelink -g remotelink -m 0750 /var/lib/remotelink \
+    && install -d -o remotelink -g remotelink -m 0755 /var/lib/remotelink/users \
+    && ln -s /var/lib/remotelink/users /users \
     && install -d -o root -g remotelink -m 0750 /etc/remotelink \
     && install -d -o remotelink -g remotelink -m 0750 /etc/remotelink/tls \
     && printf '{"targets":[]}\n' > /etc/remotelink/targets.json
@@ -57,12 +65,16 @@ COPY docker/entrypoint.sh /usr/local/bin/remotelink-entrypoint
 COPY docker/generate-default-certificate.sh /usr/local/bin/remotelink-generate-certificate
 
 ENV LD_LIBRARY_PATH=/opt/remotelink/lib \
+    HOME=/tmp \
+    XDG_CONFIG_HOME=/tmp/.config \
     REMOTELINK_WEB_ROOT=/opt/remotelink/web \
     REMOTELINK_STATE_DIR=/var/lib/remotelink \
     REMOTELINK_TARGETS_FILE=/etc/remotelink/targets.json \
     REMOTELINK_ALLOWED_HOSTS=* \
     REMOTELINK_TLS_CERTIFICATE=/etc/remotelink/tls/fullchain.pem \
     REMOTELINK_TLS_PRIVATE_KEY=/etc/remotelink/tls/privkey.pem \
+    REMOTELINK_GUACD_HOST=127.0.0.1 \
+    REMOTELINK_GUACD_PORT=4822 \
     REMOTELINK_ICE_UDP_PORT_MIN=50000 \
     REMOTELINK_ICE_UDP_PORT_MAX=50019
 
@@ -73,7 +85,8 @@ RUN chmod 0755 /usr/local/bin/remotelink-entrypoint /usr/local/bin/remotelink-ge
     && remotelink-generate-certificate \
     && chown -R remotelink:remotelink /etc/remotelink/tls
 USER remotelink
+STOPSIGNAL SIGTERM
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/remotelink-entrypoint"]
 CMD ["/opt/remotelink/bin/remotelink"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD curl --fail --silent --insecure https://127.0.0.1:18080/healthz || curl --fail --silent http://127.0.0.1:18080/healthz || exit 1
+  CMD test -s /tmp/remotelink-guacd.pid && kill -0 "$(cat /tmp/remotelink-guacd.pid)" && (curl --fail --silent --insecure https://127.0.0.1:18080/healthz || curl --fail --silent http://127.0.0.1:18080/healthz) || exit 1

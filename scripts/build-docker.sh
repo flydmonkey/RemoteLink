@@ -12,13 +12,15 @@ tags=(-t "${tag}")
 if [[ "${REMOTELINK_TAG_LATEST:-1}" == "1" ]]; then tags+=(-t "${image}:latest"); fi
 if docker --version 2>/dev/null | grep -qi podman; then
   docker build --platform "${platform}" --build-arg "REMOTELINK_VERSION=${version}" \
+    --build-arg "REMOTELINK_REVISION=$(git -C "${project_root}" rev-parse HEAD 2>/dev/null || echo unknown)" \
     "${tags[@]}" "${project_root}"
   if [[ "${REMOTELINK_PUSH:-0}" == "1" ]]; then
     docker push "${tag}"
     if [[ "${REMOTELINK_TAG_LATEST:-1}" == "1" ]]; then docker push "${image}:latest"; fi
   fi
 else
-  arguments=(build --platform "${platform}" --build-arg "REMOTELINK_VERSION=${version}" "${tags[@]}")
+  arguments=(build --platform "${platform}" --build-arg "REMOTELINK_VERSION=${version}" \
+    --build-arg "REMOTELINK_REVISION=$(git -C "${project_root}" rev-parse HEAD 2>/dev/null || echo unknown)" "${tags[@]}")
   if [[ "${REMOTELINK_PUSH:-0}" == "1" ]]; then arguments+=(--push); else arguments+=(--load); fi
   arguments+=("${project_root}")
   docker buildx inspect >/dev/null 2>&1 || docker buildx create --use >/dev/null

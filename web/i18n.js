@@ -879,20 +879,30 @@
       : aliases[preference] || preference;
   document.documentElement.lang = language;
   function translationRoot(node) {
-    if (!node || typeof node.nodeType !== "number") return null;
-    if (
+    if (!(node instanceof Node)) return null;
+    const root =
       node.nodeType === Node.ELEMENT_NODE ||
       node.nodeType === Node.DOCUMENT_NODE ||
       node.nodeType === Node.DOCUMENT_FRAGMENT_NODE
-    )
-      return node;
-    return node.parentElement || null;
+        ? node
+        : node.parentElement;
+    if (!(root instanceof Node)) return null;
+    if (root.nodeType === Node.DOCUMENT_NODE) return root === document ? root : null;
+    return root.ownerDocument === document ? root : null;
   }
   function translate(root = document) {
     const target = translationRoot(root);
     if (!target) return;
     const dict = dictionaries[language] || {};
-    const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
+    let walker;
+    try {
+      walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
+    } catch {
+      // Some remote-display libraries briefly expose adopted nodes while
+      // moving their rendering tree into the page. They cannot be traversed
+      // by this document and contain no RemoteLink UI text to translate.
+      return;
+    }
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
     for (const node of nodes) {
@@ -912,19 +922,26 @@
     }
   }
   translate();
-  new MutationObserver((records) => {
-    for (const record of records) {
-      if (record.type === "characterData" || record.type === "attributes")
-        translate(record.target);
-      for (const node of record.addedNodes) translate(node);
-    }
-  }).observe(document.documentElement, {
+  const i18nObserverOptions = {
     attributes: true,
     attributeFilter: ["title", "aria-label", "placeholder"],
     characterData: true,
     childList: true,
     subtree: true,
+  };
+  const i18nObserver = new MutationObserver((records) => {
+    i18nObserver.disconnect();
+    try {
+      for (const record of records) {
+        if (record.type === "characterData" || record.type === "attributes")
+          translate(record.target);
+        for (const node of record.addedNodes) translate(node);
+      }
+    } finally {
+      i18nObserver.observe(document.documentElement, i18nObserverOptions);
+    }
   });
+  i18nObserver.observe(document.documentElement, i18nObserverOptions);
   window.RemoteLinkI18n = {
     language,
     preference,

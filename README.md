@@ -30,7 +30,7 @@ Port `18080` serves the UI, API, and WebSocket signaling over HTTPS. The image i
 
 Set `REMOTELINK_BEHIND_TLS_PROXY=1` only when a reverse proxy already terminates HTTPS. The container then serves plain HTTP and ignores the certificate. The variable does not configure a proxy, and port `18080` must stay reachable only by that proxy.
 
-UDP `50000-50019` carries RDP WebRTC media. Publish each UDP port with the same host and container port number.
+UDP `50000-50019` is used only by the FreeRDP backend for WebRTC media. Publish each UDP port with the same host and container port number. The Guacamole backend carries the remote display over the existing HTTPS/WSS connection on `18080` and does not require this UDP range.
 
 Open <https://localhost:18080> and sign in with username `admin` and the password
 set in `REMOTELINK_ADMIN_PASSWORD`. Then open **Management** to add RDP, VNC,
@@ -47,6 +47,8 @@ To use Docker Compose from this repository:
 export REMOTELINK_ADMIN_PASSWORD='replace-with-a-strong-password'
 docker compose up -d
 ```
+
+The official RemoteLink image includes guacd. Its entrypoint starts `remotelink` and `guacd` as separate supervised processes and terminates the container if either process fails, allowing the Docker restart policy to recover both. guacd listens only on `127.0.0.1:4822` inside the container and publishes no host port, so both the single-container `docker run` command and Compose support the Guacamole backend.
 
 A browser on the Docker host can open the published TCP port directly. A browser
 on another machine cannot use the container bridge address. Set
@@ -83,7 +85,7 @@ docker rm -f remotelink
 # Run the docker command above again with the same remotelink-state volume.
 ```
 
-Browsers still need direct access to UDP `50000-50019` for RDP media.
+Browsers still need direct access to UDP `50000-50019` when using the FreeRDP backend. The Guacamole backend does not require it.
 From `0.3.6`, the image serves HTTPS by default. Releases through `0.3.4` set `REMOTELINK_BEHIND_TLS_PROXY=1` and still serve plain HTTP. From `0.3.7`, outbound RDP can negotiate TLS 1.0 with older Windows hosts. Pin `flydmonkey/remotelink:0.3.8` for a reproducible deployment.
 
 ## Features
@@ -103,7 +105,7 @@ From `0.3.6`, the image serves HTTPS by default. Releases through `0.3.4` set `R
 - Standard users cannot access administrator status or disconnect operations
 - English, Simplified Chinese, Traditional Chinese, Japanese, and Korean interfaces
 - System-language detection with a persistent manual override
-- Configurable resolution, bitrate, audio, printing, and experimental hardware acceleration
+- Connection settings for resolution, visual effects, FreeRDP bitrate/frame rate, Guacamole image format/DPI, audio, printing, files, and clipboard
 - HTTPS/WSS, encrypted systemd credentials, and isolated per-user storage
 - Responsive desktop and mobile browser interface
 - Automatic gzip compression for HTML, JavaScript, CSS, JSON, and other text responses
@@ -119,11 +121,23 @@ From `0.3.6`, the image serves HTTPS by default. Releases through `0.3.4` set `R
 ```text
 Browser (plain HTML/CSS/JavaScript)
   ├─ RDP: WSS signaling + WebRTC H.264/Opus/data ── RemoteLink ── FreeRDP ── Windows
+  ├─ RDP: HTTPS/WSS Guacamole protocol ──────────── RemoteLink ── local guacd ── Windows
   ├─ VNC: one-time-ticket WSS ───────────────────── RemoteLink ── TCP/RFB ─── VNC server
   └─ SSH: one-time-ticket WSS + xterm.js ────────── RemoteLink ── libssh2 ─── SSH server
 ```
 
 The VNC client uses only noVNC Core; RemoteLink supplies its own connection and session interface. VNC and SSH credentials remain on the server, and browsers receive only short-lived, single-use session tickets. Each RDP browser connection owns an isolated capture, encoder, audio, and input lifecycle; video and input are never broadcast between users.
+
+### RDP backends and network requirements
+
+Administrators can select the backend for each RDP connection:
+
+- **FreeRDP** is recommended for modern Windows. RemoteLink encodes the desktop as H.264 and sends it over WebRTC, so browsers need HTTPS/WSS access to `18080` and access to the configured UDP ICE range (`50000-50019` by default). Browsers must trust the RemoteLink gateway HTTPS certificate.
+- **Guacamole** is intended for older Windows hosts or systems with FreeRDP graphics compatibility issues. The browser uses only RemoteLink's existing HTTPS/WSS endpoint on `18080`; RemoteLink connects to a supervised `guacd` process over loopback (bundled in the official container image and managed by a separate systemd service on bare metal). **Guacamole requires no exposed UDP ports and guacd requires no separate TLS certificate.** The browser still needs to use and trust the HTTPS certificate of the RemoteLink gateway itself.
+
+Do not expose the guacd port to the LAN or Internet. It is an internal loopback component managed by `remotelink-guacd.service` through the installation/deployment scripts.
+
+The main page's **Connection settings** are stored per browser and take effect on the next new session. Shared settings cover resolution, wallpaper, font smoothing, full-window drag, animations, desktop composition, audio, printing, files, and clipboard. FreeRDP additionally exposes H.264 bitrate and maximum frame rate; Guacamole exposes image format, DPI, and resize behavior. Existing sessions are not changed dynamically and must be reconnected.
 
 ## Requirements
 
@@ -132,7 +146,7 @@ The VNC client uses only noVNC Core; RemoteLink supplies its own connection and 
 - FreeRDP 3 and WinPR 3 development packages
 - OpenH264, Opus, libyuv, OpenSSL, libssh2, and libdatachannel
 - A TLS certificate trusted by client browsers
-- TCP 18080 and WebRTC UDP ICE connectivity. Docker bridge deployments must publish the configured UDP range and set `REMOTELINK_ICE_ADVERTISED_ADDRESS` (`18081` is loopback-only internally)
+- TCP 18080. The FreeRDP backend additionally requires WebRTC UDP ICE connectivity; Docker bridge deployments must publish the configured UDP range and set `REMOTELINK_ICE_ADVERTISED_ADDRESS` (`18081` is loopback-only internally). A Guacamole-only deployment does not need exposed UDP ICE ports
 
 ## Build
 
@@ -205,6 +219,8 @@ bash ./scripts/build-docker.sh
 REMOTELINK_IMAGE=remotelink REMOTELINK_ADMIN_PASSWORD='change-this-password' docker compose up -d
 ```
 
+Do not publish the guacd port. RemoteLink's `18080/tcp` endpoint is the only browser-facing Guacamole port. The UDP mapping exists only for FreeRDP/WebRTC and may be removed from a Guacamole-only deployment. Bare-metal/systemd installations continue to manage guacd as a separate `remotelink-guacd.service`.
+
 The service publishes TCP `18080` and UDP `50000-50019`. The Compose configuration persists all users,
 connections, credentials, and audit data in the `remotelink-state` volume. The default
 certificate is `/etc/remotelink/tls/fullchain.pem` with its key at `/etc/remotelink/tls/privkey.pem`.
@@ -237,9 +253,9 @@ server keeps HTML revalidated while serving versioned static assets with a
 one-year immutable cache, so upgrades do not reuse stale browser code.
 
 For a fresh Ubuntu/Debian host, run the interactive one-click installer from the
-repository checkout. It installs build dependencies, builds and tests RemoteLink,
-creates encrypted credentials and a self-signed TLS certificate, and starts the
-systemd service. Running it again updates the binaries while preserving existing
+repository checkout. It installs build dependencies and Podman, builds and tests RemoteLink,
+creates encrypted credentials and a self-signed TLS certificate, and starts both
+`remotelink.service` and the separate `remotelink-guacd.service`. Running it again updates the binaries while preserving existing
 configuration, credentials, and user data.
 
 ```bash

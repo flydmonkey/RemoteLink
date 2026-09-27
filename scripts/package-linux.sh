@@ -37,6 +37,7 @@ install -m 0644 "${project_root}/config/remotelink.env.example" \
   "${project_root}/config/targets.example.json" \
   "${project_root}/config/targets.systemd.example.json" "${package_root}/config/"
 cp -a "${project_root}/scripts" "${package_root}/scripts"
+cp -a "${project_root}/deploy" "${package_root}/deploy"
 install -m 0644 "${project_root}/README.md" "${project_root}/README.zh-CN.md" \
   "${project_root}/CHANGELOG.md" "${package_root}/"
 printf '%s\n' "${version}" > "${package_root}/VERSION"

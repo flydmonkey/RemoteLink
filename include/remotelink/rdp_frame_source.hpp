@@ -26,6 +26,15 @@ struct RdpConnectionOptions {
     bool ignore_certificate = false;
     bool audio_playback = true;
     bool redirect_printers = false;
+    bool redirect_clipboard = true;
+    bool show_wallpaper = true;
+    bool font_smoothing = true;
+    bool full_window_drag = true;
+    bool menu_animations = false;
+    bool desktop_composition = true;
+    std::uint32_t max_fps = 30;
+    std::uint32_t video_bitrate = 4'000'000;
+    std::string print_jobs_path;
     std::string shared_files_path;
 };
 

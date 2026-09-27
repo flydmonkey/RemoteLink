@@ -49,6 +49,14 @@ The LAN release is verified with the following gates:
     tests and explicitly confirms the observed SHA-256 host fingerprint.
 21. `npm run test:e2e` starts the three protocol containers and runs the RDP
     reachability/credential, VNC proxy, and SSH trust/terminal integrations.
+22. Save the **Connection settings**, create a new FreeRDP session, and verify
+    that resolution, H.264 bitrate/frame-rate limit, wallpaper, font smoothing,
+    full-window drag, animations, desktop composition, audio, printing, files,
+    and clipboard match the saved values.
+23. Create a new Guacamole session and verify the shared visual/resource
+    settings plus image-format preference, DPI, and resize behavior. Confirm
+    that the browser uses only the gateway HTTPS/WSS port and does not establish
+    a WebRTC UDP flow for this backend.
 
 Do not put access tokens or RDP passwords into this file, command history,
 screenshots, source files, or test fixtures.

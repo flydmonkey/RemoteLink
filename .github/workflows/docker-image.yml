@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write
+
+concurrency:
+  group: docker-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
 
 jobs:
   docker:
@@ -24,6 +29,8 @@ jobs:
         with:
           platforms: arm64
       - uses: docker/setup-buildx-action@v3
+      - name: Validate Compose configuration
+        run: REMOTELINK_ADMIN_PASSWORD=ci-test-password docker compose config --quiet
       - name: Resolve image metadata
         id: meta
         shell: bash
@@ -44,7 +51,9 @@ jobs:
           context: .
           platforms: linux/amd64
           load: true
-          build-args: REMOTELINK_VERSION=${{ steps.meta.outputs.version }}
+          build-args: |
+            REMOTELINK_VERSION=${{ steps.meta.outputs.version }}
+            REMOTELINK_REVISION=${{ github.sha }}
           tags: ${{ steps.meta.outputs.local_image }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -52,15 +61,19 @@ jobs:
         env:
           IMAGE: ${{ steps.meta.outputs.local_image }}
         run: |
-          docker run -d --name remotelink-smoke -p 127.0.0.1:18080:18080 \
+          docker volume create remotelink-smoke-state >/dev/null
+          docker run -d --name remotelink-smoke \
+            -p 127.0.0.1:18080:18080 -v remotelink-smoke-state:/var/lib/remotelink \
             -e REMOTELINK_ADMIN_PASSWORD=ci-test-password "$IMAGE"
-          trap 'docker rm -f remotelink-smoke >/dev/null 2>&1 || true' EXIT
+          trap 'docker rm -f remotelink-smoke >/dev/null 2>&1 || true; docker volume rm remotelink-smoke-state >/dev/null 2>&1 || true' EXIT
           for attempt in {1..30}; do
-            if curl -kfsS https://127.0.0.1:18080/healthz; then exit 0; fi
+            if curl -kfsS https://127.0.0.1:18080/healthz >/dev/null; then break; fi
             sleep 1
           done
+          curl -kfsS https://127.0.0.1:18080/healthz
+          curl -kfsS https://127.0.0.1:18080/settings | grep -q 'Guacamole 专属'
+          docker exec remotelink-smoke sh -c 'test -s /tmp/remotelink-guacd.pid && kill -0 "$(cat /tmp/remotelink-guacd.pid)"'
           docker logs remotelink-smoke
-          exit 1
       - name: Validate Docker Hub credentials
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
@@ -90,7 +103,11 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          build-args: REMOTELINK_VERSION=${{ steps.meta.outputs.version }}
+          provenance: mode=max
+          sbom: true
+          build-args: |
+            REMOTELINK_VERSION=${{ steps.meta.outputs.version }}
+            REMOTELINK_REVISION=${{ github.sha }}
           tags: |
             ${{ steps.meta.outputs.ghcr_image }}:${{ steps.meta.outputs.version }}
             ${{ steps.meta.outputs.ghcr_image }}:latest

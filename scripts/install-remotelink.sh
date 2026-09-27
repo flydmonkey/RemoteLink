@@ -75,7 +75,7 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y build-essential cmake ninja-build pkg-config git python3 curl openssl \
-  ca-certificates libopenh264-dev libopus-dev libyuv-dev libssl-dev libssh2-1-dev nlohmann-json3-dev
+  ca-certificates podman libopenh264-dev libopus-dev libyuv-dev libssl-dev libssh2-1-dev nlohmann-json3-dev
 
 if apt-cache show freerdp3-dev >/dev/null 2>&1 && apt-cache show libwinpr3-dev >/dev/null 2>&1; then
   apt-get install -y freerdp3-dev libwinpr3-dev
@@ -123,6 +123,14 @@ mapfile -t datachannel_libraries < <(find "${project_root}/build" -name 'libdata
 cp -a "${datachannel_libraries[@]}" "${install_root}/lib/"
 shopt -u nullglob
 cp -a "${project_root}/web/." "${install_root}/web/"
+install -d -o remotelink -g remotelink -m 0755 "${state_root}/users"
+remotelink_uid="$(id -u remotelink)"
+remotelink_gid="$(id -g remotelink)"
+sed -e "s/@REMOTELINK_UID@/${remotelink_uid}/g" \
+    -e "s/@REMOTELINK_GID@/${remotelink_gid}/g" \
+    "${project_root}/deploy/remotelink-guacd.service" \
+    > /etc/systemd/system/remotelink-guacd.service
+chmod 0644 /etc/systemd/system/remotelink-guacd.service
 
 certificate_path="${config_root}/tls/fullchain.pem"
 private_key_path="${config_root}/tls/privkey.pem"
@@ -209,6 +217,7 @@ EOF
 
 if [[ ${preserve_config} -eq 1 ]]; then
   systemctl daemon-reload
+  systemctl enable --now remotelink-guacd.service
   systemctl restart "${service_name}.service"
   sleep 2
   systemctl is-active --quiet "${service_name}.service"
@@ -263,6 +272,7 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
+systemctl enable --now remotelink-guacd.service
 systemctl enable --now "${service_name}.service"
 systemctl restart "${service_name}.service"
 sleep 2

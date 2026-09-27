@@ -43,7 +43,8 @@
         mask-image: linear-gradient(to bottom, #000, transparent 75%);
       }
       button,
-      input {
+      input,
+      select {
         font: inherit;
       }
       button {
@@ -252,6 +253,21 @@
         outline: none;
       }
       input:focus {
+        border-color: var(--live);
+        box-shadow: 0 0 0 3px rgba(67, 211, 178, 0.12);
+      }
+      #connection-backend {
+        display: block;
+        width: 100%;
+        min-height: 48px;
+        padding: 0.8rem 2.5rem 0.8rem 0.8rem;
+        color: var(--ink);
+        background-color: #222;
+        border: 1px solid #405158;
+        border-radius: 4px;
+        outline: none;
+      }
+      #connection-backend:focus {
         border-color: var(--live);
         box-shadow: 0 0 0 3px rgba(67, 211, 178, 0.12);
       }
@@ -1114,6 +1130,16 @@
       .dialog-actions .small-button {
         margin-top: 1rem;
       }
+      #connection-dialog { width: min(680px, calc(100vw - 28px)); }
+      #connection-form { max-height: min(820px, calc(100vh - 40px)); overflow: auto; }
+      .connection-section { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 6px; }
+      .connection-section legend { padding: 0 6px; font-weight: 600; }
+      .connection-section .wide { grid-column: 1 / -1; }
+      .connection-section label { margin: 0; }
+      .check-option { display: flex; align-items: center; gap: 8px; min-height: 34px; }
+      .check-option input { width: 16px; height: 16px; margin: 0; }
+      .backend-settings[hidden] { display: none; }
+      @media (max-width: 600px) { .connection-section { grid-template-columns: 1fr; } .connection-section .wide { grid-column: auto; } }
       .permission-list {
         display: grid;
         gap: 6px;
@@ -1345,7 +1371,7 @@
       <form id="connection-form">
         <h2>添加连接</h2>
         <p id="connection-description">添加由管理员维护的 RDP 连接。</p>
-        <label for="connection-name">连接名称</label
+        <fieldset class="connection-section"><legend>基本信息</legend><label for="connection-name">连接名称</label
         ><input id="connection-name" maxlength="128" required /><label
           for="connection-host"
           >主机名或 IP</label
@@ -1359,7 +1385,11 @@
           max="65535"
           value="3389"
           required
-        /><label for="connection-username">用户名</label
+        /><label for="connection-backend">RDP 后端</label
+        ><select id="connection-backend">
+          <option value="freerdp">FreeRDP（现代 Windows，推荐）</option>
+          <option value="guacamole">Guacamole（旧版 Windows 兼容）</option>
+        </select><label for="connection-username">用户名</label
         ><input id="connection-username" maxlength="256" required /><label
           for="connection-password"
           >密码</label
@@ -1369,7 +1399,7 @@
           maxlength="4096"
           autocomplete="new-password"
           required
-        />
+        /></fieldset>
         <div id="connection-error" role="alert"></div>
         <div class="dialog-actions">
           <button class="small-button" type="button" id="cancel-connection">
@@ -1410,7 +1440,7 @@
         </div>
       </form>
     </dialog>
-    <script src="/i18n.js?v=__REMOTELINK_VERSION__"></script>
+    <script src="/i18n.js?v=__REMOTELINK_VERSION__&rev=2"></script>
     <script>
       const login = document.querySelector("#login"),
         loginForm = document.querySelector("#login-form"),
@@ -1637,6 +1667,8 @@
         document.querySelector("#connection-name").value = target?.name || "";
         document.querySelector("#connection-host").value = target?.host || "";
         document.querySelector("#connection-port").value = target?.port || 3389;
+        document.querySelector("#connection-backend").value =
+          target?.rdpBackend || "freerdp";
         document.querySelector("#connection-username").value =
           target?.username || "";
         document.querySelector("#connection-password").required =
@@ -1894,11 +1926,12 @@
           name: document.querySelector("#connection-name").value.trim(),
           host: document.querySelector("#connection-host").value.trim(),
           port: Number(document.querySelector("#connection-port").value),
+          rdpBackend: document.querySelector("#connection-backend").value,
           username: document.querySelector("#connection-username").value.trim(),
           password: document.querySelector("#connection-password").value,
-          width: 1920,
-          height: 1080,
-          ignoreCertificate: true,
+          width: editingConnection?.width || 1920,
+          height: editingConnection?.height || 1080,
+          ignoreCertificate: editingConnection?.ignoreCertificate ?? true,
         };
         const editing = !!editingConnection;
         try {

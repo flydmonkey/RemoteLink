@@ -24,6 +24,7 @@ public:
         std::string id;
         std::string name;
         std::string group;
+        std::string backend;
         std::string host;
         std::string username;
         std::string account_username;
@@ -56,6 +57,10 @@ public:
                const std::string& host, const std::string& username,
                const std::string& password, std::uint32_t width,
                std::uint32_t height, std::uint32_t bitrate,
+               std::uint32_t max_fps, bool show_wallpaper,
+               bool font_smoothing, bool full_window_drag,
+               bool menu_animations, bool desktop_composition,
+               bool redirect_clipboard,
                bool audio_playback, bool redirect_printers, bool redirect_files,
                std::size_t user_identity, std::string account_username,
                std::string& error);

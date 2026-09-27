@@ -22,4 +22,33 @@ if [[ -n "${REMOTELINK_ADMIN_PASSWORD:-}" && -z "${REMOTELINK_INITIAL_ADMIN_PASS
   export REMOTELINK_INITIAL_ADMIN_PASSWORD_FILE="${password_file}"
 fi
 
-exec "$@"
+guacd_host="${REMOTELINK_GUACD_HOST:-127.0.0.1}"
+guacd_port="${REMOTELINK_GUACD_PORT:-4822}"
+if [[ "${REMOTELINK_START_GUACD:-1}" != "1" || "${guacd_host}" != "127.0.0.1" ]]; then
+  exec "$@"
+fi
+
+/usr/sbin/guacd -f -b 127.0.0.1 -l "${guacd_port}" &
+guacd_pid=$!
+printf '%s\n' "${guacd_pid}" > /tmp/remotelink-guacd.pid
+"$@" &
+remotelink_pid=$!
+
+cleanup() {
+  trap - EXIT TERM INT
+  kill -TERM "${remotelink_pid}" "${guacd_pid}" 2>/dev/null || true
+  wait "${remotelink_pid}" 2>/dev/null || true
+  wait "${guacd_pid}" 2>/dev/null || true
+  rm -f /tmp/remotelink-guacd.pid
+}
+trap cleanup EXIT TERM INT
+
+set +e
+wait -n "${remotelink_pid}" "${guacd_pid}"
+status=$?
+set -e
+if kill -0 "${remotelink_pid}" 2>/dev/null && ! kill -0 "${guacd_pid}" 2>/dev/null; then
+  echo "guacd exited unexpectedly" >&2
+  status=1
+fi
+exit "${status}"

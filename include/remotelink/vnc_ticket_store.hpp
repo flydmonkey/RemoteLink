@@ -16,6 +16,23 @@ struct VncDestination {
     std::string username;
     std::string hostname;
     std::uint16_t port = 5900;
+    std::string password;
+    std::string domain;
+    std::uint32_t width = 1920;
+    std::uint32_t height = 1080;
+    std::uint64_t user_identity = 0;
+    bool enable_printing = true;
+    bool enable_drive = false;
+    bool enable_audio = true;
+    bool enable_clipboard = true;
+    bool show_wallpaper = true;
+    bool font_smoothing = true;
+    bool full_window_drag = true;
+    bool menu_animations = false;
+    bool desktop_composition = true;
+    std::uint32_t dpi = 96;
+    std::string image_format = "webp";
+    std::string resize_method = "display-update";
 };
 
 class VncTicketStore {

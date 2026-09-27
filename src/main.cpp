@@ -22,6 +22,7 @@
 #include <cctype>
 #include <csignal>
 #include <cstdlib>
+#include <iomanip>
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -220,6 +221,7 @@ std::vector<remotelink::TargetConfig> load_managed_connections(
         remotelink::TargetConfig target;
         target.id = item.value("id", ""); target.name = item.value("name", "");
         target.group = item.value("group", "默认分组");
+        target.rdp_backend = item.value("rdpBackend", "freerdp");
         target.rdp.hostname = item.value("host", "");
         target.rdp.port = static_cast<std::uint16_t>(item.value("port", 3389));
         target.rdp.username = item.value("username", "");
@@ -232,7 +234,23 @@ std::vector<remotelink::TargetConfig> load_managed_connections(
         }
         target.rdp.width = item.value("width", 1920U); target.rdp.height = item.value("height", 1080U);
         target.rdp.ignore_certificate = item.value("ignoreCertificate", true);
+        target.performance_preset = item.value("performancePreset", "balanced");
+        target.allow_audio = item.value("allowAudio", true);
+        target.allow_printing = item.value("allowPrinting", true);
+        target.allow_files = item.value("allowFiles", true);
+        target.rdp.redirect_clipboard = item.value("clipboard", true);
+        target.rdp.show_wallpaper = item.value("wallpaper", true);
+        target.rdp.font_smoothing = item.value("fontSmoothing", true);
+        target.rdp.full_window_drag = item.value("fullWindowDrag", true);
+        target.rdp.menu_animations = item.value("menuAnimations", false);
+        target.rdp.desktop_composition = item.value("desktopComposition", true);
+        target.rdp.video_bitrate = item.value("videoBitrate", 4000000U);
+        target.rdp.max_fps = item.value("maxFps", 30U);
+        target.guacamole_dpi = item.value("guacamoleDpi", 96U);
+        target.guacamole_image_format = item.value("guacamoleImageFormat", "webp");
+        target.guacamole_resize_method = item.value("guacamoleResizeMethod", "display-update");
         if (target.id.empty() || target.name.empty() || target.rdp.hostname.empty() ||
+            (target.rdp_backend != "freerdp" && target.rdp_backend != "guacamole") ||
             !remotelink::host_is_allowed(target.rdp.hostname, allowed_hosts))
             throw std::runtime_error("invalid managed connection: " + target.id);
         result.push_back(std::move(target));
@@ -257,11 +275,22 @@ void save_managed_connections(const std::filesystem::path& path,
             std::filesystem::permissions(secret_path, std::filesystem::perms::owner_read |
                 std::filesystem::perms::owner_write, std::filesystem::perm_options::replace);
         } else std::filesystem::remove(secret_path);
-        data.push_back({{"id", target.id}, {"name", target.name}, {"group", target.group}, {"host", target.rdp.hostname},
+        data.push_back({{"id", target.id}, {"name", target.name}, {"group", target.group},
+            {"rdpBackend", target.rdp_backend}, {"host", target.rdp.hostname},
             {"port", target.rdp.port}, {"username", target.rdp.username},
             {"passwordFile", target.rdp.password.empty() ? "" : secret_path.string()},
             {"width", target.rdp.width}, {"height", target.rdp.height},
-            {"ignoreCertificate", target.rdp.ignore_certificate}});
+            {"ignoreCertificate", target.rdp.ignore_certificate},
+            {"performancePreset", target.performance_preset},
+            {"allowAudio", target.allow_audio}, {"allowPrinting", target.allow_printing},
+            {"allowFiles", target.allow_files}, {"clipboard", target.rdp.redirect_clipboard},
+            {"wallpaper", target.rdp.show_wallpaper}, {"fontSmoothing", target.rdp.font_smoothing},
+            {"fullWindowDrag", target.rdp.full_window_drag}, {"menuAnimations", target.rdp.menu_animations},
+            {"desktopComposition", target.rdp.desktop_composition},
+            {"videoBitrate", target.rdp.video_bitrate}, {"maxFps", target.rdp.max_fps},
+            {"guacamoleDpi", target.guacamole_dpi},
+            {"guacamoleImageFormat", target.guacamole_image_format},
+            {"guacamoleResizeMethod", target.guacamole_resize_method}});
     }
     const auto temporary = path.string() + ".tmp";
     { std::ofstream output(temporary, std::ios::trunc); output << data.dump(2) << '\n';
@@ -553,6 +582,7 @@ int main() {
     for(auto& item:ssh_activity)if(item.active){item.active=false;item.ended_at=ssh_startup_time;item.reason="服务重启";}
     if(!ssh_activity.empty())save_vnc_activity(ssh_activity_path,ssh_activity);
     remotelink::VncTicketStore vnc_tickets;
+    remotelink::VncTicketStore guacamole_tickets;
     std::mutex vnc_bridges_mutex;
     std::unordered_map<std::string, VncBridgeLease> vnc_bridges;
     std::jthread vnc_bridge_reaper([&vnc_bridges, &vnc_bridges_mutex](std::stop_token stop) {
@@ -617,7 +647,10 @@ int main() {
     std::vector<remotelink::WebRtcServer::PublicTarget> public_targets;
     for (const auto& target : target_catalog) public_targets.push_back({
         target.id, target.name, target.rdp.hostname, target.rdp.username,
-        target.rdp.width, target.rdp.height});
+        target.rdp_backend,
+        target.rdp.width, target.rdp.height, target.rdp.video_bitrate,
+        target.rdp.max_fps, target.allow_audio, target.allow_printing,
+        target.allow_files, target.rdp.redirect_clipboard});
     webrtc.set_targets(std::move(public_targets));
     {
         std::vector<std::vector<std::string>> permissions;
@@ -630,7 +663,11 @@ int main() {
                                          const std::string& host, const std::string& username,
                                          const std::string& password,
                                          std::uint32_t width, std::uint32_t height,
-                                         std::uint32_t bitrate, bool audio_playback,
+                                         std::uint32_t bitrate, std::uint32_t max_fps,
+                                         bool show_wallpaper, bool font_smoothing,
+                                         bool full_window_drag, bool menu_animations,
+                                         bool desktop_composition, bool redirect_clipboard,
+                                         bool audio_playback,
                                          bool redirect_printers, bool redirect_files,
                                          std::size_t user_identity,
                                          std::string& error) {
@@ -638,7 +675,9 @@ int main() {
         { std::lock_guard lock(users_mutex);
           if (user_identity < users.size()) account_username = users[user_identity].username; }
         return sessions.start(peer, target, host, username, password, width, height,
-                              bitrate, audio_playback, redirect_printers, redirect_files,
+                              bitrate, max_fps, show_wallpaper, font_smoothing,
+                              full_window_drag, menu_animations, desktop_composition,
+                              redirect_clipboard, audio_playback, redirect_printers, redirect_files,
                               user_identity, std::move(account_username), error);
     });
     webrtc.set_input_handler([&sessions](const std::string& peer, const std::string& input) { sessions.input(peer, input); });
@@ -654,6 +693,9 @@ int main() {
     });
     http.set_ssh_ticket_handler([&ssh_tickets](const std::string& ticket) {
         return ssh_tickets.consume(ticket);
+    });
+    http.set_guacamole_ticket_handler([&guacamole_tickets](const std::string& ticket) {
+        return guacamole_tickets.consume(ticket);
     });
     http.set_ssh_session_observer([&ssh_bridges, &ssh_bridges_mutex,
                                    &ssh_activity,&ssh_activity_mutex,&ssh_activity_path](
@@ -717,6 +759,7 @@ int main() {
                           &connection_secrets_path,
                           &vnc_connections, &vnc_connections_mutex, &vnc_connections_path,
                           &vnc_connection_secrets_path, &vnc_ca_path, &vnc_tickets,
+                          &guacamole_tickets,
                           &vnc_bridges, &vnc_bridges_mutex,
                           &vnc_activity, &vnc_activity_mutex,
                           &ssh_connections, &ssh_connections_mutex, &ssh_connections_path,
@@ -772,6 +815,68 @@ int main() {
                 targets.push_back({{"id", target.id}, {"name", target.name}});
             }
             response.body = json{{"targets", std::move(targets)}}.dump();
+            return response;
+        }
+        if (request.method == "POST" && request.path == "/api/guacamole/sessions") {
+            const auto payload = json::parse(request.body, nullptr, false);
+            const std::string target_id = payload.is_object() ? payload.value("targetId", "") : "";
+            std::vector<std::string> allowed;
+            bool administrator = false;
+            { std::lock_guard lock(users_mutex);
+              administrator = *user_identity == 0;
+              allowed = users[*user_identity].allowed_targets; }
+            if (!administrator && std::find(allowed.begin(), allowed.end(), target_id) == allowed.end()) {
+                response.status = 403;
+                response.body = json{{"error", "target not authorized"}}.dump();
+                return response;
+            }
+            const auto target = std::find_if(target_catalog.begin(), target_catalog.end(),
+                [&](const auto& item) { return item.id == target_id; });
+            if (target == target_catalog.end()) {
+                response.status = 404;
+                response.body = json{{"error", "RDP target not found"}}.dump();
+                return response;
+            }
+            if (target->rdp_backend != "guacamole") {
+                response.status = 409;
+                response.body = json{{"error", "target is configured for FreeRDP"}}.dump();
+                return response;
+            }
+            auto width = payload.value("width", target->rdp.width);
+            auto height = payload.value("height", target->rdp.height);
+            const bool enable_printing = payload.value("printer", true) && target->allow_printing;
+            const bool enable_drive = payload.value("files", false) && target->allow_files;
+            const bool enable_audio = payload.value("sound", true) && target->allow_audio;
+            const bool enable_clipboard = payload.value("clipboard", true) && target->rdp.redirect_clipboard;
+            const auto requested_dpi = payload.value("guacamoleDpi", target->guacamole_dpi);
+            const auto requested_format = payload.value("guacamoleFormat", target->guacamole_image_format);
+            const auto requested_resize = payload.value("guacamoleResize", target->guacamole_resize_method);
+            const auto guacamole_dpi = std::clamp<std::uint32_t>(requested_dpi, 72, 240);
+            const std::string guacamole_format =
+                (requested_format == "png" || requested_format == "jpeg") ? requested_format : "webp";
+            const std::string guacamole_resize =
+                (requested_resize == "reconnect" || requested_resize == "none")
+                    ? requested_resize : "display-update";
+            if (width < 640 || width > 7680) width = target->rdp.width;
+            if (height < 480 || height > 4320) height = target->rdp.height;
+            const auto ticket = guacamole_tickets.issue({
+                .target_id = target->id, .target_name = target->name,
+                .username = target->rdp.username, .hostname = target->rdp.hostname,
+                .port = target->rdp.port, .password = target->rdp.password,
+                .domain = target->rdp.domain, .width = width, .height = height,
+                .user_identity = *user_identity, .enable_printing = enable_printing,
+                .enable_drive = enable_drive, .enable_audio = enable_audio,
+                .enable_clipboard = enable_clipboard,
+                .show_wallpaper = payload.value("wallpaper", true),
+                .font_smoothing = payload.value("fontSmoothing", true),
+                .full_window_drag = payload.value("fullWindowDrag", true),
+                .menu_animations = payload.value("menuAnimations", false),
+                .desktop_composition = payload.value("desktopComposition", true),
+                .dpi = guacamole_dpi, .image_format = guacamole_format,
+                .resize_method = guacamole_resize});
+            response.body = json{{"ticket", ticket},
+                {"websocketUrl", "/guacamole/ws?ticket=" + ticket},
+                {"expiresIn", 30}}.dump();
             return response;
         }
         if (request.method == "GET" && request.path == "/api/ssh/targets") {
@@ -1269,22 +1374,44 @@ int main() {
                 const std::string host = payload.is_object() ? payload.value("host", "") : "";
                 const std::string username = payload.is_object() ? payload.value("username", "") : "";
                 const std::string password = payload.is_object() ? payload.value("password", "") : "";
+                const std::string backend = payload.is_object()
+                    ? payload.value("rdpBackend", "freerdp") : "freerdp";
                 const int port = payload.is_object() ? payload.value("port", 3389) : 0;
                 if (name.empty() || name.size() > 128 || group.empty() || group.size() > 64 || host.empty() || host.size() > 255 ||
                     port < 1 || port > 65535 || username.empty() || username.size() > 256 ||
                     password.empty() || password.size() > 4096 ||
+                    (backend != "freerdp" && backend != "guacamole") ||
                     !remotelink::host_is_allowed(host, allowed_hosts)) {
                     response.status = 400; response.body = json{{"error", "invalid connection"}}.dump(); return response;
                 }
                 remotelink::TargetConfig target;
                 target.id = id; target.name = name; target.group = group; target.rdp.hostname = host;
+                target.rdp_backend = backend;
                 target.rdp.port = static_cast<std::uint16_t>(port);
                 target.rdp.username = username; target.rdp.password = password;
                 target.rdp.width = payload.value("width", 1920U);
                 target.rdp.height = payload.value("height", 1080U);
                 target.rdp.ignore_certificate = payload.value("ignoreCertificate", true);
+                target.performance_preset = payload.value("performancePreset", "balanced");
+                target.allow_audio = payload.value("allowAudio", true);
+                target.allow_printing = payload.value("allowPrinting", true);
+                target.allow_files = payload.value("allowFiles", true);
+                target.rdp.redirect_clipboard = payload.value("clipboard", true);
+                target.rdp.show_wallpaper = payload.value("wallpaper", true);
+                target.rdp.font_smoothing = payload.value("fontSmoothing", true);
+                target.rdp.full_window_drag = payload.value("fullWindowDrag", true);
+                target.rdp.menu_animations = payload.value("menuAnimations", false);
+                target.rdp.desktop_composition = payload.value("desktopComposition", true);
+                target.rdp.video_bitrate = payload.value("videoBitrate", 4000000U);
+                target.rdp.max_fps = payload.value("maxFps", 30U);
+                target.guacamole_dpi = payload.value("guacamoleDpi", 96U);
+                target.guacamole_image_format = payload.value("guacamoleImageFormat", "webp");
+                target.guacamole_resize_method = payload.value("guacamoleResizeMethod", "display-update");
                 if (target.rdp.width < 640 || target.rdp.width > 7680 ||
-                    target.rdp.height < 480 || target.rdp.height > 4320) {
+                    target.rdp.height < 480 || target.rdp.height > 4320 ||
+                    target.rdp.max_fps < 10 || target.rdp.max_fps > 60 ||
+                    target.rdp.video_bitrate < 500000 || target.rdp.video_bitrate > 20000000 ||
+                    target.guacamole_dpi < 72 || target.guacamole_dpi > 240) {
                     response.status = 400; response.body = json{{"error", "invalid dimensions"}}.dump(); return response;
                 }
                 managed_targets.push_back(target); target_catalog.push_back(target);
@@ -1292,7 +1419,10 @@ int main() {
                 sessions.set_targets(target_catalog);
                 std::vector<remotelink::WebRtcServer::PublicTarget> published;
                 for (const auto& item : target_catalog) published.push_back({item.id, item.name,
-                    item.rdp.hostname, item.rdp.username, item.rdp.width, item.rdp.height});
+                    item.rdp.hostname, item.rdp.username, item.rdp_backend,
+                    item.rdp.width, item.rdp.height, item.rdp.video_bitrate,
+                    item.rdp.max_fps, item.allow_audio, item.allow_printing,
+                    item.allow_files, item.rdp.redirect_clipboard});
                 webrtc.set_targets(std::move(published));
                 response.body = json{{"id", id}, {"name", name}}.dump(); return response;
             }
@@ -1311,24 +1441,55 @@ int main() {
                 const std::string host = payload.value("host", "");
                 const std::string username = payload.value("username", "");
                 const std::string password = payload.value("password", "");
+                const std::string backend = payload.value("rdpBackend", "freerdp");
                 const int port = payload.value("port", 3389);
                 if (name.empty() || name.size() > 128 || group.empty() || group.size() > 64 || host.empty() || host.size() > 255 ||
                     port < 1 || port > 65535 || username.empty() || username.size() > 256 ||
                     password.size() > 4096 || (password.empty() && managed->rdp.password.empty()) ||
+                    (backend != "freerdp" && backend != "guacamole") ||
                     !remotelink::host_is_allowed(host, allowed_hosts)) {
                     response.status = 400; response.body = json{{"error", "invalid connection"}}.dump(); return response;
                 }
                 auto updated = *managed;
                 updated.name = name; updated.group = group; updated.rdp.hostname = host;
+                updated.rdp_backend = backend;
                 updated.rdp.port = static_cast<std::uint16_t>(port);
                 updated.rdp.username = username;
                 if (!password.empty()) updated.rdp.password = password;
+                updated.rdp.width = payload.value("width", updated.rdp.width);
+                updated.rdp.height = payload.value("height", updated.rdp.height);
+                updated.rdp.ignore_certificate = payload.value("ignoreCertificate", updated.rdp.ignore_certificate);
+                updated.performance_preset = payload.value("performancePreset", updated.performance_preset);
+                updated.allow_audio = payload.value("allowAudio", updated.allow_audio);
+                updated.allow_printing = payload.value("allowPrinting", updated.allow_printing);
+                updated.allow_files = payload.value("allowFiles", updated.allow_files);
+                updated.rdp.redirect_clipboard = payload.value("clipboard", updated.rdp.redirect_clipboard);
+                updated.rdp.show_wallpaper = payload.value("wallpaper", updated.rdp.show_wallpaper);
+                updated.rdp.font_smoothing = payload.value("fontSmoothing", updated.rdp.font_smoothing);
+                updated.rdp.full_window_drag = payload.value("fullWindowDrag", updated.rdp.full_window_drag);
+                updated.rdp.menu_animations = payload.value("menuAnimations", updated.rdp.menu_animations);
+                updated.rdp.desktop_composition = payload.value("desktopComposition", updated.rdp.desktop_composition);
+                updated.rdp.video_bitrate = payload.value("videoBitrate", updated.rdp.video_bitrate);
+                updated.rdp.max_fps = payload.value("maxFps", updated.rdp.max_fps);
+                updated.guacamole_dpi = payload.value("guacamoleDpi", updated.guacamole_dpi);
+                updated.guacamole_image_format = payload.value("guacamoleImageFormat", updated.guacamole_image_format);
+                updated.guacamole_resize_method = payload.value("guacamoleResizeMethod", updated.guacamole_resize_method);
+                if (updated.rdp.width < 640 || updated.rdp.width > 7680 ||
+                    updated.rdp.height < 480 || updated.rdp.height > 4320 ||
+                    updated.rdp.max_fps < 10 || updated.rdp.max_fps > 60 ||
+                    updated.rdp.video_bitrate < 500000 || updated.rdp.video_bitrate > 20000000 ||
+                    updated.guacamole_dpi < 72 || updated.guacamole_dpi > 240) {
+                    response.status = 400; response.body = json{{"error", "invalid display settings"}}.dump(); return response;
+                }
                 *managed = updated; *catalog = updated;
                 save_managed_connections(connections_path, connection_secrets_path, managed_targets);
                 sessions.set_targets(target_catalog);
                 std::vector<remotelink::WebRtcServer::PublicTarget> published;
                 for (const auto& item : target_catalog) published.push_back({item.id, item.name,
-                    item.rdp.hostname, item.rdp.username, item.rdp.width, item.rdp.height});
+                    item.rdp.hostname, item.rdp.username, item.rdp_backend,
+                    item.rdp.width, item.rdp.height, item.rdp.video_bitrate,
+                    item.rdp.max_fps, item.allow_audio, item.allow_printing,
+                    item.allow_files, item.rdp.redirect_clipboard});
                 webrtc.set_targets(std::move(published));
                 response.body = json{{"id", id}, {"name", name}}.dump(); return response;
             }
@@ -1352,7 +1513,10 @@ int main() {
                 sessions.set_targets(target_catalog);
                 std::vector<remotelink::WebRtcServer::PublicTarget> published;
                 for (const auto& item : target_catalog) published.push_back({item.id, item.name,
-                    item.rdp.hostname, item.rdp.username, item.rdp.width, item.rdp.height});
+                    item.rdp.hostname, item.rdp.username, item.rdp_backend,
+                    item.rdp.width, item.rdp.height, item.rdp.video_bitrate,
+                    item.rdp.max_fps, item.allow_audio, item.allow_printing,
+                    item.allow_files, item.rdp.redirect_clipboard});
                 webrtc.set_targets(std::move(published));
                 {
                     std::lock_guard lock(users_mutex);
@@ -1511,7 +1675,8 @@ int main() {
                 std::to_string(*user_identity) / "files";
         const std::filesystem::path print_directory =
             std::filesystem::path(configured_state && *configured_state
-                ? configured_state : "/var/lib/remotelink") / "print-jobs";
+                ? configured_state : "/var/lib/remotelink") / "users" /
+                std::to_string(*user_identity) / "print-jobs";
         const std::filesystem::path audit_path =
             std::filesystem::path(configured_state && *configured_state
                 ? configured_state : "/var/lib/remotelink") / "file-audit.jsonl";
@@ -1645,22 +1810,39 @@ int main() {
             audit_file_action("move", destination.lexically_relative(file_directory));
             response.body = json{{"status", "moved"}}.dump(); return response;
         }
-        auto print_jobs = [&print_directory, user_identity] {
+        auto import_admin_prints = [&print_directory, user_identity] {
+            if (*user_identity != 0) return;
+            const char* state = std::getenv("REMOTELINK_STATE_DIR");
+            const auto legacy = std::filesystem::path(state && *state
+                ? state : "/var/lib/remotelink") / "print-jobs";
+            std::error_code error;
+            std::filesystem::create_directories(print_directory, error);
+            for (std::filesystem::directory_iterator it(legacy, error), end;
+                 !error && it != end; it.increment(error)) {
+                if (!it->is_regular_file(error) || it->path().extension() != ".pdf") continue;
+                const auto modified = std::chrono::system_clock::now() +
+                    (it->last_write_time(error) - std::filesystem::file_time_type::clock::now());
+                const std::time_t timestamp = std::chrono::system_clock::to_time_t(modified);
+                std::tm local {};
+                localtime_r(&timestamp, &local);
+                std::ostringstream stem;
+                stem << std::put_time(&local, "%Y-%m-%d_%H-%M-%S");
+                auto destination = print_directory / (stem.str() + ".pdf");
+                for (unsigned suffix = 1; std::filesystem::exists(destination, error); ++suffix)
+                    destination = print_directory /
+                        (stem.str() + " (" + std::to_string(suffix) + ").pdf");
+                std::filesystem::rename(it->path(), destination, error);
+                if (error) error.clear();
+            }
+        };
+        auto print_jobs = [&print_directory, &import_admin_prints] {
+            import_admin_prints();
             std::vector<std::filesystem::directory_entry> jobs;
             std::error_code error;
             for (std::filesystem::directory_iterator it(print_directory, error), end;
                  !error && it != end; it.increment(error)) {
                 if (it->is_regular_file(error) && it->path().extension() == ".pdf") {
-                    auto owner_path = it->path(); owner_path += ".owner";
-                    std::string owner;
-                    { std::ifstream owner_file(owner_path); owner_file >> owner; }
-                    const std::string expected = std::to_string(*user_identity);
-                    if (owner.empty()) {
-                        std::ofstream owner_file(owner_path, std::ios::trunc);
-                        owner_file << expected;
-                        owner = expected;
-                    }
-                    if (owner == expected) jobs.push_back(*it);
+                    jobs.push_back(*it);
                 }
             }
             std::sort(jobs.begin(), jobs.end(), [](const auto& left, const auto& right) {
@@ -1681,15 +1863,32 @@ int main() {
             }), jobs.end());
             return jobs;
         };
-        auto print_path = [&print_directory, user_identity](const std::string& name) {
+        auto print_path = [&print_directory](const std::string& name) {
             if (name.empty() || name != std::filesystem::path(name).filename().string() ||
                 std::filesystem::path(name).extension() != ".pdf") return std::filesystem::path{};
             const auto path = print_directory / name;
-            auto owner_path = path; owner_path += ".owner";
-            std::string owner;
-            { std::ifstream owner_file(owner_path); owner_file >> owner; }
-            return owner == std::to_string(*user_identity) ? path : std::filesystem::path{};
+            return path;
         };
+        if (request.method == "POST" && request.path == "/api/admin/prints/upload") {
+            std::string name = percent_decode(request.file_name);
+            name = std::filesystem::path(name).filename().string();
+            if (name.empty()) name = "RemoteLink Print.pdf";
+            if (!std::filesystem::path(name).extension().string().ends_with("pdf")) name += ".pdf";
+            if (request.body.empty() || request.body.size() > 128ULL * 1024 * 1024) {
+                response.status = 400; response.body = json{{"error", "invalid print job"}}.dump(); return response;
+            }
+            std::error_code error; std::filesystem::create_directories(print_directory, error);
+            const auto stem = std::filesystem::path(name).stem().string();
+            auto path = print_directory / name;
+            for (unsigned suffix = 1; std::filesystem::exists(path, error); ++suffix)
+                path = print_directory / (stem + " (" + std::to_string(suffix) + ").pdf");
+            std::ofstream output(path, std::ios::binary | std::ios::trunc);
+            output.write(request.body.data(), static_cast<std::streamsize>(request.body.size()));
+            if (!output) { response.status = 500; response.body = json{{"error", "cannot save print job"}}.dump(); return response; }
+            output.close();
+            response.body = json{{"status", "stored"}, {"name", path.filename().string()}}.dump();
+            return response;
+        }
         if (request.method == "GET" && request.path == "/api/admin/prints") {
             json items = json::array();
             for (const auto& entry : print_jobs()) {
@@ -1749,13 +1948,17 @@ int main() {
         if (request.method == "GET" && request.path == "/api/admin/state") {
             json targets_json = json::array();
             for (const auto& target : sessions.target_snapshots()) {
+                const auto configured = std::find_if(target_catalog.begin(), target_catalog.end(),
+                    [&](const auto& item) { return item.id == target.id; });
                 targets_json.push_back({
                     {"id", target.id}, {"name", target.name}, {"group", target.group},
+                    {"rdpBackend", target.backend},
                     {"host", target.host}, {"username", target.username}, {"port", target.port},
                     {"accountUsername", target.account_username},
                     {"managed", std::any_of(managed_targets.begin(), managed_targets.end(),
                         [&](const auto& item) { return item.id == target.id; })},
                     {"width", target.width}, {"height", target.height},
+                    {"ignoreCertificate", configured == target_catalog.end() || configured->rdp.ignore_certificate},
                     {"hasPassword", target.has_password},
                     {"busy", target.busy}, {"peerId", target.peer_id},
                     {"state", target.state},
@@ -1763,7 +1966,22 @@ int main() {
                     {"capturedFrames", target.captured_frames},
                     {"encodedFrames", target.encoded_frames},
                     {"droppedFrames", target.dropped_frames},
-                    {"sentBytes", target.sent_bytes}
+                    {"sentBytes", target.sent_bytes},
+                    {"performancePreset", configured == target_catalog.end() ? "balanced" : configured->performance_preset},
+                    {"allowAudio", configured == target_catalog.end() || configured->allow_audio},
+                    {"allowPrinting", configured == target_catalog.end() || configured->allow_printing},
+                    {"allowFiles", configured == target_catalog.end() || configured->allow_files},
+                    {"clipboard", configured == target_catalog.end() || configured->rdp.redirect_clipboard},
+                    {"wallpaper", configured == target_catalog.end() || configured->rdp.show_wallpaper},
+                    {"fontSmoothing", configured == target_catalog.end() || configured->rdp.font_smoothing},
+                    {"fullWindowDrag", configured == target_catalog.end() || configured->rdp.full_window_drag},
+                    {"menuAnimations", configured != target_catalog.end() && configured->rdp.menu_animations},
+                    {"desktopComposition", configured == target_catalog.end() || configured->rdp.desktop_composition},
+                    {"videoBitrate", configured == target_catalog.end() ? 4000000U : configured->rdp.video_bitrate},
+                    {"maxFps", configured == target_catalog.end() ? 30U : configured->rdp.max_fps},
+                    {"guacamoleDpi", configured == target_catalog.end() ? 96U : configured->guacamole_dpi},
+                    {"guacamoleImageFormat", configured == target_catalog.end() ? "webp" : configured->guacamole_image_format},
+                    {"guacamoleResizeMethod", configured == target_catalog.end() ? "display-update" : configured->guacamole_resize_method}
                 });
             }
             json events_json = json::array();

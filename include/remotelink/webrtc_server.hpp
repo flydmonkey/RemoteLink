@@ -27,13 +27,22 @@ public:
         std::string name;
         std::string host;
         std::string username;
+        std::string backend;
         std::uint32_t width;
         std::uint32_t height;
+        std::uint32_t bitrate = 4'000'000;
+        std::uint32_t max_fps = 30;
+        bool sound = true;
+        bool printer = true;
+        bool files = true;
+        bool clipboard = true;
     };
     using StartHandler = std::function<bool(const std::string&, const std::string&,
                                             const std::string&, const std::string&,
                                             const std::string&, std::uint32_t,
-                                            std::uint32_t, std::uint32_t, bool, bool, bool, std::size_t,
+                                            std::uint32_t, std::uint32_t, std::uint32_t,
+                                            bool, bool, bool, bool, bool, bool,
+                                            bool, bool, bool, std::size_t,
                                             std::string&)>;
     using PeerHandler = std::function<void(const std::string&)>;
     using InputHandler = std::function<void(const std::string&, const std::string&)>;

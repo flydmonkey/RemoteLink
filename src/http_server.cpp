@@ -16,6 +16,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <fstream>
+#include <filesystem>
 #include <iostream>
 #include <limits>
 #include <sstream>
@@ -23,7 +24,9 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <ctime>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace remotelink {
@@ -85,6 +88,12 @@ void HttpServer::set_ssh_control_handler(
     std::function<void(const VncDestination&, const std::string&)> handler) {
     if (thread_.joinable()) throw std::logic_error("SSH control handler must be set before HTTP server starts");
     ssh_control_handler_ = std::move(handler);
+}
+void HttpServer::set_guacamole_ticket_handler(
+    std::function<std::optional<VncDestination>(const std::string&)> handler) {
+    if (thread_.joinable())
+        throw std::logic_error("Guacamole ticket handler must be set before HTTP server starts");
+    guacamole_ticket_handler_ = std::move(handler);
 }
 
 namespace {
@@ -276,6 +285,223 @@ bool write_websocket_frame(int client, SSL* tls, std::uint8_t opcode,
     }
     return write_client(client, tls, header.data(), header_size) &&
            write_client(client, tls, data, size);
+}
+
+bool relay_websocket_message_to_tcp(int client, SSL* tls, int backend,
+    const std::function<void(const std::string&)>& control);
+
+std::string guac_instruction(const std::vector<std::string>& elements) {
+    std::string result;
+    for (std::size_t index = 0; index < elements.size(); ++index) {
+        if (index != 0) result.push_back(',');
+        result += std::to_string(elements[index].size()) + "." + elements[index];
+    }
+    result.push_back(';');
+    return result;
+}
+
+std::optional<std::vector<std::string>> read_guac_instruction(int socket) {
+    std::vector<std::string> elements;
+    for (;;) {
+        std::string length_text;
+        char character = 0;
+        while (true) {
+            if (::recv(socket, &character, 1, 0) != 1) return std::nullopt;
+            if (character == '.') break;
+            if (!std::isdigit(static_cast<unsigned char>(character)) || length_text.size() > 9)
+                return std::nullopt;
+            length_text.push_back(character);
+        }
+        if (length_text.empty()) return std::nullopt;
+        const auto length = static_cast<std::size_t>(std::stoul(length_text));
+        if (length > 16U * 1024U * 1024U) return std::nullopt;
+        std::string value(length, '\0');
+        std::size_t received = 0;
+        while (received < length) {
+            const auto count = ::recv(socket, value.data() + received, length - received, 0);
+            if (count <= 0) return std::nullopt;
+            received += static_cast<std::size_t>(count);
+        }
+        if (::recv(socket, &character, 1, 0) != 1 || (character != ',' && character != ';'))
+            return std::nullopt;
+        elements.push_back(std::move(value));
+        if (character == ';') return elements;
+    }
+}
+
+bool guacd_handshake(int backend, const VncDestination& destination) {
+    auto send = [&](const std::vector<std::string>& values) {
+        const auto instruction = guac_instruction(values);
+        return write_socket(backend, instruction.data(), instruction.size());
+    };
+    if (!send({"select", "rdp"})) return false;
+    const auto args = read_guac_instruction(backend);
+    if (!args || args->empty() || (*args)[0] != "args") return false;
+    std::vector<std::string> image_types {"image"};
+    if (destination.image_format == "png") image_types.insert(image_types.end(), {"image/png", "image/webp", "image/jpeg"});
+    else if (destination.image_format == "jpeg") image_types.insert(image_types.end(), {"image/jpeg", "image/webp", "image/png"});
+    else image_types.insert(image_types.end(), {"image/webp", "image/png", "image/jpeg"});
+    if (!send({"size", std::to_string(destination.width), std::to_string(destination.height),
+               std::to_string(destination.dpi)}) ||
+        !send({"audio", "audio/L16", "audio/ogg"}) ||
+        !send({"video"}) ||
+        !send(image_types)) return false;
+
+    std::unordered_map<std::string, std::string> parameters {
+        {"hostname", destination.hostname}, {"port", std::to_string(destination.port)},
+        {"username", destination.username}, {"password", destination.password},
+        {"domain", destination.domain}, {"security", "any"}, {"ignore-cert", "true"},
+        {"width", std::to_string(destination.width)}, {"height", std::to_string(destination.height)},
+        {"dpi", std::to_string(destination.dpi)}, {"resize-method", destination.resize_method},
+        {"color-depth", "32"},
+        {"enable-wallpaper", destination.show_wallpaper ? "true" : "false"},
+        {"enable-font-smoothing", destination.font_smoothing ? "true" : "false"},
+        {"enable-full-window-drag", destination.full_window_drag ? "true" : "false"},
+        {"enable-menu-animations", destination.menu_animations ? "true" : "false"},
+        {"enable-desktop-composition", destination.desktop_composition ? "true" : "false"},
+        {"disable-copy", destination.enable_clipboard ? "false" : "true"},
+        {"disable-paste", destination.enable_clipboard ? "false" : "true"},
+        {"disable-audio", destination.enable_audio ? "false" : "true"},
+        {"enable-printing", destination.enable_printing ? "true" : "false"},
+        {"printer-name", "RemoteLink Printer"},
+        {"enable-drive", destination.enable_drive ? "true" : "false"},
+        {"drive-name", "Gateway Files"},
+        {"drive-path", "/users/" + std::to_string(destination.user_identity) + "/files"},
+        {"create-drive-path", "true"}, {"disable-upload", "false"},
+        {"disable-download", "false"}
+    };
+    std::vector<std::string> connect {"connect"};
+    for (std::size_t index = 1; index < args->size(); ++index)
+        connect.push_back(parameters[(*args)[index]]);
+    if (!send(connect)) return false;
+    const auto ready = read_guac_instruction(backend);
+    return ready && !ready->empty() && (*ready)[0] == "ready";
+}
+
+void proxy_guacamole_websocket(int client, SSL* tls, const std::string& request,
+                               const VncDestination& destination) {
+    const auto key = header_value(request, "sec-websocket-key");
+    const char* configured_host = std::getenv("REMOTELINK_GUACD_HOST");
+    const char* configured_port = std::getenv("REMOTELINK_GUACD_PORT");
+    const std::string guacd_host = configured_host && *configured_host ? configured_host : "127.0.0.1";
+    std::uint16_t guacd_port = 4822;
+    if (configured_port && *configured_port) {
+        try { guacd_port = static_cast<std::uint16_t>(std::stoul(configured_port)); }
+        catch (...) { guacd_port = 4822; }
+    }
+    const int backend = key.empty() ? -1 : connect_tcp(guacd_host, guacd_port);
+    if (backend < 0 || !guacd_handshake(backend, destination)) {
+        static constexpr char unavailable[] =
+            "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        write_client(client, tls, unavailable, sizeof(unavailable) - 1);
+    } else {
+        const auto response = "HTTP/1.1 101 Switching Protocols\r\n"
+            "Upgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Protocol: guacamole\r\n"
+            "Sec-WebSocket-Accept: " + websocket_accept(key) + "\r\n\r\n";
+        if (write_client(client, tls, response.data(), response.size())) {
+            const auto uuid = guac_instruction({"", destination.session_id});
+            if (write_websocket_frame(client, tls, 0x1, uuid.data(), uuid.size())) {
+                std::unordered_set<std::string> download_streams;
+                struct Download { std::string name; std::string data; };
+                std::unordered_map<std::string, Download> downloads;
+                while (true) {
+                    pollfd descriptors[2] {{client, POLLIN, 0}, {backend, POLLIN, 0}};
+                    const auto ready = ::poll(descriptors, 2, -1);
+                    if (ready < 0 && errno == EINTR) continue;
+                    if (ready <= 0 || descriptors[0].revents & (POLLERR | POLLHUP | POLLNVAL) ||
+                        descriptors[1].revents & (POLLERR | POLLHUP | POLLNVAL)) break;
+                    if (descriptors[0].revents & POLLIN) {
+                        std::string client_message;
+                        if (!relay_websocket_message_to_tcp(client, tls, backend,
+                            [&](const std::string& message) { client_message = message; })) break;
+                        if (!client_message.empty()) {
+                            if (client_message.starts_with("0.,4.ping,")) {
+                                if (!write_websocket_frame(client, tls, 0x1,
+                                        client_message.data(), client_message.size())) break;
+                            } else if (!write_socket(backend, client_message.data(), client_message.size())) break;
+                        }
+                    }
+                    if (descriptors[1].revents & POLLIN) {
+                        /* TCP has no message boundaries, while WebSocketTunnel parses each
+                         * received WebSocket message independently. Never expose a partial
+                         * Guacamole instruction to the browser: read one complete instruction
+                         * from guacd and serialize it as one text frame. This is particularly
+                         * important for large img/blob updates whose arbitrary TCP splits
+                         * otherwise corrupt layers and produce severe visual displacement. */
+                        const auto instruction = read_guac_instruction(backend);
+                        if (!instruction) break;
+                        const auto encoded = guac_instruction(*instruction);
+                        if (!write_websocket_frame(client, tls, 0x1,
+                                encoded.data(), encoded.size())) break;
+                        /* File streams (including redirected print jobs) share the same
+                         * guacd socket as display and input. A delayed browser ACK applies
+                         * backpressure to that socket and can freeze the entire RDP session.
+                         * Acknowledge each file blob as soon as it has been committed to the
+                         * WebSocket. The browser remains responsible for assembling/saving it. */
+                        if (instruction->size() >= 2 && (*instruction)[0] == "file") {
+                            download_streams.insert((*instruction)[1]);
+                            if (instruction->size() >= 4)
+                                downloads[(*instruction)[1]].name = (*instruction)[3];
+                            /* guacd waits for an initial ACK before it will deliver the
+                             * filtered PDF. Waiting for the first blob before ACKing
+                             * deadlocks print-job close: Ghostscript waits for EOF while
+                             * the RDP thread waits for the output thread. */
+                            const auto ack = guac_instruction(
+                                {"ack", (*instruction)[1], "OK", "0"});
+                            if (!write_socket(backend, ack.data(), ack.size())) break;
+                        } else if (instruction->size() >= 3 && (*instruction)[0] == "blob" &&
+                                 download_streams.contains((*instruction)[1])) {
+                            auto& download = downloads[(*instruction)[1]];
+                            const auto& encoded_blob = (*instruction)[2];
+                            if (download.data.size() < 128U * 1024U * 1024U) {
+                                std::string decoded((encoded_blob.size() * 3) / 4 + 3, '\0');
+                                const int count = EVP_DecodeBlock(
+                                    reinterpret_cast<unsigned char*>(decoded.data()),
+                                    reinterpret_cast<const unsigned char*>(encoded_blob.data()),
+                                    static_cast<int>(encoded_blob.size()));
+                                if (count >= 0) {
+                                    std::size_t size = static_cast<std::size_t>(count);
+                                    if (!encoded_blob.empty() && encoded_blob.back() == '=') --size;
+                                    if (encoded_blob.size() > 1 && encoded_blob[encoded_blob.size() - 2] == '=') --size;
+                                    download.data.append(decoded.data(), size);
+                                }
+                            }
+                            const auto ack = guac_instruction(
+                                {"ack", (*instruction)[1], "OK", "0"});
+                            if (!write_socket(backend, ack.data(), ack.size())) break;
+                        } else if (instruction->size() >= 2 && (*instruction)[0] == "end") {
+                            if (auto found = downloads.find((*instruction)[1]); found != downloads.end()) {
+                                std::time_t now = std::time(nullptr);
+                                std::tm local {};
+                                localtime_r(&now, &local);
+                                char timestamp[32] {};
+                                std::strftime(timestamp, sizeof(timestamp), "%Y-%m-%d_%H-%M-%S", &local);
+                                auto name = std::string(timestamp) + ".pdf";
+                                const char* state = std::getenv("REMOTELINK_STATE_DIR");
+                                const auto directory = std::filesystem::path(
+                                    state && *state ? state : "/var/lib/remotelink") / "users" /
+                                    std::to_string(destination.user_identity) / "print-jobs";
+                                std::error_code error; std::filesystem::create_directories(directory, error);
+                                const auto stem = std::filesystem::path(name).stem().string();
+                                auto path = directory / name;
+                                for (unsigned suffix = 1; std::filesystem::exists(path, error); ++suffix)
+                                    path = directory / (stem + " (" + std::to_string(suffix) + ").pdf");
+                                std::ofstream output(path, std::ios::binary | std::ios::trunc);
+                                output.write(found->second.data.data(),
+                                    static_cast<std::streamsize>(found->second.data.size()));
+                                output.close();
+                                downloads.erase(found);
+                            }
+                            download_streams.erase((*instruction)[1]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (backend >= 0) { ::shutdown(backend, SHUT_RDWR); ::close(backend); }
+    if (tls != nullptr) { SSL_shutdown(tls); SSL_free(tls); }
+    ::shutdown(client, SHUT_RDWR); ::close(client);
 }
 
 bool relay_websocket_message_to_tcp(int client, SSL* tls, int backend,
@@ -609,6 +835,28 @@ void HttpServer::run() {
                         std::move(*destination), ssh_session_observer_, ssh_control_handler_).detach();
             continue;
         }
+        const std::string guacamole_prefix = "/guacamole/ws?ticket=";
+        const bool guacamole_websocket_request = parsed.method == "GET" &&
+            parsed.path.starts_with(guacamole_prefix) &&
+            lower(raw_request.substr(0, headers_end)).find("upgrade: websocket") != std::string::npos;
+        if (guacamole_websocket_request) {
+            auto ticket = parsed.path.substr(guacamole_prefix.size());
+            if (const auto separator = ticket.find_first_of("?&"); separator != std::string::npos)
+                ticket.resize(separator);
+            const auto destination = guacamole_ticket_handler_
+                ? guacamole_ticket_handler_(ticket) : std::nullopt;
+            if (!destination) {
+                static constexpr char forbidden[] =
+                    "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                write_client(client, tls, forbidden, sizeof(forbidden) - 1);
+                if (tls != nullptr) { SSL_shutdown(tls); SSL_free(tls); }
+                ::close(client);
+                continue;
+            }
+            std::thread(proxy_guacamole_websocket, client, tls, std::move(raw_request),
+                        std::move(*destination)).detach();
+            continue;
+        }
         const auto query_position = parsed.path.find('?');
         const std::string resource_path = parsed.path.substr(0, query_position);
         const bool versioned_resource = query_position != std::string::npos &&
@@ -636,6 +884,8 @@ void HttpServer::run() {
             (resource_path == "/ssh" || resource_path == "/ssh.html" || resource_path == "/ssh/settings");
         const bool ssh_session_request = parsed.method == "GET" &&
             (resource_path == "/ssh/session" || resource_path == "/ssh-session.html");
+        const bool guacamole_session_request = parsed.method == "GET" &&
+            (resource_path == "/guacamole/session" || resource_path == "/guacamole-session.html");
         const bool icon_request = parsed.method == "GET" && resource_path == "/remotelink-icon.png";
         const bool favicon_request = parsed.method == "GET" && resource_path == "/favicon.ico";
         const bool i18n_request = parsed.method == "GET" && resource_path == "/i18n.js";
@@ -645,12 +895,16 @@ void HttpServer::run() {
         const bool xterm_request = parsed.method == "GET" &&
             resource_path.starts_with("/vendor/xterm/") &&
             resource_path.find("..") == std::string::npos;
+        const bool guacamole_asset_request = parsed.method == "GET" &&
+            resource_path.starts_with("/vendor/guacamole/") &&
+            resource_path.find("..") == std::string::npos;
         const bool health_request = parsed.method == "GET" && resource_path == "/healthz";
         const bool api_request = resource_path == "/api/admin/vnc" ||
                                  resource_path.starts_with("/api/admin/") ||
                                  resource_path.starts_with("/api/auth/") ||
                                  resource_path.starts_with("/api/vnc/") ||
                                  resource_path.starts_with("/api/ssh/") ||
+                                 resource_path.starts_with("/api/guacamole/") ||
                                  resource_path.starts_with("/api/admin/ssh");
 
         std::string body;
@@ -668,7 +922,8 @@ void HttpServer::run() {
         else if (root_request || admin_request || session_request || settings_request ||
                  vnc_request || vnc_session_request || vnc_admin_request || vnc_permissions_request ||
                  users_request || ssh_request || ssh_session_request || icon_request || favicon_request ||
-                 i18n_request || novnc_request || xterm_request) {
+                 guacamole_session_request || i18n_request || novnc_request || xterm_request ||
+                 guacamole_asset_request) {
             const char* configured_web_root = std::getenv("REMOTELINK_WEB_ROOT");
             const std::string web_root = configured_web_root && *configured_web_root
                 ? configured_web_root : REMOTELINK_WEB_ROOT;
@@ -685,8 +940,10 @@ void HttpServer::run() {
             else if (users_request) page = "/users.html";
             else if (ssh_request) page = "/ssh.html";
             else if (ssh_session_request) page = "/ssh-session.html";
+            else if (guacamole_session_request) page = "/guacamole-session.html";
             else if (novnc_request) page = resource_path;
             else if (xterm_request) page = resource_path;
+            else if (guacamole_asset_request) page = resource_path;
             std::ifstream input(web_root + page,
                                 std::ios::binary);
             std::ostringstream contents;
@@ -696,7 +953,7 @@ void HttpServer::run() {
             content_type = favicon_request ? "image/x-icon" :
                            icon_request ? "image/png" :
                            xterm_request && resource_path.ends_with(".css") ? "text/css; charset=utf-8" :
-                           (i18n_request || novnc_request || xterm_request) ? "application/javascript; charset=utf-8" :
+                           (i18n_request || novnc_request || xterm_request || guacamole_asset_request) ? "application/javascript; charset=utf-8" :
                            "text/html; charset=utf-8";
             if (content_type != "image/png" && content_type != "image/x-icon")
                 replace_all(body, "__REMOTELINK_VERSION__", REMOTELINK_VERSION);
@@ -711,10 +968,10 @@ void HttpServer::run() {
             body = "Not found\n";
         }
 
-        const bool static_asset = icon_request || favicon_request || i18n_request || novnc_request || xterm_request;
+        const bool static_asset = icon_request || favicon_request || i18n_request || novnc_request || xterm_request || guacamole_asset_request;
         const bool html_document = root_request || admin_request || session_request || settings_request ||
             vnc_request || vnc_session_request || vnc_admin_request || vnc_permissions_request ||
-            users_request || ssh_request || ssh_session_request;
+            users_request || ssh_request || ssh_session_request || guacamole_session_request;
         const std::string cache_control = static_asset
             ? (versioned_resource ? "public, max-age=31536000, immutable"
                                   : "public, max-age=3600, must-revalidate")

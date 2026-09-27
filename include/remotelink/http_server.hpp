@@ -50,6 +50,8 @@ public:
     void set_ssh_session_observer(std::function<void(const VncDestination&, bool)> observer);
     void set_ssh_control_handler(
         std::function<void(const VncDestination&, const std::string&)> handler);
+    void set_guacamole_ticket_handler(
+        std::function<std::optional<VncDestination>(const std::string&)> handler);
 
 private:
     void run();
@@ -68,6 +70,7 @@ private:
     std::function<std::optional<VncDestination>(const std::string&)> ssh_ticket_handler_;
     std::function<void(const VncDestination&, bool)> ssh_session_observer_;
     std::function<void(const VncDestination&, const std::string&)> ssh_control_handler_;
+    std::function<std::optional<VncDestination>(const std::string&)> guacamole_ticket_handler_;
     std::jthread thread_;
 };
 

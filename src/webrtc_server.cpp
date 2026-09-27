@@ -226,7 +226,11 @@ void WebRtcServer::handle_message(const std::shared_ptr<Peer>& peer,
             for (const auto& target : targets_) if (permitted(target.id)) targets.push_back({
                 {"id", target.id}, {"name", target.name},
                 {"host", target.host}, {"username", target.username},
-                {"width", target.width}, {"height", target.height}});
+                {"backend", target.backend},
+                {"width", target.width}, {"height", target.height},
+                {"bitrate", target.bitrate}, {"maxFps", target.max_fps},
+                {"sound", target.sound}, {"printer", target.printer},
+                {"files", target.files}, {"clipboard", target.clipboard}});
         }
         peer->socket->send(json{{"type", "authenticated"}, {"targets", targets}}.dump());
         return;
@@ -264,6 +268,13 @@ void WebRtcServer::handle_message(const std::shared_ptr<Peer>& peer,
         const std::uint32_t width = payload.value("width", 0U);
         const std::uint32_t height = payload.value("height", 0U);
         const std::uint32_t bitrate = payload.value("bitrate", 4'000'000U);
+        const std::uint32_t max_fps = payload.value("maxFps", 30U);
+        const bool show_wallpaper = payload.value("wallpaper", true);
+        const bool font_smoothing = payload.value("fontSmoothing", true);
+        const bool full_window_drag = payload.value("fullWindowDrag", true);
+        const bool menu_animations = payload.value("menuAnimations", false);
+        const bool desktop_composition = payload.value("desktopComposition", true);
+        const bool redirect_clipboard = payload.value("clipboard", true);
         const bool audio_playback = payload.value("sound", true);
         const bool redirect_printers = payload.value("printer", false);
         const bool redirect_files = payload.value("files", false);
@@ -271,7 +282,9 @@ void WebRtcServer::handle_message(const std::shared_ptr<Peer>& peer,
         { std::lock_guard lock(mutex_); start = start_handler_; }
         std::string error;
         if (!start || !start(peer->id, target, host, username, password, width, height,
-                             bitrate, audio_playback, redirect_printers, redirect_files,
+                             bitrate, max_fps, show_wallpaper, font_smoothing,
+                             full_window_drag, menu_animations, desktop_composition,
+                             redirect_clipboard, audio_playback, redirect_printers, redirect_files,
                              peer->user_identity, error)) {
             peer->socket->send(json{{"type", "error"}, {"message", error.empty() ? "unable to start session" : error}}.dump());
             return;

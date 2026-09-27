@@ -51,7 +51,11 @@ bool SessionManager::start(const std::string& peer_id, const std::string& target
                            const std::string& host, const std::string& username,
                            const std::string& password,
                            std::uint32_t width, std::uint32_t height,
-                           std::uint32_t bitrate, bool audio_playback,
+                           std::uint32_t bitrate, std::uint32_t max_fps,
+                           bool show_wallpaper, bool font_smoothing,
+                           bool full_window_drag, bool menu_animations,
+                           bool desktop_composition, bool redirect_clipboard,
+                           bool audio_playback,
                            bool redirect_printers, bool redirect_files, std::size_t user_identity,
                            std::string account_username, std::string& error) {
     std::vector<TargetConfig> targets;
@@ -60,6 +64,10 @@ bool SessionManager::start(const std::string& peer_id, const std::string& target
         [&](const TargetConfig& item) { return item.id == target_id; });
     if (target == targets.end()) { error = "unknown target"; return false; }
     const auto& template_target = *target;
+    if (template_target.rdp_backend != "freerdp") {
+        error = "target requires guacamole backend";
+        return false;
+    }
     auto rdp = template_target.rdp;
     (void)host;
     if (!username.empty()) rdp.username = username;
@@ -69,18 +77,39 @@ bool SessionManager::start(const std::string& peer_id, const std::string& target
         rdp.width = width;
         rdp.height = height;
     }
-    rdp.audio_playback = audio_playback;
-    rdp.redirect_printers = redirect_printers;
-    if (redirect_files) {
-        const char* state_root = std::getenv("REMOTELINK_STATE_DIR");
-        rdp.shared_files_path = (std::filesystem::path(state_root && *state_root
-            ? state_root : "/var/lib/remotelink") / "users" /
-            std::to_string(user_identity) / "files").string();
+    rdp.audio_playback = audio_playback && template_target.allow_audio;
+    rdp.max_fps = std::clamp<std::uint32_t>(
+        std::min(max_fps == 0 ? rdp.max_fps : max_fps, rdp.max_fps), 10, 60);
+    rdp.show_wallpaper = show_wallpaper;
+    rdp.font_smoothing = font_smoothing;
+    rdp.full_window_drag = full_window_drag;
+    rdp.menu_animations = menu_animations;
+    rdp.desktop_composition = desktop_composition;
+    rdp.redirect_clipboard = redirect_clipboard && template_target.rdp.redirect_clipboard;
+    // The stock FreeRDP CUPS backend runs all jobs as the single service
+    // account and provides no authenticated application-user identity. Until
+    // a session-aware backend can be kept outside the RDP connect path, only
+    // the primary administrator may use this compatibility printer. This
+    // prevents one non-admin user from receiving another user's PDF.
+    rdp.redirect_printers = redirect_printers && template_target.allow_printing && user_identity == 0;
+    const char* state_root = std::getenv("REMOTELINK_STATE_DIR");
+    const auto user_root = std::filesystem::path(state_root && *state_root
+        ? state_root : "/var/lib/remotelink") / "users" /
+        std::to_string(user_identity);
+    if (rdp.redirect_printers) {
+        rdp.print_jobs_path = (user_root / "print-jobs").string();
+        std::filesystem::create_directories(rdp.print_jobs_path);
+    } else {
+        rdp.print_jobs_path.clear();
+    }
+    if (redirect_files && template_target.allow_files) {
+        rdp.shared_files_path = (user_root / "files").string();
         std::filesystem::create_directories(rdp.shared_files_path);
     } else {
         rdp.shared_files_path.clear();
     }
-    bitrate = std::clamp<std::uint32_t>(bitrate == 0 ? 4'000'000 : bitrate,
+    bitrate = std::min(bitrate == 0 ? rdp.video_bitrate : bitrate, rdp.video_bitrate);
+    bitrate = std::clamp<std::uint32_t>(bitrate,
                                        500'000, 20'000'000);
     if (rdp.username.empty() || rdp.password.empty() ||
         rdp.username.size() > 256 || rdp.password.size() > 4096) {
@@ -120,7 +149,7 @@ bool SessionManager::start(const std::string& peer_id, const std::string& target
         });
         managed->source = source.get();
         auto sink = std::make_unique<WebRtcVideoSink>(
-            server_, peer_id, rdp.width, rdp.height, 30, bitrate);
+            server_, peer_id, rdp.width, rdp.height, rdp.max_fps, bitrate);
         managed->sink = sink.get();
         managed->session = std::make_unique<Session>(std::move(source), std::move(sink));
         std::unique_lock lock(mutex_);
@@ -292,6 +321,7 @@ std::vector<SessionManager::TargetSnapshot> SessionManager::target_snapshots() c
             .id = target.id,
             .name = target.name,
             .group = target.group,
+            .backend = target.rdp_backend,
             .host = target.rdp.hostname,
             .username = target.rdp.username,
             .port = target.rdp.port,

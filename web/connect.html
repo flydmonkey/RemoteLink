@@ -862,7 +862,7 @@
         }
       }
     </style>
-    <script src="/i18n.js?v=__REMOTELINK_VERSION__"></script>
+    <script src="/i18n.js?v=__REMOTELINK_VERSION__&rev=2"></script>
     <script>
       const targetSelect = document.querySelector("#target");
       const targetList = document.querySelector("#target-list");
@@ -1072,10 +1072,15 @@
               settings,
               explicitAuto
                 ? automaticResolution()
-                : { width: 1920, height: 1080 },
+                : { width: selected.width || 1920, height: selected.height || 1080 },
             );
           }
-          settings.bitrate = Number(settings.bitrate) || 4000000;
+          settings.bitrate = Math.min(Number(settings.bitrate) || selected.bitrate || 4000000,
+            selected.bitrate || 4000000);
+          settings.sound = settings.sound !== false && selected.sound !== false;
+          settings.printer = settings.printer !== false && selected.printer !== false;
+          settings.files = settings.files === true && selected.files !== false;
+          settings.clipboard = settings.clipboard !== false && selected.clipboard !== false;
           const network =
             navigator.connection ||
             navigator.mozConnection ||
@@ -1095,6 +1100,7 @@
             JSON.stringify({
               target: selected?.id || "",
               host,
+              backend: selected?.backend || "freerdp",
               accessToken,
               startedAt: Date.now(),
               ...settings,
@@ -1104,7 +1110,8 @@
             socket.onclose = null;
             socket.close();
           }
-          location.href = "/session";
+          location.href = selected?.backend === "guacamole"
+            ? "/guacamole/session" : "/session";
         });
       accessToken = sessionStorage.getItem("remotelink-access-token") || "";
       const returnedError = sessionStorage.getItem("remotelink-error");

@@ -1,5 +1,15 @@
 # RemoteLink changelog
 
+## 0.3.9
+
+- Add a selectable Guacamole RDP backend for older Windows hosts while retaining the restored FreeRDP path for modern Windows.
+- Add shared connection display/resource settings plus backend-specific FreeRDP bitrate/frame-rate and Guacamole image/DPI/resize settings.
+- Integrate Guacamole printing, per-user file management, clipboard, audio, resolution handling, and corrected pointer scaling.
+- Isolate files and print jobs by RemoteLink user and restore FreeRDP printing for the primary administrator.
+- Bundle guacd in the official container image as a separately supervised loopback-only process; bare-metal installs continue to use a separate systemd service.
+- Extend Docker and GitHub Actions validation with container tests, guacd health checks, SBOM generation, provenance, and multi-architecture release publishing.
+- Document that Guacamole needs no exposed UDP range and no separate guacd TLS certificate.
+
 ## 0.3.8
 
 - Recreate the H.264 encoder when the Windows desktop size differs from the requested resolution.
