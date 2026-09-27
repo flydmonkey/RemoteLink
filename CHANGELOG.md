@@ -1,5 +1,9 @@
 # RemoteLink changelog
 
+## 0.3.10
+
+- Keep Docker image tests compatible with the intentionally reduced build context while retaining workflow-policy checks in repository CI.
+
 ## 0.3.9
 
 - Add a selectable Guacamole RDP backend for older Windows hosts while retaining the restored FreeRDP path for modern Windows.

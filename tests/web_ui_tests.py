@@ -90,13 +90,15 @@ assert "无需为 Guacamole 开放 UDP 端口" in readme_zh
 assert "无需为 guacd 单独申请、安装或配置 TLS 证书" in readme_zh
 compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
 dockerfile = (root / "Dockerfile").read_text(encoding="utf-8")
-docker_workflow = (root / ".github" / "workflows" / "docker-image.yml").read_text(encoding="utf-8")
+docker_workflow_path = root / ".github" / "workflows" / "docker-image.yml"
+docker_workflow = docker_workflow_path.read_text(encoding="utf-8") if docker_workflow_path.exists() else ""
 guacd_unit = (root / "deploy" / "remotelink-guacd.service").read_text(encoding="utf-8")
 assert "REMOTELINK_GUACD_HOST: 127.0.0.1" in compose
 assert "guacd libguac-client-rdp0t64" in dockerfile
 assert "/usr/sbin/guacd -f -b 127.0.0.1" in (root / "docker" / "entrypoint.sh").read_text(encoding="utf-8")
 assert "ctest --test-dir build --output-on-failure" in dockerfile
-assert "remotelink-guacd" in docker_workflow and "sbom: true" in docker_workflow
+if docker_workflow:
+    assert "remotelink-guacd" in docker_workflow and "sbom: true" in docker_workflow
 assert "@REMOTELINK_UID@:@REMOTELINK_GID@" in guacd_unit
 for page in localized_pages:
     source = page.read_text(encoding="utf-8")
