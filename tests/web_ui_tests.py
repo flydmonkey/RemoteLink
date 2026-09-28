@@ -85,6 +85,7 @@ for parameter in ("enable-printing", "enable-drive", "drive-path", "RemoteLink P
 assert "new Guacamole.BlobReader(stream,mimetype)" in guacamole_session
 assert 'stream.sendAck("OK",Guacamole.Status.Code.SUCCESS)' in guacamole_session
 assert 'fetch("/api/admin/prints/upload"' in guacamole_session
+assert "文件上传失败" in guacamole_session and "if(!response.ok)throw new Error" in guacamole_session
 assert "gateway_print_blob" not in http_server and "download_streams" not in http_server, (
     "The WebSocket proxy must remain transparent so BlobReader is the sole owner of print ACKs"
 )
