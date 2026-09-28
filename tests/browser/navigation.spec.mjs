@@ -684,6 +684,7 @@ test("user management exposes the complete account lifecycle", async ({
 });
 
 test("Telnet page manages connections with semantic feedback", async ({ page }) => {
+  let testedProtocol;
   await page.addInitScript(() =>
     sessionStorage.setItem("remotelink-access-token", "test"),
   );
@@ -699,9 +700,10 @@ test("Telnet page manages connections with semantic feedback", async ({ page }) 
   await page.route("**/api/admin/telnet/activity", (route) =>
     route.fulfill({ json: { active: [], history: [] } }),
   );
-  await page.route("**/api/admin/telnet/test", (route) =>
-    route.fulfill({ json: { reachable: true } }),
-  );
+  await page.route("**/api/admin/telnet/test", async (route) => {
+    testedProtocol = route.request().postDataJSON().protocol;
+    await route.fulfill({ json: { reachable: true } });
+  });
   await page.goto("/telnet.html");
   await expect(page.getByRole("heading", { name: "Telnet 连接" })).toBeVisible();
   await expect(page.locator("#target")).toHaveValue("telnet-1");
@@ -709,8 +711,12 @@ test("Telnet page manages connections with semantic feedback", async ({ page }) 
   await page.getByRole("button", { name: "添加连接" }).click();
   await expect(page.locator("#port")).toHaveValue("23");
   await expect(page.locator("#private-key")).toHaveCount(0);
+  await page.locator("#protocol").selectOption("raw");
+  await expect(page.locator("#username")).toBeDisabled();
+  await expect(page.locator("#password")).toBeDisabled();
   await page.locator("#host").fill("127.0.0.1");
   await page.getByRole("button", { name: "测试连接" }).click();
+  expect(testedProtocol).toBe("raw");
   await expect(page.locator("#editor-notice")).toHaveText("连接成功");
   await expect(page.locator("#editor-notice")).toHaveAttribute("data-state", "success");
   await expect(page.locator("#editor-notice")).toHaveCSS("color", "rgb(120, 215, 162)");

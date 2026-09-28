@@ -1,5 +1,11 @@
 # RemoteLink changelog
 
+## Unreleased
+
+- Add Raw TCP terminal connections alongside Telnet using a shared terminal bridge.
+- Preserve existing Telnet connection data while recording the transport type for new and updated connections.
+- Include terminal connections when validating per-user connection permissions.
+
 ## 0.3.22
 
 - Translate RDP connection test results and connection saved notifications as complete phrases.

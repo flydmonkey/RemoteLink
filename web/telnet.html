@@ -672,7 +672,9 @@
     <dialog id="editor">
       <form id="form" class="editor">
         <h2 id="editor-title">添加 Telnet 连接</h2>
-        <label>连接名称</label
+        <label>连接类型</label
+        ><select id="protocol"><option value="telnet">Telnet</option><option value="raw">Raw TCP</option></select
+        ><label>连接名称</label
         ><input id="name" maxlength="128" required /><label>主机</label
         ><input id="host" maxlength="255" required /><label>端口</label
         ><input
@@ -799,7 +801,10 @@
           main.className = "row-main";
           main.innerHTML = '<strong></strong><div class="muted"></div>';
           main.children[0].textContent = item.name;
-          main.children[1].textContent = `${item.username ? item.username + "@" : ""}${item.host}:${item.port} · ${item.hasPassword ? "凭据已配置（不回显）" : "交互式登录"}`;
+          const protocol = item.protocol === "raw" ? "Raw TCP" : "Telnet";
+          const authentication = item.protocol === "raw" ? "透明传输" :
+            (item.hasPassword ? "凭据已配置（不回显）" : "交互式登录");
+          main.children[1].textContent = `${protocol} · ${item.username ? item.username + "@" : ""}${item.host}:${item.port} · ${authentication}`;
           actions.className = "row-actions";
           actions.append(
             button("编辑", () => openEditor(item)),
@@ -864,6 +869,8 @@
         for (const key of ["name", "host", "port", "username"])
           document.querySelector(`#${key}`).value =
             item?.[key] || (key === "port" ? 23 : "");
+        document.querySelector("#protocol").value = item?.protocol || "telnet";
+        updateProtocolFields();
         setNotice(
           document.querySelector("#editor-notice"),
           item?.hasPassword ? "凭据已配置（不回显）；留空将保留当前凭据。" : "",
@@ -934,9 +941,21 @@
       document.querySelector("#manager-close").onclick = () => manager.close();
       document.querySelector("#add").onclick = () => openEditor();
       document.querySelector("#cancel").onclick = () => editor.close();
+      function updateProtocolFields() {
+        const raw = document.querySelector("#protocol").value === "raw";
+        document.querySelector("#username").disabled = raw;
+        document.querySelector("#password").disabled = raw;
+        document.querySelector("#password-label").textContent = raw ? "密码（Raw TCP 不使用）" : "密码（可选）";
+        if (raw && !editing) {
+          document.querySelector("#username").value = "";
+          document.querySelector("#password").value = "";
+        }
+      }
+      document.querySelector("#protocol").onchange = updateProtocolFields;
       function formPayload() {
         return {
           id: editing?.id,
+          protocol: document.querySelector("#protocol").value,
           name: document.querySelector("#name").value.trim(),
           host: document.querySelector("#host").value.trim(),
           port: Number(document.querySelector("#port").value),

@@ -2,7 +2,7 @@
 
 简体中文 | [English](README.md)
 
-RemoteLink 是一款可自行部署、通过浏览器使用的 RDP、VNC、SSH 和 Telnet 远程连接工具。RDP 使用 FreeRDP 与 WebRTC，VNC 使用 noVNC Core 和服务端 WSS-to-RFB 代理，SSH 使用 xterm.js 和服务端 libssh2 代理，Telnet 使用 xterm.js 和服务端协议代理。浏览器不会接收设备密码、私钥或证书。
+RemoteLink 是一款可自行部署、通过浏览器使用的 RDP、VNC、SSH、Telnet 和 Raw TCP 远程连接工具。RDP 使用 FreeRDP 与 WebRTC，VNC 使用 noVNC Core 和服务端 WSS-to-RFB 代理，SSH 使用 xterm.js 和服务端 libssh2 代理，Telnet 与 Raw TCP 共用 xterm.js 和服务端终端代理。浏览器不会接收设备密码、私钥或证书。
 
 网关以单个 Linux 服务运行。用户只需要现代浏览器，不需要浏览器扩展或桌面客户端。
 
@@ -111,6 +111,7 @@ FreeRDP 后端仍要求浏览器能够直接访问 UDP `50000-50019`；Guacamole
 - VNC 支持密码、用户名密码和 CA 证书三种认证模式，并按 RDP 策略自动重连
 - 独立 SSH 终端，支持用户名密码和 PEM/OpenSSH 私钥认证，以及浏览家目录、上传、下载和删除的 SFTP 文件管理
 - 统一查看 RDP、VNC、SSH、Telnet 活动会话、最近活动和断开原因
+- Telnet 协议协商与字节透明 Raw TCP 会话共用终端桥接层
 - 三种协议均支持替换、清除凭据，并只显示“已配置”而不回显内容
 - SSH 主机指纹必须经过管理员测试、核对并明确确认后才允许连接
 
@@ -197,7 +198,7 @@ ctest --test-dir build --output-on-failure
 
 ## 配置
 
-首次登录后，管理员在各协议的“管理”页面维护 RDP、VNC、SSH、Telnet 连接，并在“用户管理”中分配连接权限。连接密码、SSH 私钥和 VNC CA 证书保存在 `REMOTELINK_STATE_DIR` 下仅服务账户可读的文件中，管理接口不会回显，并支持替换或清除。RemoteLink 到目标设备之间的 Telnet 流量不加密，只应在可信网络中使用。`REMOTELINK_TARGETS_FILE` 仅用于兼容导入旧版 RDP 目标，首次启动后会自动迁移为受管理连接。
+首次登录后，管理员在各协议的“管理”页面维护 RDP、VNC、SSH 和终端连接，并在“用户管理”中分配连接权限。终端连接可以选择 Telnet 或字节透明的 Raw TCP。连接密码、SSH 私钥和 VNC CA 证书保存在 `REMOTELINK_STATE_DIR` 下仅服务账户可读的文件中，管理接口不会回显，并支持替换或清除。RemoteLink 到目标设备之间的 Telnet 和 Raw TCP 流量不加密，只应在可信网络中使用。`REMOTELINK_TARGETS_FILE` 仅用于兼容导入旧版 RDP 目标，首次启动后会自动迁移为受管理连接。
 
 | 变量 | 用途 |
 | --- | --- |

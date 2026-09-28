@@ -1,4 +1,4 @@
-#include "remotelink/telnet_bridge.hpp"
+#include "remotelink/terminal_bridge.hpp"
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -32,7 +32,7 @@ int connect_tcp(const std::string& hostname, std::uint16_t port) {
 }
 }
 
-struct TelnetBridge::Impl {
+struct TerminalBridge::Impl {
     int upstream = -1;
     int listener = -1;
     std::uint16_t listen_port = 0;
@@ -41,6 +41,7 @@ struct TelnetBridge::Impl {
     std::jthread worker;
     std::string username;
     std::string password;
+    TerminalProtocol protocol = TerminalProtocol::telnet;
 
     ~Impl() { shutdown(); }
 
@@ -67,7 +68,7 @@ struct TelnetBridge::Impl {
                 const auto count = recv(source, buffer.data(), buffer.size(), 0);
                 if (count <= 0) { finished = true; break; }
                 std::string output;
-                if (index == 1) {
+                if (index == 1 && protocol == TerminalProtocol::telnet) {
                     output.reserve(static_cast<std::size_t>(count));
                     for (std::ptrdiff_t position = 0; position < count; ++position) {
                         const auto value = static_cast<unsigned char>(buffer[static_cast<std::size_t>(position)]);
@@ -135,28 +136,30 @@ struct TelnetBridge::Impl {
     }
 };
 
-TelnetBridge::TelnetBridge(std::unique_ptr<Impl> impl) : impl_(std::move(impl)) {}
-TelnetBridge::~TelnetBridge() { stop(); }
+TerminalBridge::TerminalBridge(std::unique_ptr<Impl> impl) : impl_(std::move(impl)) {}
+TerminalBridge::~TerminalBridge() { stop(); }
 
-std::shared_ptr<TelnetBridge> TelnetBridge::create(TelnetBridgeOptions options, std::string& error) {
+std::shared_ptr<TerminalBridge> TerminalBridge::create(TerminalBridgeOptions options,
+                                                       std::string& error) {
     auto impl = std::make_unique<Impl>();
     impl->username = std::move(options.username);
     impl->password = std::move(options.password);
+    impl->protocol = options.protocol;
     impl->upstream = connect_tcp(options.hostname, options.port);
-    if (impl->upstream < 0) { error = "无法连接 Telnet 目标"; return {}; }
+    if (impl->upstream < 0) { error = "无法连接终端目标"; return {}; }
     impl->listener = socket(AF_INET, SOCK_STREAM, 0);
     sockaddr_in address{}; address.sin_family = AF_INET; address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     if (impl->listener < 0 || bind(impl->listener, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0 ||
-        listen(impl->listener, 1) != 0) { error = "无法创建 Telnet 本地代理"; return {}; }
+        listen(impl->listener, 1) != 0) { error = "无法创建终端本地代理"; return {}; }
     socklen_t address_size = sizeof(address);
     getsockname(impl->listener, reinterpret_cast<sockaddr*>(&address), &address_size);
     impl->listen_port = ntohs(address.sin_port);
-    auto bridge = std::shared_ptr<TelnetBridge>(new TelnetBridge(std::move(impl)));
+    auto bridge = std::shared_ptr<TerminalBridge>(new TerminalBridge(std::move(impl)));
     bridge->impl_->worker = std::jthread([state=bridge->impl_.get()] { state->run(); });
     return bridge;
 }
 
-std::uint16_t TelnetBridge::port() const { return impl_->listen_port; }
-void TelnetBridge::stop() { if (impl_) impl_->shutdown(); }
+std::uint16_t TerminalBridge::port() const { return impl_->listen_port; }
+void TerminalBridge::stop() { if (impl_) impl_->shutdown(); }
 
 }  // namespace remotelink
