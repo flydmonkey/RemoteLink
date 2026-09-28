@@ -14,6 +14,7 @@
 #include "remotelink/vnc_bridge.hpp"
 #include "remotelink/ssh_bridge.hpp"
 #include "remotelink/ssh_files.hpp"
+#include "remotelink/telnet_bridge.hpp"
 #endif
 
 #include <atomic>
@@ -81,6 +82,15 @@ struct SshConnection {
     std::string pending_host_key_sha256;
 };
 
+struct TelnetConnection {
+    std::string id;
+    std::string name;
+    std::string hostname;
+    std::uint16_t port = 23;
+    std::string username;
+    std::string password;
+};
+
 struct VncActivity {
     std::string id;
     std::string target_id;
@@ -98,6 +108,10 @@ struct VncBridgeLease {
 };
 struct SshBridgeLease {
     std::shared_ptr<remotelink::SshBridge> bridge;
+    std::chrono::steady_clock::time_point expires_at;
+};
+struct TelnetBridgeLease {
+    std::shared_ptr<remotelink::TelnetBridge> bridge;
     std::chrono::steady_clock::time_point expires_at;
 };
 
@@ -424,6 +438,58 @@ void save_ssh_connections(const std::filesystem::path& path,
     std::filesystem::rename(temporary, path);
 }
 
+std::vector<TelnetConnection> load_telnet_connections(const std::filesystem::path& path) {
+    std::vector<TelnetConnection> result;
+    if (!std::filesystem::is_regular_file(path)) return result;
+    std::ifstream input(path);
+    const auto data = nlohmann::json::parse(input, nullptr, false);
+    if (!data.is_array()) throw std::runtime_error("invalid Telnet connection registry");
+    for (const auto& item : data) {
+        TelnetConnection connection{item.value("id", ""), item.value("name", ""),
+            item.value("host", ""), static_cast<std::uint16_t>(item.value("port", 23)),
+            item.value("username", "")};
+        const auto password_file = item.value("passwordFile", "");
+        if (!password_file.empty()) {
+            std::ifstream secret(password_file, std::ios::binary);
+            connection.password.assign(std::istreambuf_iterator<char>(secret), {});
+            if (!secret && connection.password.empty())
+                throw std::runtime_error("cannot read Telnet credential: " + connection.id);
+        }
+        if (connection.id.empty() || connection.name.empty() || connection.hostname.empty() || connection.port == 0)
+            throw std::runtime_error("invalid Telnet connection: " + connection.id);
+        result.push_back(std::move(connection));
+    }
+    return result;
+}
+
+void save_telnet_connections(const std::filesystem::path& path,
+                             const std::filesystem::path& secret_directory,
+                             const std::vector<TelnetConnection>& connections) {
+    std::filesystem::create_directories(secret_directory);
+    std::filesystem::permissions(secret_directory, std::filesystem::perms::owner_all,
+                                 std::filesystem::perm_options::replace);
+    nlohmann::json data = nlohmann::json::array();
+    for (const auto& connection : connections) {
+        const auto secret_path = secret_directory / (connection.id + ".txt");
+        if (!connection.password.empty()) {
+            std::ofstream secret(secret_path, std::ios::binary | std::ios::trunc);
+            secret << connection.password;
+            if (!secret) throw std::runtime_error("cannot save Telnet credential");
+            std::filesystem::permissions(secret_path, std::filesystem::perms::owner_read |
+                std::filesystem::perms::owner_write, std::filesystem::perm_options::replace);
+        } else std::filesystem::remove(secret_path);
+        data.push_back({{"id",connection.id},{"name",connection.name},{"host",connection.hostname},
+            {"port",connection.port},{"username",connection.username},
+            {"passwordFile",connection.password.empty()?"":secret_path.string()}});
+    }
+    const auto temporary = path.string() + ".tmp";
+    { std::ofstream output(temporary, std::ios::trunc); output << data.dump(2) << '\n';
+      if (!output) throw std::runtime_error("cannot save Telnet connections"); }
+    std::filesystem::permissions(temporary, std::filesystem::perms::owner_read |
+        std::filesystem::perms::owner_write, std::filesystem::perm_options::replace);
+    std::filesystem::rename(temporary, path);
+}
+
 void request_stop(int) {
     running = false;
 }
@@ -581,6 +647,21 @@ int main() {
         std::chrono::system_clock::now().time_since_epoch()).count();
     for(auto& item:ssh_activity)if(item.active){item.active=false;item.ended_at=ssh_startup_time;item.reason="服务重启";}
     if(!ssh_activity.empty())save_vnc_activity(ssh_activity_path,ssh_activity);
+    const auto telnet_connections_path = state_root / "telnet-connections.json";
+    const auto telnet_connection_secrets_path = state_root / "telnet-connection-secrets";
+    auto telnet_connections = load_telnet_connections(telnet_connections_path);
+    save_telnet_connections(telnet_connections_path, telnet_connection_secrets_path, telnet_connections);
+    std::mutex telnet_connections_mutex;
+    remotelink::VncTicketStore telnet_tickets;
+    std::mutex telnet_bridges_mutex;
+    std::unordered_map<std::string, TelnetBridgeLease> telnet_bridges;
+    const auto telnet_activity_path = state_root / "telnet-activity.json";
+    std::mutex telnet_activity_mutex;
+    auto telnet_activity = load_vnc_activity(telnet_activity_path);
+    for (auto& item : telnet_activity) if (item.active) {
+        item.active=false; item.ended_at=ssh_startup_time; item.reason="服务重启";
+    }
+    if (!telnet_activity.empty()) save_vnc_activity(telnet_activity_path, telnet_activity);
     remotelink::VncTicketStore vnc_tickets;
     remotelink::VncTicketStore guacamole_tickets;
     std::mutex vnc_bridges_mutex;
@@ -694,6 +775,17 @@ int main() {
     http.set_ssh_ticket_handler([&ssh_tickets](const std::string& ticket) {
         return ssh_tickets.consume(ticket);
     });
+    http.set_telnet_ticket_handler([&telnet_tickets](const std::string& ticket) {
+        return telnet_tickets.consume(ticket);
+    });
+    std::jthread telnet_bridge_reaper([&telnet_bridges, &telnet_bridges_mutex](std::stop_token stop) {
+        while (!stop.stop_requested()) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            const auto now = std::chrono::steady_clock::now();
+            std::lock_guard lock(telnet_bridges_mutex);
+            std::erase_if(telnet_bridges, [now](const auto& item) { return item.second.expires_at <= now; });
+        }
+    });
     http.set_guacamole_ticket_handler([&guacamole_tickets](const std::string& ticket) {
         return guacamole_tickets.consume(ticket);
     });
@@ -719,6 +811,21 @@ int main() {
         const auto found=ssh_bridges.find(destination.session_id);
         if(found!=ssh_bridges.end()) found->second.bridge->resize(
             payload.value("columns",0U),payload.value("rows",0U));
+    });
+    http.set_telnet_session_observer([&telnet_bridges, &telnet_bridges_mutex,
+                                      &telnet_activity, &telnet_activity_mutex, &telnet_activity_path](
+        const remotelink::VncDestination& destination, bool connected) {
+        const auto now=std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        { std::lock_guard activity_lock(telnet_activity_mutex);
+          const auto entry=std::find_if(telnet_activity.begin(),telnet_activity.end(),
+              [&](const auto& item){return item.id==destination.session_id;});
+          if(connected&&entry==telnet_activity.end()){telnet_activity.push_back({destination.session_id,destination.target_id,destination.target_name,destination.username,now,0,true});if(telnet_activity.size()>200)telnet_activity.erase(telnet_activity.begin());}
+          else if(!connected&&entry!=telnet_activity.end()){entry->active=false;entry->ended_at=now;if(entry->reason.empty())entry->reason="客户端断开或网络中断";}
+          try{save_vnc_activity(telnet_activity_path,telnet_activity);}catch(const std::exception& error){std::cerr<<"cannot persist Telnet activity: "<<error.what()<<'\n';} }
+        { std::lock_guard lock(telnet_bridges_mutex); const auto found=telnet_bridges.find(destination.session_id);
+          if(connected&&found!=telnet_bridges.end())found->second.expires_at=std::chrono::steady_clock::time_point::max();
+          if(!connected)telnet_bridges.erase(destination.session_id); }
     });
     http.set_vnc_session_observer([&vnc_activity, &vnc_activity_mutex, &vnc_activity_path,
                                    &vnc_bridges, &vnc_bridges_mutex](
@@ -765,6 +872,9 @@ int main() {
                           &ssh_connections, &ssh_connections_mutex, &ssh_connections_path,
                           &ssh_connection_secrets_path, &ssh_tickets, &ssh_bridges,
                           &ssh_bridges_mutex, &ssh_activity, &ssh_activity_mutex,
+                          &telnet_connections, &telnet_connections_mutex, &telnet_connections_path,
+                          &telnet_connection_secrets_path, &telnet_tickets, &telnet_bridges,
+                          &telnet_bridges_mutex, &telnet_activity, &telnet_activity_mutex,
                           &allowed_hosts, tls_enabled](
                              const remotelink::HttpRequest& request) {
         using json = nlohmann::json;
@@ -878,6 +988,42 @@ int main() {
                 {"websocketUrl", "/guacamole/ws?ticket=" + ticket},
                 {"expiresIn", 30}}.dump();
             return response;
+        }
+        if (request.method == "GET" && request.path == "/api/telnet/targets") {
+            std::vector<std::string> allowed; bool administrator = false;
+            { std::lock_guard lock(users_mutex); administrator = *user_identity == 0;
+              allowed = users[*user_identity].allowed_targets; }
+            json targets = json::array();
+            std::lock_guard lock(telnet_connections_mutex);
+            for (const auto& connection : telnet_connections) {
+                if (!administrator && std::find(allowed.begin(), allowed.end(), connection.id) == allowed.end()) continue;
+                targets.push_back({{"id",connection.id},{"name",connection.name}});
+            }
+            response.body=json{{"targets",std::move(targets)}}.dump(); return response;
+        }
+        if (request.method == "POST" && request.path == "/api/telnet/sessions") {
+            const auto payload=json::parse(request.body,nullptr,false);
+            const auto target_id=payload.is_object()?payload.value("targetId",""):"";
+            std::vector<std::string> allowed; bool administrator=false; std::string gateway_username;
+            { std::lock_guard lock(users_mutex); administrator=*user_identity==0;
+              allowed=users[*user_identity].allowed_targets; gateway_username=users[*user_identity].username; }
+            if (!administrator && std::find(allowed.begin(),allowed.end(),target_id)==allowed.end()) {
+                response.status=403; response.body=json{{"error","target not authorized"}}.dump(); return response;
+            }
+            std::lock_guard lock(telnet_connections_mutex);
+            const auto connection=std::find_if(telnet_connections.begin(),telnet_connections.end(),
+                [&](const auto& item){return item.id==target_id;});
+            if(connection==telnet_connections.end()){response.status=404;response.body=json{{"error","Telnet target not found"}}.dump();return response;}
+            std::string error;
+            auto bridge=remotelink::TelnetBridge::create({.hostname=connection->hostname,
+                .port=connection->port,.username=connection->username,.password=connection->password},error);
+            if(!bridge){response.status=502;response.body=json{{"error",error}}.dump();return response;}
+            const auto ticket=telnet_tickets.issue({.target_id=connection->id,.target_name=connection->name,
+                .username=gateway_username,.hostname="127.0.0.1",.port=bridge->port()});
+            {std::lock_guard bridge_lock(telnet_bridges_mutex);telnet_bridges.emplace(ticket,TelnetBridgeLease{
+                std::move(bridge),std::chrono::steady_clock::now()+std::chrono::seconds(30)});}
+            response.body=json{{"ticket",ticket},{"targetId",connection->id},
+                {"websocketUrl","/telnet/ws?ticket="+ticket},{"expiresIn",30}}.dump();return response;
         }
         if (request.method == "GET" && request.path == "/api/ssh/targets") {
             std::vector<std::string> allowed; bool administrator = false;
@@ -1034,6 +1180,66 @@ int main() {
                 {"viewOnly", connection->view_only},
                 {"expiresIn", 30}}.dump();
             return response;
+        }
+        if (request.path.starts_with("/api/admin/telnet")) {
+            if (*user_identity != 0) { response.status=403; response.body=json{{"error","primary administrator required"}}.dump(); return response; }
+            if(request.method=="GET"&&request.path=="/api/admin/telnet"){
+                json connections=json::array();std::lock_guard lock(telnet_connections_mutex);
+                for(const auto& item:telnet_connections) connections.push_back({{"id",item.id},{"name",item.name},
+                    {"host",item.hostname},{"port",item.port},{"username",item.username},{"hasPassword",!item.password.empty()}});
+                response.body=json{{"connections",std::move(connections)}}.dump();return response;
+            }
+            if(request.method=="GET"&&request.path=="/api/admin/telnet/activity"){
+                json active=json::array(),history=json::array();std::lock_guard lock(telnet_activity_mutex);
+                for(auto item=telnet_activity.rbegin();item!=telnet_activity.rend();++item){json entry={{"id",item->id},{"targetId",item->target_id},{"targetName",item->target_name},{"username",item->username},{"startedAt",item->started_at},{"endedAt",item->ended_at},{"reason",item->reason}};(item->active?active:history).push_back(std::move(entry));}
+                response.body=json{{"active",std::move(active)},{"history",std::move(history)}}.dump();return response;
+            }
+            const auto payload=json::parse(request.body,nullptr,false);
+            if(!payload.is_object()){response.status=400;response.body=json{{"error","invalid payload"}}.dump();return response;}
+            if(request.method=="POST"&&request.path=="/api/admin/telnet/test"){
+                TelnetConnection candidate{payload.value("id",""),"",payload.value("host",""),
+                    static_cast<std::uint16_t>(payload.value("port",23)),payload.value("username",""),payload.value("password","")};
+                {std::lock_guard lock(telnet_connections_mutex);const auto found=std::find_if(telnet_connections.begin(),telnet_connections.end(),[&](const auto& item){return item.id==candidate.id;});if(found!=telnet_connections.end()&&candidate.password.empty())candidate.password=found->password;}
+                if(candidate.hostname.empty()||candidate.port==0){response.status=400;response.body=json{{"error","Telnet 连接配置无效"}}.dump();return response;}
+                std::string error;auto bridge=remotelink::TelnetBridge::create({.hostname=candidate.hostname,.port=candidate.port,.username=candidate.username,.password=candidate.password},error);
+                if(!bridge){response.status=502;response.body=json{{"error",error}}.dump();return response;}
+                response.body=json{{"reachable",true}}.dump();return response;
+            }
+            if(request.method=="POST"&&request.path=="/api/admin/telnet/save"){
+                const auto supplied_id=payload.value("id","");const auto id=supplied_id.empty()?"telnet-"+generate_connection_id():supplied_id;
+                static const std::regex valid_telnet_id("^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$");
+                const auto name=payload.value("name","");const auto host=payload.value("host","");const auto port=payload.value("port",23);
+                const auto username=payload.value("username","");
+                if(!std::regex_match(id,valid_telnet_id)||name.empty()||host.empty()||port<1||port>65535){response.status=400;response.body=json{{"error","Telnet 连接配置无效"}}.dump();return response;}
+                if(name.size()>128||host.size()>255||username.size()>256||payload.value("password","").size()>4096){response.status=400;response.body=json{{"error","Telnet 连接配置过长"}}.dump();return response;}
+                std::lock_guard lock(telnet_connections_mutex);
+                auto found=std::find_if(telnet_connections.begin(),telnet_connections.end(),[&](const auto& item){return item.id==id;});
+                if(found==telnet_connections.end()&&!supplied_id.empty()){response.status=404;response.body=json{{"error","Telnet connection not found"}}.dump();return response;}
+                TelnetConnection updated{id,name,host,static_cast<std::uint16_t>(port),username,payload.value("password","")};
+                if(found!=telnet_connections.end()){if(updated.password.empty())updated.password=found->password;*found=std::move(updated);}else telnet_connections.push_back(std::move(updated));
+                save_telnet_connections(telnet_connections_path,telnet_connection_secrets_path,telnet_connections);
+                response.body=json{{"id",id}}.dump();return response;
+            }
+            if(request.method=="POST"&&request.path=="/api/admin/telnet/delete"){
+                const auto id=payload.value("id","");
+                {std::lock_guard lock(telnet_connections_mutex);const auto before=telnet_connections.size();std::erase_if(telnet_connections,[&](const auto& item){return item.id==id;});if(before==telnet_connections.size()){response.status=404;response.body=json{{"error","Telnet connection not found"}}.dump();return response;}save_telnet_connections(telnet_connections_path,telnet_connection_secrets_path,telnet_connections);}
+                std::filesystem::remove(telnet_connection_secrets_path/(id+".txt"));
+                {std::lock_guard users_lock(users_mutex);for(auto& user:users)std::erase(user.allowed_targets,id);save_users(users_path,users);}
+                response.body=json{{"deleted",true}}.dump();return response;
+            }
+            if(request.method=="POST"&&request.path=="/api/admin/telnet/disconnect"){
+                const auto id=payload.value("id","");
+                {std::lock_guard activity_lock(telnet_activity_mutex);const auto entry=std::find_if(telnet_activity.begin(),telnet_activity.end(),[&](const auto& item){return item.id==id&&item.active;});if(entry!=telnet_activity.end())entry->reason="管理员断开";}
+                std::lock_guard lock(telnet_bridges_mutex);const auto removed=telnet_bridges.erase(id);response.body=json{{"disconnected",removed!=0}}.dump();return response;
+            }
+            if(request.method=="POST"&&request.path=="/api/admin/telnet/credentials/clear"){
+                const auto id=payload.value("id","");std::lock_guard lock(telnet_connections_mutex);
+                const auto found=std::find_if(telnet_connections.begin(),telnet_connections.end(),[&](const auto& item){return item.id==id;});
+                if(found==telnet_connections.end()){response.status=404;response.body=json{{"error","Telnet connection not found"}}.dump();return response;}
+                found->password.clear();save_telnet_connections(telnet_connections_path,telnet_connection_secrets_path,telnet_connections);
+                response.body=json{{"updated",true}}.dump();return response;
+            }
+            response.status=405;response.body=json{{"error","method not allowed"}}.dump();return response;
         }
         if (request.path.starts_with("/api/admin/ssh")) {
             if (*user_identity != 0) { response.status=403; response.body=json{{"error","primary administrator required"}}.dump(); return response; }

@@ -88,6 +88,18 @@ void HttpServer::set_ssh_control_handler(
     if (thread_.joinable()) throw std::logic_error("SSH control handler must be set before HTTP server starts");
     ssh_control_handler_ = std::move(handler);
 }
+
+void HttpServer::set_telnet_ticket_handler(
+    std::function<std::optional<VncDestination>(const std::string&)> handler) {
+    if (thread_.joinable()) throw std::logic_error("Telnet ticket handler must be set before HTTP server starts");
+    telnet_ticket_handler_ = std::move(handler);
+}
+
+void HttpServer::set_telnet_session_observer(
+    std::function<void(const VncDestination&, bool)> observer) {
+    if (thread_.joinable()) throw std::logic_error("Telnet observer must be set before HTTP server starts");
+    telnet_session_observer_ = std::move(observer);
+}
 void HttpServer::set_guacamole_ticket_handler(
     std::function<std::optional<VncDestination>(const std::string&)> handler) {
     if (thread_.joinable())
@@ -780,6 +792,27 @@ void HttpServer::run() {
                         std::move(*destination), ssh_session_observer_, ssh_control_handler_).detach();
             continue;
         }
+        const std::string telnet_prefix = "/telnet/ws?ticket=";
+        const bool telnet_websocket_request = parsed.method == "GET" &&
+            parsed.path.starts_with(telnet_prefix) &&
+            lower(raw_request.substr(0, headers_end)).find("upgrade: websocket") != std::string::npos;
+        if (telnet_websocket_request) {
+            const auto ticket = parsed.path.substr(telnet_prefix.size());
+            const auto destination = telnet_ticket_handler_ ? telnet_ticket_handler_(ticket) : std::nullopt;
+            if (!destination) {
+                static constexpr char forbidden[] =
+                    "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                write_client(client, tls, forbidden, sizeof(forbidden) - 1);
+                if (tls != nullptr) { SSL_shutdown(tls); SSL_free(tls); }
+                ::close(client);
+                continue;
+            }
+            std::thread(proxy_terminal_websocket, client, tls, std::move(raw_request),
+                        std::move(*destination), telnet_session_observer_,
+                        std::function<void(const VncDestination&, const std::string&)>(
+                            [](const VncDestination&, const std::string&) {})).detach();
+            continue;
+        }
         const std::string guacamole_prefix = "/guacamole/ws?ticket=";
         const bool guacamole_websocket_request = parsed.method == "GET" &&
             parsed.path.starts_with(guacamole_prefix) &&
@@ -829,6 +862,10 @@ void HttpServer::run() {
             (resource_path == "/ssh" || resource_path == "/ssh.html" || resource_path == "/ssh/settings");
         const bool ssh_session_request = parsed.method == "GET" &&
             (resource_path == "/ssh/session" || resource_path == "/ssh-session.html");
+        const bool telnet_request = parsed.method == "GET" &&
+            (resource_path == "/telnet" || resource_path == "/telnet.html" || resource_path == "/telnet/settings");
+        const bool telnet_session_request = parsed.method == "GET" &&
+            (resource_path == "/telnet/session" || resource_path == "/telnet-session.html");
         const bool guacamole_session_request = parsed.method == "GET" &&
             (resource_path == "/guacamole/session" || resource_path == "/guacamole-session.html");
         const bool icon_request = parsed.method == "GET" && resource_path == "/remotelink-icon.png";
@@ -849,6 +886,7 @@ void HttpServer::run() {
                                  resource_path.starts_with("/api/auth/") ||
                                  resource_path.starts_with("/api/vnc/") ||
                                  resource_path.starts_with("/api/ssh/") ||
+                                 resource_path.starts_with("/api/telnet/") ||
                                  resource_path.starts_with("/api/guacamole/") ||
                                  resource_path.starts_with("/api/admin/ssh");
 
@@ -866,7 +904,7 @@ void HttpServer::run() {
         }
         else if (root_request || admin_request || session_request || settings_request ||
                  vnc_request || vnc_session_request || vnc_admin_request || vnc_permissions_request ||
-                 users_request || ssh_request || ssh_session_request || icon_request || favicon_request ||
+                 users_request || ssh_request || ssh_session_request || telnet_request || telnet_session_request || icon_request || favicon_request ||
                  guacamole_session_request || i18n_request || novnc_request || xterm_request ||
                  guacamole_asset_request) {
             const char* configured_web_root = std::getenv("REMOTELINK_WEB_ROOT");
@@ -885,6 +923,8 @@ void HttpServer::run() {
             else if (users_request) page = "/users.html";
             else if (ssh_request) page = "/ssh.html";
             else if (ssh_session_request) page = "/ssh-session.html";
+            else if (telnet_request) page = "/telnet.html";
+            else if (telnet_session_request) page = "/telnet-session.html";
             else if (guacamole_session_request) page = "/guacamole-session.html";
             else if (novnc_request) page = resource_path;
             else if (xterm_request) page = resource_path;

@@ -321,6 +321,12 @@
               <div class="muted">暂无 SSH 连接</div>
             </div>
           </section>
+          <section class="permission-group">
+            <h3>Telnet</h3>
+            <div class="checks" id="telnet-checks">
+              <div class="muted">暂无 Telnet 连接</div>
+            </div>
+          </section>
         </div>
         <div id="permission-notice" class="dialog-notice notice"></div>
         <div class="dialog-actions">
@@ -341,6 +347,7 @@
         rdpTargets = [],
         vncTargets = [],
         sshTargets = [],
+        telnetTargets = [],
         editing = null,
         resetting = null,
         permissionUser = null;
@@ -405,16 +412,18 @@
         return button;
       }
       async function refresh() {
-        const [userData, rdpData, vncData, sshData] = await Promise.all([
+        const [userData, rdpData, vncData, sshData, telnetData] = await Promise.all([
           api("/api/admin/users"),
           api("/api/admin/state"),
           api("/api/admin/vnc"),
           api("/api/admin/ssh"),
+          api("/api/admin/telnet").catch(() => ({ connections: [] })),
         ]);
         users = userData.items || [];
         rdpTargets = (rdpData.targets || []).filter((item) => item.managed);
         vncTargets = vncData.connections || [];
         sshTargets = sshData.connections || [];
+        telnetTargets = telnetData.connections || [];
         render();
       }
       function openEditor(user = null) {
@@ -458,6 +467,7 @@
         fillChecks(document.querySelector("#rdp-checks"), rdpTargets, user);
         fillChecks(document.querySelector("#vnc-checks"), vncTargets, user);
         fillChecks(document.querySelector("#ssh-checks"), sshTargets, user);
+        fillChecks(document.querySelector("#telnet-checks"), telnetTargets, user);
         document.querySelector("#permission-notice").textContent = "";
         permissions.showModal();
       }

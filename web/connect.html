@@ -526,7 +526,8 @@
         <nav class="protocol-nav" aria-label="连接协议">
           <a class="protocol-link" href="/" aria-current="page">RDP</a
           ><a class="protocol-link" href="/vnc">VNC</a
-          ><a class="protocol-link" href="/ssh">SSH</a>
+          ><a class="protocol-link" href="/ssh">SSH</a
+          ><a class="protocol-link" href="/telnet">Telnet</a>
         </nav>
         <nav class="nav-group" aria-label="应用导航">
           <a class="nav status-nav" href="/admin" aria-label="状态" title="状态" hidden
@@ -915,8 +916,8 @@
       }
       async function updateProtocolTabs(account) {
         if (account.admin) return;
-        const paths = ["/api/rdp/targets", "/api/vnc/targets", "/api/ssh/targets"];
-        const links = ["/", "/vnc", "/ssh"];
+        const paths = ["/api/rdp/targets", "/api/vnc/targets", "/api/ssh/targets", "/api/telnet/targets"];
+        const links = ["/", "/vnc", "/ssh", "/telnet"];
         const availability = await Promise.all(
           paths.map(async (path) => {
             try {

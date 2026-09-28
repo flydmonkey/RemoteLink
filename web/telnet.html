@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>RemoteLink · SSH</title>
+    <title>RemoteLink · Telnet</title>
     <script src="/i18n.js?v=__REMOTELINK_VERSION__&rev=2" defer></script>
     <style>
       :root {
@@ -21,6 +21,7 @@
         --muted: #ffffff92;
         --accent: #73bee8;
         --danger: #ff99a4;
+        --success: #78d7a2;
       }
       * {
         box-sizing: border-box;
@@ -343,6 +344,15 @@
       }
       .notice {
         min-height: 20px;
+        color: var(--muted);
+      }
+      .notice[data-state="info"] {
+        color: var(--accent);
+      }
+      .notice[data-state="success"] {
+        color: var(--success);
+      }
+      .notice[data-state="error"] {
         color: var(--danger);
       }
       dialog {
@@ -539,13 +549,13 @@
         <strong class="brand">RemoteLink</strong>
         <nav class="nav">
           <a href="/">RDP</a><a href="/vnc">VNC</a
-          ><a href="/ssh" aria-current="page">SSH</a><a href="/telnet">Telnet</a>
+          ><a href="/ssh">SSH</a><a href="/telnet" aria-current="page">Telnet</a>
         </nav>
         <div class="tools">
           <a
             id="manage"
             class="settings-link"
-            href="/ssh/settings"
+            href="/telnet/settings"
             hidden
             title="管理"
             aria-label="管理"
@@ -601,14 +611,14 @@
         <div class="hero">
           <div class="hero-icon">&gt;_</div>
           <div>
-            <h1>SSH 连接</h1>
+            <h1>Telnet 连接</h1>
             <p>选择计算机并连接</p>
           </div>
         </div>
         <div class="field">
           <label class="connection-label" for="target">我的连接</label
           ><select id="target">
-            <option value="">请选择 SSH 设备</option>
+            <option value="">请选择 Telnet 设备</option>
           </select>
         </div>
         <div id="notice" class="notice"></div>
@@ -619,7 +629,7 @@
     </div>
     <dialog id="manager">
       <header class="settings-title">
-        <a href="/ssh" title="返回 SSH 连接" aria-label="返回 SSH 连接"
+        <a href="/telnet" title="返回 Telnet 连接" aria-label="返回 Telnet 连接"
           ><svg
             viewBox="0 0 24 24"
             fill="none"
@@ -661,7 +671,7 @@
     </dialog>
     <dialog id="editor">
       <form id="form" class="editor">
-        <h2 id="editor-title">添加 SSH 连接</h2>
+        <h2 id="editor-title">添加 Telnet 连接</h2>
         <label>连接名称</label
         ><input id="name" maxlength="128" required /><label>主机</label
         ><input id="host" maxlength="255" required /><label>端口</label
@@ -670,20 +680,17 @@
           type="number"
           min="1"
           max="65535"
-          value="22"
+          value="23"
           required
         /><label>用户名</label
-        ><input id="username" maxlength="256" required /><label>认证方式</label
-        ><select id="auth">
-          <option value="password">用户名和密码</option>
-          <option value="key">SSH 私钥</option></select
-        ><label id="password-label">密码</label
+        ><input id="username" maxlength="256" /><label id="password-label">密码（可选）</label
         ><input id="password" type="password" />
+        <select id="auth" hidden><option value="password">用户名和密码</option></select>
         <div id="key-fields" class="key-row" hidden>
           <label>私钥</label
           ><textarea
             id="private-key"
-            placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+            placeholder="-----BEGIN OPENTelnet PRIVATE KEY-----"
           ></textarea
           ><label>私钥口令（可选）</label
           ><input id="passphrase" type="password" />
@@ -712,7 +719,7 @@
       let connections = [],
         editing = null,
         pendingFingerprint = "";
-      const settingsMode = location.pathname === "/ssh/settings";
+      const settingsMode = location.pathname === "/telnet/settings";
       if (settingsMode) {
         document.body.classList.add("settings-mode");
         manager.setAttribute("open", "");
@@ -755,13 +762,18 @@
           throw new Error(data.error || `HTTP ${response.status}`);
         return data;
       }
+      function setNotice(element, message = "", state = "neutral") {
+        element.textContent = message;
+        if (message) element.dataset.state = state;
+        else delete element.dataset.state;
+      }
       async function refresh() {
         const me = await api("/api/auth/me");
         document.querySelector("#manage").hidden = !me.admin;
         document.querySelector("#users-link").hidden = !me.admin;
         document.querySelector("#account-summary").textContent =
           me.username || me.name;
-        const data = await api("/api/ssh/targets");
+        const data = await api("/api/telnet/targets");
         const availableTargets = data.targets || [];
         updateProtocolTabs(me, availableTargets);
         target.replaceChildren();
@@ -769,30 +781,30 @@
           for (const item of availableTargets)
             target.add(new Option(item.name, item.id));
           target.selectedIndex = 0;
-        } else target.add(new Option("请选择 SSH 设备", ""));
+        } else target.add(new Option("请选择 Telnet 设备", ""));
         if (me.admin) {
-          connections = (await api("/api/admin/ssh")).connections || [];
-          const activity = await api("/api/admin/ssh/activity");
+          connections = (await api("/api/admin/telnet")).connections || [];
+          const activity = await api("/api/admin/telnet/activity");
           renderActivity(activity);
           renderList();
         }
       }
-      async function updateProtocolTabs(account, sshTargets) {
+      async function updateProtocolTabs(account, telnetTargets) {
         if (account.admin) return;
         const checks = await Promise.all([
           api("/api/rdp/targets").then((data) => (data.targets || []).length > 0).catch(() => null),
           api("/api/vnc/targets").then((data) => (data.targets || []).length > 0).catch(() => null),
-          Promise.resolve(sshTargets.length > 0),
-          api("/api/telnet/targets").then((data) => (data.targets || []).length > 0).catch(() => null),
+          api("/api/ssh/targets").then((data) => (data.targets || []).length > 0).catch(() => null),
+          Promise.resolve(telnetTargets.length > 0),
         ]);
         const links = [...document.querySelectorAll(".nav a")];
         links.forEach((link, index) => {
           if (checks[index] !== null) link.hidden = !checks[index];
         });
-        if (!checks[2]) {
+        if (!checks[3]) {
           const destinations = ["/", "/vnc", "/ssh", "/telnet"];
           const next = checks.findIndex(Boolean);
-          if (next >= 0 && next !== 2) location.replace(destinations[next]);
+          if (next >= 0 && next !== 3) location.replace(destinations[next]);
         }
       }
       function renderList() {
@@ -806,11 +818,10 @@
           main.className = "row-main";
           main.innerHTML = '<strong></strong><div class="muted"></div>';
           main.children[0].textContent = item.name;
-          main.children[1].textContent = `${item.username}@${item.host}:${item.port} · ${item.authType === "key" ? "私钥" : "密码"} · ${item.hasPassword || item.hasPrivateKey ? "凭据已配置（不回显）" : "未配置凭据"}${item.hostKeySha256 ? " · 指纹已信任" : " · 指纹待确认"}`;
+          main.children[1].textContent = `${item.username ? item.username + "@" : ""}${item.host}:${item.port} · ${item.hasPassword ? "凭据已配置（不回显）" : "交互式登录"}`;
           actions.className = "row-actions";
           actions.append(
             button("编辑", () => openEditor(item)),
-            button("重置信任", () => resetTrust(item)),
             button("清除凭据", () => clearCredentials(item)),
             button("删除", () => removeConnection(item), "danger"),
           );
@@ -841,7 +852,7 @@
                 button(
                   "断开",
                   async () => {
-                    await api("/api/admin/ssh/disconnect", {
+                    await api("/api/admin/telnet/disconnect", {
                       method: "POST",
                       body: JSON.stringify({ id: item.id }),
                     });
@@ -871,26 +882,26 @@
       }
       function openEditor(item = null) {
         editing = item;
-        pendingFingerprint = item?.pendingHostKeySha256 || "";
+        pendingFingerprint = "";
         document.querySelector("#form").reset();
         document.querySelector("#editor-title").textContent = item
-          ? "编辑 SSH 连接"
-          : "添加 SSH 连接";
+          ? "编辑 Telnet 连接"
+          : "添加 Telnet 连接";
         for (const key of ["name", "host", "port", "username"])
           document.querySelector(`#${key}`).value =
-            item?.[key] || (key === "port" ? 22 : "");
+            item?.[key] || (key === "port" ? 23 : "");
         document.querySelector("#auth").value = item?.authType || "password";
         toggleAuth();
-        document.querySelector("#editor-notice").textContent =
-          item?.hasPassword || item?.hasPrivateKey
-            ? "凭据已配置（不回显）；留空将保留当前凭据。"
-            : "";
+        setNotice(
+          document.querySelector("#editor-notice"),
+          item?.hasPassword ? "凭据已配置（不回显）；留空将保留当前凭据。" : "",
+        );
         document.querySelector("#confirm-fingerprint").hidden = true;
         editor.showModal();
       }
       async function removeConnection(item) {
         if (!confirm(`删除“${item.name}”？`)) return;
-        await api("/api/admin/ssh/delete", {
+        await api("/api/admin/telnet/delete", {
           method: "POST",
           body: JSON.stringify({ id: item.id }),
         });
@@ -902,7 +913,7 @@
           !confirm(`重置“${item.name}”的主机指纹信任？`)
         )
           return;
-        await api("/api/admin/ssh/trust/reset", {
+        await api("/api/admin/telnet/trust/reset", {
           method: "POST",
           body: JSON.stringify({ id: item.id }),
         });
@@ -910,7 +921,7 @@
       }
       async function clearCredentials(item) {
         if (!confirm(`清除“${item.name}”保存的登录凭据？`)) return;
-        await api("/api/admin/ssh/credentials/clear", {
+        await api("/api/admin/telnet/credentials/clear", {
           method: "POST",
           body: JSON.stringify({ id: item.id }),
         });
@@ -918,22 +929,22 @@
       }
       document.querySelector("#connect").onclick = async () => {
         if (!target.value) {
-          notice.textContent = "请选择 SSH 设备。";
+          setNotice(notice, "请选择 Telnet 设备。", "error");
           return;
         }
         try {
-          notice.textContent = "";
-          const session = await api("/api/ssh/sessions", {
+          setNotice(notice);
+          const session = await api("/api/telnet/sessions", {
             method: "POST",
             body: JSON.stringify({ targetId: target.value }),
           });
           sessionStorage.setItem(
-            "remotelink-ssh-session",
+            "remotelink-telnet-session",
             JSON.stringify(session),
           );
-          location.href = `/ssh/session?name=${encodeURIComponent(target.options[target.selectedIndex].text)}`;
+          location.href = `/telnet/session?name=${encodeURIComponent(target.options[target.selectedIndex].text)}`;
         } catch (error) {
-          notice.textContent = error.message;
+          setNotice(notice, error.message, "error");
         }
       };
       const accountTrigger = document.querySelector("#account-trigger"),
@@ -981,57 +992,56 @@
       document.querySelector("#test").onclick = async () => {
         const output = document.querySelector("#editor-notice");
         try {
-          output.textContent = "正在验证连接和身份…";
-          const result = await api("/api/admin/ssh/test", {
+          setNotice(output, "正在验证连接…", "info");
+          const result = await api("/api/admin/telnet/test", {
             method: "POST",
             body: JSON.stringify(formPayload()),
           });
-          output.textContent = result.authenticated
-            ? `连接成功 · 主机指纹 ${result.hostKeySha256}${result.trusted ? " · 已信任" : " · 请核对后确认"}`
-            : result.error || "连接失败";
-          pendingFingerprint = result.hostKeySha256 || "";
-          document.querySelector("#confirm-fingerprint").hidden =
-            result.trusted || !pendingFingerprint;
+          setNotice(
+            output,
+            result.reachable ? "连接成功" : result.error || "连接失败",
+            result.reachable ? "success" : "error",
+          );
         } catch (error) {
-          output.textContent = error.message;
+          setNotice(output, error.message, "error");
         }
       };
       document.querySelector("#confirm-fingerprint").onclick = async () => {
         const output = document.querySelector("#editor-notice");
         if (!editing?.id) {
-          output.textContent = "请先保存连接，再测试并确认主机指纹。";
+          setNotice(output, "请先保存连接。", "error");
           return;
         }
         try {
-          await api("/api/admin/ssh/trust/confirm", {
+          await api("/api/admin/telnet/trust/confirm", {
             method: "POST",
             body: JSON.stringify({
               id: editing.id,
               fingerprint: pendingFingerprint,
             }),
           });
-          output.textContent = `主机指纹已确认 · ${pendingFingerprint}`;
+          setNotice(output, "设置已确认。", "success");
           document.querySelector("#confirm-fingerprint").hidden = true;
           await refresh();
         } catch (error) {
-          output.textContent = error.message;
+          setNotice(output, error.message, "error");
         }
       };
       document.querySelector("#form").onsubmit = async (event) => {
         event.preventDefault();
         const payload = formPayload();
         try {
-          await api("/api/admin/ssh/save", {
+          await api("/api/admin/telnet/save", {
             method: "POST",
             body: JSON.stringify(payload),
           });
           editor.close();
           await refresh();
         } catch (error) {
-          document.querySelector("#editor-notice").textContent = error.message;
+          setNotice(document.querySelector("#editor-notice"), error.message, "error");
         }
       };
-      refresh().catch((error) => (notice.textContent = error.message));
+      refresh().catch((error) => setNotice(notice, error.message, "error"));
     </script>
   </body>
 </html>

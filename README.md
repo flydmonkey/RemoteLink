@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md) | English
 
-RemoteLink is a self-hosted, browser-based remote connection tool for RDP, VNC, and SSH. It supports server-managed SSH password and private-key authentication without exposing credentials to the browser.
+RemoteLink is a self-hosted, browser-based remote connection tool for RDP, VNC, SSH, and Telnet. It supports server-managed SSH and Telnet credentials without exposing them to the browser.
 
 The gateway runs as a single Linux service. Users only need a modern browser—no extension or desktop client is required.
 
@@ -113,7 +113,7 @@ From `0.3.6`, the image serves HTTPS by default. Releases through `0.3.4` set `R
 - Native RemoteLink VNC device, session toolbar, administration, and user-permission UI
 - VNC password, username/password, and CA-certificate authentication modes with automatic reconnect
 - Native SSH terminal with password or private-key credentials, administrator-confirmed host fingerprints, and SFTP file management for browse/upload/download/delete operations
-- Unified RDP, VNC, and SSH active-session and recent-activity audit views
+- Unified RDP, VNC, SSH, and Telnet active-session and recent-activity audit views
 - Non-revealing credential status with replace and clear operations for every protocol
 
 ## Architecture
@@ -171,7 +171,7 @@ ctest --test-dir build --output-on-failure
 
 ## Configuration
 
-After first login, administrators manage RDP, VNC, and SSH connections from each protocol's **Management** page and grant access from **User management**. Connection credentials are stored in owner-only files under `REMOTELINK_STATE_DIR`, are never returned by the API, and can be replaced or cleared from the interface. `REMOTELINK_TARGETS_FILE` remains available for importing legacy RDP targets; imported connections are migrated to managed state on first start.
+After first login, administrators manage RDP, VNC, SSH, and Telnet connections from each protocol's **Management** page and grant access from **User management**. Connection credentials are stored in owner-only files under `REMOTELINK_STATE_DIR`, are never returned by the API, and can be replaced or cleared from the interface. Telnet traffic between RemoteLink and the target is unencrypted and should only be used on trusted networks. `REMOTELINK_TARGETS_FILE` remains available for importing legacy RDP targets; imported connections are migrated to managed state on first start.
 
 | Variable | Purpose |
 | --- | --- |

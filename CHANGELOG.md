@@ -1,5 +1,11 @@
 # RemoteLink changelog
 
+## 0.3.16
+
+- Add managed Telnet connections with optional server-side login credentials, per-user authorization, activity auditing, and administrator disconnect controls.
+- Add a browser-based Telnet terminal using single-use WebSocket tickets and Telnet option negotiation filtering.
+- Add Telnet navigation, management, and differentiated informational, success, and error feedback.
+
 ## 0.3.15
 
 - Bundle guacd 1.3.0 as the default Guacamole RDP backend for better compatibility with legacy Windows applications.

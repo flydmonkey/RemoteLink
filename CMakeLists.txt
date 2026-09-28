@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(remotelink VERSION 0.3.8 LANGUAGES C CXX)
+project(remotelink VERSION 0.3.16 LANGUAGES C CXX)
 
 option(REMOTELINK_BUILD_TESTS "Build unit tests" ON)
 option(REMOTELINK_ENABLE_STREAMING "Build WebRTC/H.264 streaming support" ON)
@@ -83,6 +83,7 @@ if(REMOTELINK_ENABLE_STREAMING)
         src/ssh_bridge.cpp
         src/ssh_files.cpp
         src/target_config.cpp
+        src/telnet_bridge.cpp
         src/vnc_bridge.cpp
         src/vnc_ticket_store.cpp
         src/webrtc_server.cpp
