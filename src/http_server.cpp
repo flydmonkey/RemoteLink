@@ -353,6 +353,12 @@ bool guacd_handshake(int backend, const VncDestination& destination) {
         {"width", std::to_string(destination.width)}, {"height", std::to_string(destination.height)},
         {"dpi", std::to_string(destination.dpi)}, {"resize-method", destination.resize_method},
         {"color-depth", "32"},
+        // Prefer the basic GDI path for legacy RDP servers. Their partial
+        // GFX/cache updates can leave controls or labels absent even though
+        // surrounding drawing orders arrive normally.
+        {"disable-gfx", "true"},
+        {"disable-bitmap-caching", "true"},
+        {"disable-offscreen-caching", "true"},
         {"enable-wallpaper", destination.show_wallpaper ? "true" : "false"},
         {"enable-font-smoothing", destination.font_smoothing ? "true" : "false"},
         {"enable-full-window-drag", destination.full_window_drag ? "true" : "false"},
