@@ -685,27 +685,10 @@
         /><label>用户名</label
         ><input id="username" maxlength="256" /><label id="password-label">密码（可选）</label
         ><input id="password" type="password" />
-        <select id="auth" hidden><option value="password">用户名和密码</option></select>
-        <div id="key-fields" class="key-row" hidden>
-          <label>私钥</label
-          ><textarea
-            id="private-key"
-            placeholder="-----BEGIN OPENTelnet PRIVATE KEY-----"
-          ></textarea
-          ><label>私钥口令（可选）</label
-          ><input id="passphrase" type="password" />
-        </div>
         <div id="editor-notice" class="notice"></div>
         <div class="dialog-actions">
           <button id="cancel" type="button" class="secondary">取消</button
           ><button id="test" type="button" class="secondary">测试连接</button
-          ><button
-            id="confirm-fingerprint"
-            type="button"
-            class="secondary"
-            hidden
-          >
-            确认并信任指纹</button
           ><button class="primary">保存</button>
         </div>
       </form>
@@ -716,9 +699,7 @@
         notice = document.querySelector("#notice"),
         manager = document.querySelector("#manager"),
         editor = document.querySelector("#editor");
-      let connections = [],
-        editing = null,
-        pendingFingerprint = "";
+      let connections = [], editing = null;
       const settingsMode = location.pathname === "/telnet/settings";
       if (settingsMode) {
         document.body.classList.add("settings-mode");
@@ -874,15 +855,8 @@
         value.onclick = handler;
         return value;
       }
-      function toggleAuth() {
-        const key = document.querySelector("#auth").value === "key";
-        document.querySelector("#key-fields").hidden = !key;
-        document.querySelector("#password").hidden = key;
-        document.querySelector("#password-label").hidden = key;
-      }
       function openEditor(item = null) {
         editing = item;
-        pendingFingerprint = "";
         document.querySelector("#form").reset();
         document.querySelector("#editor-title").textContent = item
           ? "编辑 Telnet 连接"
@@ -890,30 +864,15 @@
         for (const key of ["name", "host", "port", "username"])
           document.querySelector(`#${key}`).value =
             item?.[key] || (key === "port" ? 23 : "");
-        document.querySelector("#auth").value = item?.authType || "password";
-        toggleAuth();
         setNotice(
           document.querySelector("#editor-notice"),
           item?.hasPassword ? "凭据已配置（不回显）；留空将保留当前凭据。" : "",
         );
-        document.querySelector("#confirm-fingerprint").hidden = true;
         editor.showModal();
       }
       async function removeConnection(item) {
         if (!confirm(`删除“${item.name}”？`)) return;
         await api("/api/admin/telnet/delete", {
-          method: "POST",
-          body: JSON.stringify({ id: item.id }),
-        });
-        await refresh();
-      }
-      async function resetTrust(item) {
-        if (
-          !item.hostKeySha256 ||
-          !confirm(`重置“${item.name}”的主机指纹信任？`)
-        )
-          return;
-        await api("/api/admin/telnet/trust/reset", {
           method: "POST",
           body: JSON.stringify({ id: item.id }),
         });
@@ -975,7 +934,6 @@
       document.querySelector("#manager-close").onclick = () => manager.close();
       document.querySelector("#add").onclick = () => openEditor();
       document.querySelector("#cancel").onclick = () => editor.close();
-      document.querySelector("#auth").onchange = toggleAuth;
       function formPayload() {
         return {
           id: editing?.id,
@@ -983,10 +941,7 @@
           host: document.querySelector("#host").value.trim(),
           port: Number(document.querySelector("#port").value),
           username: document.querySelector("#username").value.trim(),
-          authType: document.querySelector("#auth").value,
           password: document.querySelector("#password").value,
-          privateKey: document.querySelector("#private-key").value,
-          passphrase: document.querySelector("#passphrase").value,
         };
       }
       document.querySelector("#test").onclick = async () => {
@@ -1002,27 +957,6 @@
             result.reachable ? "连接成功" : result.error || "连接失败",
             result.reachable ? "success" : "error",
           );
-        } catch (error) {
-          setNotice(output, error.message, "error");
-        }
-      };
-      document.querySelector("#confirm-fingerprint").onclick = async () => {
-        const output = document.querySelector("#editor-notice");
-        if (!editing?.id) {
-          setNotice(output, "请先保存连接。", "error");
-          return;
-        }
-        try {
-          await api("/api/admin/telnet/trust/confirm", {
-            method: "POST",
-            body: JSON.stringify({
-              id: editing.id,
-              fingerprint: pendingFingerprint,
-            }),
-          });
-          setNotice(output, "设置已确认。", "success");
-          document.querySelector("#confirm-fingerprint").hidden = true;
-          await refresh();
         } catch (error) {
           setNotice(output, error.message, "error");
         }

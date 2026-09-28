@@ -2116,12 +2116,14 @@
     </script>
     <script>
       async function unifiedState() {
-        const [state, vnc, ssh, vncActivity, sshActivity] = await Promise.all([
+        const [state, vnc, ssh, telnet, vncActivity, sshActivity, telnetActivity] = await Promise.all([
           api("/api/admin/state"),
           api("/api/admin/vnc"),
           api("/api/admin/ssh"),
+          api("/api/admin/telnet").catch(() => ({ connections: [] })),
           api("/api/admin/vnc/activity"),
           api("/api/admin/ssh/activity"),
+          api("/api/admin/telnet/activity").catch(() => ({ active: [], history: [] })),
         ]);
         const activeSessions = state.targets
           .filter((item) => item.busy)
@@ -2198,12 +2200,46 @@
               ),
             });
         }
+        for (const item of telnet.connections) {
+          const active = telnetActivity.active.find(
+            (entry) => entry.targetId === item.id,
+          );
+          state.targets.push({
+            id: item.id,
+            name: item.name,
+            host: item.host,
+            username: item.username || "",
+            port: item.port,
+            managed: false,
+            protocol: "Telnet",
+            width: 0,
+            height: 0,
+            busy: !!active,
+            peerId: active?.id,
+            state: active ? "connected" : "",
+            connectedSeconds: active
+              ? Math.max(0, Math.floor(Date.now() / 1000) - active.startedAt)
+              : 0,
+          });
+          for (const session of telnetActivity.active.filter(
+            (entry) => entry.targetId === item.id,
+          ))
+            activeSessions.push({
+              ...state.targets.at(-1),
+              busy: true,
+              peerId: session.id,
+              accountUsername: session.username,
+              state: "connected",
+              connectedSeconds: Math.max(0, Math.floor(Date.now() / 1000) - session.startedAt),
+            });
+        }
         for (const target of state.targets)
           target.protocol = target.protocol || "RDP";
         const extraEvents = [];
         for (const [protocol, activity] of [
           ["VNC", vncActivity],
           ["SSH", sshActivity],
+          ["Telnet", telnetActivity],
         ])
           for (const item of [...activity.active, ...activity.history])
             extraEvents.push({
@@ -2215,7 +2251,7 @@
               protocol,
               username: item.username,
               host:
-                (protocol === "VNC" ? vnc.connections : ssh.connections).find(
+                (protocol === "VNC" ? vnc.connections : protocol === "SSH" ? ssh.connections : telnet.connections).find(
                   (target) => target.id === item.targetId,
                 )?.host || "",
               message: item.endedAt ? "会话已结束" : "远程会话已创建",
@@ -2264,7 +2300,8 @@
             manage.className = "small-button protocol-manage";
             manage.textContent = "管理";
             manage.href =
-              target.protocol === "VNC" ? "/vnc?admin=1" : "/ssh?admin=1";
+              target.protocol === "VNC" ? "/vnc?admin=1" :
+              target.protocol === "SSH" ? "/ssh?admin=1" : "/telnet/settings";
             actions.prepend(manage);
           }
         });
@@ -2278,9 +2315,9 @@
           `确定断开“${target.name}”的当前 ${target.protocol} 会话？`;
         confirmAction = async () => {
           await api(
-            target.protocol === "VNC"
-              ? "/api/admin/vnc/disconnect"
-              : "/api/admin/ssh/disconnect",
+            target.protocol === "VNC" ? "/api/admin/vnc/disconnect" :
+            target.protocol === "SSH" ? "/api/admin/ssh/disconnect" :
+              "/api/admin/telnet/disconnect",
             { method: "POST", body: JSON.stringify({ id: target.peerId }) },
           );
           await refresh();

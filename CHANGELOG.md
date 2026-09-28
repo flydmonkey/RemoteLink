@@ -1,5 +1,11 @@
 # RemoteLink changelog
 
+## 0.3.17
+
+- Include Telnet targets and sessions in the unified administrator status and activity views.
+- Add Telnet interface translations and browser regression coverage for connection management and semantic feedback.
+- Remove inherited SSH fingerprint, private-key, and SFTP code from the Telnet pages.
+
 ## 0.3.16
 
 - Add managed Telnet connections with optional server-side login credentials, per-user authorization, activity auditing, and administrator disconnect controls.
