@@ -171,3 +171,23 @@ test("editing, activity, validation, and destructive messages never mix Chinese 
   });
   expect(validation).toBe("Please fill out this field.");
 });
+
+test("user management translates complete role and account-state labels", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("remotelink-language", "en");
+    sessionStorage.setItem("remotelink-access-token", "i18n-audit");
+  });
+  await page.route("**/api/admin/users", (route) => route.fulfill({ json: { items: [
+    { id: "admin", name: "Administrator", username: "admin", admin: true, enabled: true },
+    { id: "user", name: "Monkey", username: "monkey", admin: false, enabled: false, allowedTargets: [] },
+  ] } }));
+  await page.route("**/api/admin/state", (route) => route.fulfill({ json: { targets: [] } }));
+  await page.route("**/api/admin/vnc", (route) => route.fulfill({ json: { connections: [] } }));
+  await page.route("**/api/admin/ssh", (route) => route.fulfill({ json: { connections: [] } }));
+  await page.route("**/api/admin/telnet", (route) => route.fulfill({ json: { connections: [] } }));
+  await page.goto("/users.html");
+  await expect(page.getByText("Primary administrator", { exact: true })).toBeVisible();
+  await expect(page.getByText("Standard user", { exact: true })).toBeVisible();
+  await expect(page.getByText("Suspended", { exact: true })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/主管理员|普通用户|已冻结/);
+});

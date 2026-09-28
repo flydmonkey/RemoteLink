@@ -227,6 +227,7 @@
   };
   Object.assign(dictionaries["zh-TW"], { 选择计算机并连接: "選擇電腦並連線" });
   Object.assign(dictionaries.en, {
+    "主管理员":"Primary administrator","普通用户":"Standard user","已冻结":"Suspended","冻结":"Suspend","编辑用户":"Edit user","连接授权 · {name}":"Connection access · {name}",
     选择计算机并连接: "Select a computer and connect",
   });
   Object.assign(dictionaries.ja, {
@@ -946,6 +947,7 @@
     [/^重置“(.+)”的主机指纹信任？$/, "重置“{name}”的主机指纹信任？", ["name"]],
     [/^已更新连接 (.+)$/, "已更新连接 {name}", ["name"]],
     [/^已添加连接 (.+)$/, "已添加连接 {name}", ["name"]],
+    [/^连接授权 · (.+)$/, "连接授权 · {name}", ["name"]],
   ];
   function translatedValue(value, locale = language) {
     const dict = dictionaries[locale] || {};

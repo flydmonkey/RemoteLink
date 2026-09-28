@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.3.23
+
+- Translate user-management roles, suspended state, edit actions, and connection-access titles as complete phrases.
+- Translate terminal disconnect messages before adding console punctuation.
 - Add Raw TCP terminal connections alongside Telnet using a shared terminal bridge.
 - Preserve existing Telnet connection data while recording the transport type for new and updated connections.
 - Include terminal connections when validating per-user connection permissions.

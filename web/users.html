@@ -379,12 +379,12 @@
           row.className = "row";
           identity.innerHTML = '<strong></strong><div class="muted"></div>';
           identity.children[0].textContent = user.name;
-          identity.children[1].textContent = user.admin
+          identity.children[1].textContent = RemoteLinkI18n.t(user.admin
             ? "主管理员"
-            : "普通用户";
+            : "普通用户");
           username.textContent = user.username;
           state.className = `state ${user.enabled ? "enabled" : "muted"}`;
-          state.textContent = user.enabled ? "已启用" : "已冻结";
+          state.textContent = RemoteLinkI18n.t(user.enabled ? "已启用" : "已冻结");
           actions.className = "actions";
           const edit = action("编辑", () => openEditor(user)),
             password = action("重置密码", () => openReset(user));
@@ -463,7 +463,7 @@
       function openPermissions(user) {
         permissionUser = user;
         document.querySelector("#permission-title").textContent =
-          `连接授权 · ${user.name}`;
+          RemoteLinkI18n.t(`连接授权 · ${user.name}`);
         fillChecks(document.querySelector("#rdp-checks"), rdpTargets, user);
         fillChecks(document.querySelector("#vnc-checks"), vncTargets, user);
         fillChecks(document.querySelector("#ssh-checks"), sshTargets, user);
@@ -536,10 +536,12 @@
             error.message;
         }
       };
-      refresh().catch((error) => {
-        if (error.message !== "unauthorized")
-          notice.textContent = error.message;
-      });
+      window.addEventListener("DOMContentLoaded", () => {
+        refresh().catch((error) => {
+          if (error.message !== "unauthorized")
+            notice.textContent = error.message;
+        });
+      }, { once: true });
     </script>
   </body>
 </html>
