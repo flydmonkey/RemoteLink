@@ -1,5 +1,10 @@
 # RemoteLink changelog
 
+## 0.3.14
+
+- Use Guacamole's standard `BlobReader` print flow: acknowledge stream creation once, acknowledge each PDF block once, and upload the completed PDF through RemoteLink's authenticated per-user print endpoint.
+- Keep the Guacamole WebSocket proxy transparent and make the managed guacd log level configurable with `REMOTELINK_GUACD_LOG_LEVEL`.
+
 ## 0.3.13
 
 - Terminate Guacamole print-PDF data streams at the gateway so printing no longer depends on browser ACK timing and repeated jobs cannot stall behind the WebSocket.

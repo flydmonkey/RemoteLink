@@ -28,7 +28,8 @@ if [[ "${REMOTELINK_START_GUACD:-1}" != "1" || "${guacd_host}" != "127.0.0.1" ]]
   exec "$@"
 fi
 
-/usr/sbin/guacd -f -b 127.0.0.1 -l "${guacd_port}" &
+guacd_log_level="${REMOTELINK_GUACD_LOG_LEVEL:-info}"
+/usr/sbin/guacd -f -L "${guacd_log_level}" -b 127.0.0.1 -l "${guacd_port}" &
 guacd_pid=$!
 printf '%s\n' "${guacd_pid}" > /tmp/remotelink-guacd.pid
 "$@" &

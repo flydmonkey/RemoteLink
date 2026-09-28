@@ -82,10 +82,12 @@ http_server = (root / "src" / "http_server.cpp").read_text(encoding="utf-8")
 for parameter in ("enable-printing", "enable-drive", "drive-path", "RemoteLink Printer",
                   "enable-wallpaper", "enable-font-smoothing", "disable-copy", "resize-method"):
     assert parameter in http_server, f"Guacamole handshake is missing {parameter}"
-assert "download_streams" in http_server and http_server.count(
-    '{"ack", (*instruction)[1], "OK", "0"}'
-) == 2, "The gateway must ACK both print stream creation and each intercepted PDF blob"
-assert "gateway_print_blob" in http_server and "if (!gateway_print_blob)" in http_server
+assert "new Guacamole.BlobReader(stream,mimetype)" in guacamole_session
+assert 'stream.sendAck("OK",Guacamole.Status.Code.SUCCESS)' in guacamole_session
+assert 'fetch("/api/admin/prints/upload"' in guacamole_session
+assert "gateway_print_blob" not in http_server and "download_streams" not in http_server, (
+    "The WebSocket proxy must remain transparent so BlobReader is the sole owner of print ACKs"
+)
 readme_zh = (root / "README.zh-CN.md").read_text(encoding="utf-8")
 assert "无需为 Guacamole 开放 UDP 端口" in readme_zh
 assert "无需为 guacd 单独申请、安装或配置 TLS 证书" in readme_zh
@@ -104,7 +106,8 @@ assert "if (options_.redirect_printers && !options_.print_jobs_path.empty())" in
     root / "src" / "rdp_frame_source.cpp").read_text(encoding="utf-8")
 assert "&& user_identity == 0" not in (
     root / "src" / "session_manager.cpp").read_text(encoding="utf-8")
-assert "/usr/sbin/guacd -f -b 127.0.0.1" in (root / "docker" / "entrypoint.sh").read_text(encoding="utf-8")
+entrypoint = (root / "docker" / "entrypoint.sh").read_text(encoding="utf-8")
+assert "/usr/sbin/guacd -f -L" in entrypoint and "REMOTELINK_GUACD_LOG_LEVEL" in entrypoint
 assert "ctest --test-dir build --output-on-failure" in dockerfile
 if docker_workflow:
     assert "remotelink-guacd" in docker_workflow and "sbom: true" in docker_workflow

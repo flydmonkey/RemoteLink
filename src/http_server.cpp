@@ -26,7 +26,6 @@
 #include <cctype>
 #include <ctime>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 namespace remotelink {
@@ -391,6 +390,8 @@ void proxy_guacamole_websocket(int client, SSL* tls, const std::string& request,
     }
     const int backend = key.empty() ? -1 : connect_tcp(guacd_host, guacd_port);
     if (backend < 0 || !guacd_handshake(backend, destination)) {
+        std::cerr << "guacamole session " << destination.session_id
+                  << ": guacd connection or handshake failed\n";
         static constexpr char unavailable[] =
             "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
         write_client(client, tls, unavailable, sizeof(unavailable) - 1);
@@ -401,9 +402,6 @@ void proxy_guacamole_websocket(int client, SSL* tls, const std::string& request,
         if (write_client(client, tls, response.data(), response.size())) {
             const auto uuid = guac_instruction({"", destination.session_id});
             if (write_websocket_frame(client, tls, 0x1, uuid.data(), uuid.size())) {
-                std::unordered_set<std::string> download_streams;
-                struct Download { std::string name; std::string data; };
-                std::unordered_map<std::string, Download> downloads;
                 while (true) {
                     pollfd descriptors[2] {{client, POLLIN, 0}, {backend, POLLIN, 0}};
                     const auto ready = ::poll(descriptors, 2, -1);
@@ -430,76 +428,9 @@ void proxy_guacamole_websocket(int client, SSL* tls, const std::string& request,
                          * otherwise corrupt layers and produce severe visual displacement. */
                         const auto instruction = read_guac_instruction(backend);
                         if (!instruction) break;
-                        const bool gateway_print_blob = instruction->size() >= 3 &&
-                            (*instruction)[0] == "blob" &&
-                            download_streams.contains((*instruction)[1]);
-                        /* Print data is consumed and acknowledged by the gateway so guacd
-                         * never depends on browser scheduling for backpressure. Forward the
-                         * file/end notifications, but not their PDF blobs: the browser only
-                         * needs to refresh the server-side print list when the stream ends. */
-                        if (!gateway_print_blob) {
-                            const auto encoded = guac_instruction(*instruction);
-                            if (!write_websocket_frame(client, tls, 0x1,
-                                    encoded.data(), encoded.size())) break;
-                        }
-                        /* Guacd also requires an initial ACK before sending the first blob.
-                         * The Guacamole browser client does not ACK the file instruction. */
-                        if (instruction->size() >= 2 && (*instruction)[0] == "file") {
-                            download_streams.insert((*instruction)[1]);
-                            if (instruction->size() >= 4)
-                                downloads[(*instruction)[1]].name = (*instruction)[3];
-                            /* guacd waits for an initial ACK before it will deliver the
-                             * filtered PDF. Waiting for the first blob before ACKing
-                             * deadlocks print-job close: Ghostscript waits for EOF while
-                             * the RDP thread waits for the output thread. */
-                            const auto ack = guac_instruction(
-                                {"ack", (*instruction)[1], "OK", "0"});
-                            if (!write_socket(backend, ack.data(), ack.size())) break;
-                        } else if (instruction->size() >= 3 && (*instruction)[0] == "blob" &&
-                                 download_streams.contains((*instruction)[1])) {
-                            auto& download = downloads[(*instruction)[1]];
-                            const auto& encoded_blob = (*instruction)[2];
-                            if (download.data.size() < 128U * 1024U * 1024U) {
-                                std::string decoded((encoded_blob.size() * 3) / 4 + 3, '\0');
-                                const int count = EVP_DecodeBlock(
-                                    reinterpret_cast<unsigned char*>(decoded.data()),
-                                    reinterpret_cast<const unsigned char*>(encoded_blob.data()),
-                                    static_cast<int>(encoded_blob.size()));
-                                if (count >= 0) {
-                                    std::size_t size = static_cast<std::size_t>(count);
-                                    if (!encoded_blob.empty() && encoded_blob.back() == '=') --size;
-                                    if (encoded_blob.size() > 1 && encoded_blob[encoded_blob.size() - 2] == '=') --size;
-                                    download.data.append(decoded.data(), size);
-                                }
-                            }
-                            const auto ack = guac_instruction(
-                                {"ack", (*instruction)[1], "OK", "0"});
-                            if (!write_socket(backend, ack.data(), ack.size())) break;
-                        } else if (instruction->size() >= 2 && (*instruction)[0] == "end") {
-                            if (auto found = downloads.find((*instruction)[1]); found != downloads.end()) {
-                                std::time_t now = std::time(nullptr);
-                                std::tm local {};
-                                localtime_r(&now, &local);
-                                char timestamp[32] {};
-                                std::strftime(timestamp, sizeof(timestamp), "%Y-%m-%d_%H-%M-%S", &local);
-                                auto name = std::string(timestamp) + ".pdf";
-                                const char* state = std::getenv("REMOTELINK_STATE_DIR");
-                                const auto directory = std::filesystem::path(
-                                    state && *state ? state : "/var/lib/remotelink") / "users" /
-                                    std::to_string(destination.user_identity) / "print-jobs";
-                                std::error_code error; std::filesystem::create_directories(directory, error);
-                                const auto stem = std::filesystem::path(name).stem().string();
-                                auto path = directory / name;
-                                for (unsigned suffix = 1; std::filesystem::exists(path, error); ++suffix)
-                                    path = directory / (stem + " (" + std::to_string(suffix) + ").pdf");
-                                std::ofstream output(path, std::ios::binary | std::ios::trunc);
-                                output.write(found->second.data.data(),
-                                    static_cast<std::streamsize>(found->second.data.size()));
-                                output.close();
-                                downloads.erase(found);
-                            }
-                            download_streams.erase((*instruction)[1]);
-                        }
+                        const auto encoded = guac_instruction(*instruction);
+                        if (!write_websocket_frame(client, tls, 0x1,
+                                encoded.data(), encoded.size())) break;
                     }
                 }
             }

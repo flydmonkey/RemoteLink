@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 ExecStartPre=-/usr/bin/podman rm -f remotelink-guacd
 ExecStartPre=/usr/bin/install -d -o remotelink -g remotelink -m 0755 /var/lib/remotelink/users
-ExecStart=/usr/bin/podman run --rm --name remotelink-guacd --network host --user @REMOTELINK_UID@:@REMOTELINK_GID@ -e HOME=/tmp -e XDG_CONFIG_HOME=/tmp/.config -v /var/lib/remotelink/users:/users:Z --entrypoint /opt/guacamole/sbin/guacd docker.io/guacamole/guacd:1.6.0 -f -b 127.0.0.1 -l 4822
+ExecStart=/usr/bin/podman run --rm --name remotelink-guacd --network host --user @REMOTELINK_UID@:@REMOTELINK_GID@ -e HOME=/tmp -e XDG_CONFIG_HOME=/tmp/.config -v /var/lib/remotelink/users:/users:Z --entrypoint /opt/guacamole/sbin/guacd docker.io/guacamole/guacd:1.6.0 -f -L info -b 127.0.0.1 -l 4822
 ExecStop=-/usr/bin/podman stop -t 10 remotelink-guacd
 Restart=on-failure
 RestartSec=3
