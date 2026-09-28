@@ -335,7 +335,7 @@
           );
         socket.onclose = () => {
           status.textContent = "已断开";
-          append(`\n[${RemoteLinkI18n.t("连接已断开")}]\n`);
+          append(`\n${RemoteLinkI18n.t("[连接已断开]")}\n`);
         };
         socket.onerror = () => (status.textContent = "连接失败");
       }
