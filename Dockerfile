@@ -38,7 +38,7 @@ ARG GUACAMOLE_VERSION=1.6.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       autoconf automake libtool libcairo2-dev libjpeg-turbo8-dev libpng-dev \
-      freerdp2-dev libpulse-dev libwebp-dev uuid-dev \
+      freerdp2-dev libossp-uuid-dev libpulse-dev libwebp-dev uuid-dev \
     && rm -rf /var/lib/apt/lists/* \
     && git clone --branch "${GUACAMOLE_VERSION}" --depth 1 \
       https://github.com/apache/guacamole-server.git /guacamole-server \
