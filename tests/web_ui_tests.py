@@ -98,6 +98,7 @@ docker_workflow_path = root / ".github" / "workflows" / "docker-image.yml"
 docker_workflow = docker_workflow_path.read_text(encoding="utf-8") if docker_workflow_path.exists() else ""
 guacd_unit = (root / "deploy" / "remotelink-guacd.service").read_text(encoding="utf-8")
 assert "REMOTELINK_GUACD_HOST: 127.0.0.1" in compose
+assert "while (expected_size == 0 || raw_request.size() < expected_size)" in http_server
 assert "ARG GUACAMOLE_VERSION=1.6.0" in dockerfile
 assert "apache/guacamole-server.git" in dockerfile
 assert "freerdp2-dev" in dockerfile

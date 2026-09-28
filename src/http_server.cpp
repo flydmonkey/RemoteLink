@@ -662,7 +662,15 @@ void HttpServer::run() {
         char buffer[4096];
         std::size_t expected_size = 0;
         bool malformed_request = false;
-        while (raw_request.size() < 64 * 1024) {
+        // Limit the headers independently from the request body. The previous
+        // loop stopped once the combined request exceeded 64 KiB, truncating
+        // every normal chunked file upload even though bodies up to 64 MiB are
+        // explicitly accepted below.
+        while (expected_size == 0 || raw_request.size() < expected_size) {
+            if (expected_size == 0 && raw_request.size() >= 64 * 1024) {
+                malformed_request = true;
+                break;
+            }
             const auto received = receive(buffer, sizeof(buffer));
             if (received <= 0) break;
             raw_request.append(buffer, static_cast<std::size_t>(received));
