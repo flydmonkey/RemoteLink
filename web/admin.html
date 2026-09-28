@@ -1945,9 +1945,9 @@
           editingConnection = null;
           await refresh();
           await refreshUsers();
-          notice.textContent = editing
+          notice.textContent = RemoteLinkI18n.t(editing
             ? `已更新连接 ${payload.name}`
-            : `已添加连接 ${payload.name}`;
+            : `已添加连接 ${payload.name}`);
         } catch (error) {
           document.querySelector("#connection-error").textContent =
             error.message;
@@ -2097,9 +2097,9 @@
                 method: "POST",
                 body: JSON.stringify({ id: target.id }),
               });
-              button.textContent = "可连接";
+              button.textContent = RemoteLinkI18n.t("可连接");
             } catch {
-              button.textContent = "不可连接";
+              button.textContent = RemoteLinkI18n.t("不可连接");
             }
             setTimeout(() => {
               button.disabled = false;

@@ -155,6 +155,7 @@ test("editing, activity, validation, and destructive messages never mix Chinese 
     "确定清除“Windows Server”保存的 RDP 密码？清除后需要重新配置才能连接。",
     "确定删除“Windows Server”吗？该操作会同时撤销所有用户对此连接的授权。",
     "清除“test”保存的 VNC 凭据？", "远程会话已结束", "客户端断开或网络中断",
+    "可连接", "不可连接", "已更新连接 Windows Server", "已添加连接 Windows Server",
   ];
   const translated = await page.evaluate((values) => values.map((value) => RemoteLinkI18n.t(value)), sources);
   expect(translated.filter((value) => /\p{Script=Han}/u.test(value)), translated.join("\n")).toEqual([]);

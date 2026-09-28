@@ -1,5 +1,10 @@
 # RemoteLink changelog
 
+## 0.3.22
+
+- Translate RDP connection test results and connection saved notifications as complete phrases.
+- Preserve administrator-provided connection names as user data instead of translating them.
+
 ## 0.3.21
 
 - Eliminate mixed Chinese and English in RDP, VNC, and SSH editing and destructive-action flows.
