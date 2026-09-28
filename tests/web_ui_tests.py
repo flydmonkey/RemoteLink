@@ -100,6 +100,8 @@ guacd_unit = (root / "deploy" / "remotelink-guacd.service").read_text(encoding="
 assert "REMOTELINK_GUACD_HOST: 127.0.0.1" in compose
 assert "ARG GUACAMOLE_VERSION=1.6.0" in dockerfile
 assert "apache/guacamole-server.git" in dockerfile
+assert "freerdp2-dev" in dockerfile
+assert "--with-freerdp-plugin-dir=/usr/lib/x86_64-linux-gnu/freerdp2" in dockerfile
 assert "guacd libguac-client-rdp0t64" not in dockerfile
 assert "ghostscript" in dockerfile
 assert "ghostscript podman" in (

@@ -74,6 +74,7 @@ jobs:
           curl -kfsS https://127.0.0.1:18080/settings | grep -q 'Guacamole 专属'
           docker exec remotelink-smoke sh -c 'test -s /tmp/remotelink-guacd.pid && kill -0 "$(cat /tmp/remotelink-guacd.pid)"'
           docker exec remotelink-smoke guacd -v | grep -q 'version 1.6.0'
+          docker exec remotelink-smoke sh -c "ldd /opt/guacamole/lib/libguac-client-rdp.so | grep -q 'libfreerdp2.so.2'"
           docker exec remotelink-smoke sh -c 'command -v gs >/dev/null && printf "%s\n" "%!PS" "/Times-Roman findfont 18 scalefont setfont" "72 720 moveto (RemoteLink print test) show" "showpage" | gs -q -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite -sOutputFile=/tmp/print-smoke.pdf - && test -s /tmp/print-smoke.pdf && head -c 5 /tmp/print-smoke.pdf | grep -q "%PDF-"'
           docker logs remotelink-smoke
       - name: Validate Docker Hub credentials

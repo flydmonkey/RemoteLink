@@ -38,14 +38,14 @@ ARG GUACAMOLE_VERSION=1.6.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       autoconf automake libtool libcairo2-dev libjpeg-turbo8-dev libpng-dev \
-      libpulse-dev libwebp-dev uuid-dev \
+      freerdp2-dev libpulse-dev libwebp-dev uuid-dev \
     && rm -rf /var/lib/apt/lists/* \
     && git clone --branch "${GUACAMOLE_VERSION}" --depth 1 \
       https://github.com/apache/guacamole-server.git /guacamole-server \
     && cd /guacamole-server \
     && autoreconf -fi \
     && ./configure --prefix=/opt/guacamole \
-      --with-freerdp-plugin-dir=/opt/guacamole/lib/freerdp3 \
+      --with-freerdp-plugin-dir=/usr/lib/x86_64-linux-gnu/freerdp2 \
       --disable-guacenc --disable-guaclog \
       CPPFLAGS=-Wno-error=deprecated-declarations \
     && make -j"$(nproc)" \
@@ -66,6 +66,7 @@ LABEL org.opencontainers.image.title="RemoteLink" \
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl ghostscript openssl tini \
       freerdp3-dev libwinpr3-dev libopenh264-dev libopus-dev libyuv-dev \
+      libfreerdp-client2-2t64 libfreerdp2-2t64 libwinpr2-2t64 \
       libcairo2 libjpeg-turbo8 libpng16-16t64 libpulse0 libssl-dev \
       libssh2-1-dev libwebp7 libossp-uuid16 zlib1g \
     && rm -rf /var/lib/apt/lists/* \
