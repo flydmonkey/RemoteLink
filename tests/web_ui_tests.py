@@ -75,18 +75,19 @@ for source, button_id in (
 for feature in ("sessionSize", "createClipboardStream", "StringReader", "requestFullscreen", "0xFFFF",
                 "onfilesystem", "onfile", "/api/admin/files", "/api/admin/prints"):
     assert feature in guacamole_session, f"Guacamole session is missing {feature}"
-assert "sendAck(stream.index" in guacamole_session, "Guacamole input streams must be acknowledged"
-assert "sendMouseState(state,true)" in guacamole_session
-assert "state.x/scale" not in guacamole_session and "state.y/scale" not in guacamole_session
+guacamole_compact = re.sub(r"\s+", "", guacamole_session)
+assert "sendAck(stream.index" in guacamole_compact, "Guacamole input streams must be acknowledged"
+assert "sendMouseState(state,true)" in guacamole_compact
+assert "state.x/scale" not in guacamole_compact and "state.y/scale" not in guacamole_compact
 http_server = (root / "src" / "http_server.cpp").read_text(encoding="utf-8")
 for parameter in ("enable-printing", "enable-drive", "drive-path", "RemoteLink Printer",
                   "enable-wallpaper", "enable-font-smoothing", "disable-copy", "resize-method"):
     assert parameter in http_server, f"Guacamole handshake is missing {parameter}"
-assert "new Guacamole.BlobReader(stream,mimetype)" in guacamole_session
-assert 'stream.sendAck("OK",Guacamole.Status.Code.SUCCESS)' in guacamole_session
-assert 'fetch("/api/admin/prints/upload"' in guacamole_session
-assert "文件上传失败" in guacamole_session and "if(!response.ok)throw new Error" in guacamole_session
-assert '["预览",()=>downloadFile' not in guacamole_session
+assert "newGuacamole.BlobReader(stream,mimetype)" in guacamole_compact
+assert 'stream.sendAck("OK",Guacamole.Status.Code.SUCCESS)' in guacamole_compact
+assert 'fetch("/api/admin/prints/upload"' in guacamole_compact
+assert "文件上传失败" in guacamole_session and "if(!response.ok)thrownewError" in guacamole_compact
+assert '["预览",()=>downloadFile' not in guacamole_compact
 assert "actions.append(preview, download)" not in session
 assert "gateway_print_blob" not in http_server and "download_streams" not in http_server, (
     "The WebSocket proxy must remain transparent so BlobReader is the sole owner of print ACKs"

@@ -418,7 +418,7 @@
             }
             const remove = document.createElement("button"); remove.textContent = "删除";
             remove.onclick = async () => {
-              if (!confirm(`删除“${item.name}”？`)) return;
+              if (!(await RemoteLinkI18n.confirm(`删除“${item.name}”？`, { confirmText: "删除" }))) return;
               try { await fileRequest("/api/ssh/files/delete", item.path, { method: "POST" }); await loadFiles(); }
               catch (error) { fileNotice.textContent = error.message; }
             }; buttons.append(remove); row.append(nameButton, size, modified, buttons); fileItems.append(row);

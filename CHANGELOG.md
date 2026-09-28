@@ -1,5 +1,11 @@
 # RemoteLink changelog
 
+## 0.3.20
+
+- Replace native browser confirmation and prompt dialogs with localized RemoteLink-styled dialogs.
+- Use a distinct danger action for destructive operations and support keyboard and backdrop cancellation.
+- Migrate connection deletion, credential clearing, SSH trust reset, file deletion, and folder creation flows.
+
 ## 0.3.19
 
 - Translate dynamic connection errors, credential summaries, and native browser dialogs.

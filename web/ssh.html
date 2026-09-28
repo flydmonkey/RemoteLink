@@ -889,7 +889,7 @@
         editor.showModal();
       }
       async function removeConnection(item) {
-        if (!confirm(`删除“${item.name}”？`)) return;
+        if (!(await RemoteLinkI18n.confirm(`删除“${item.name}”？`, { confirmText: "删除" }))) return;
         await api("/api/admin/ssh/delete", {
           method: "POST",
           body: JSON.stringify({ id: item.id }),
@@ -899,7 +899,7 @@
       async function resetTrust(item) {
         if (
           !item.hostKeySha256 ||
-          !confirm(`重置“${item.name}”的主机指纹信任？`)
+          !(await RemoteLinkI18n.confirm(`重置“${item.name}”的主机指纹信任？`, { confirmText: "重置信任" }))
         )
           return;
         await api("/api/admin/ssh/trust/reset", {
@@ -909,7 +909,7 @@
         await refresh();
       }
       async function clearCredentials(item) {
-        if (!confirm(`清除“${item.name}”保存的登录凭据？`)) return;
+        if (!(await RemoteLinkI18n.confirm(`清除“${item.name}”保存的登录凭据？`, { confirmText: "清除凭据" }))) return;
         await api("/api/admin/ssh/credentials/clear", {
           method: "POST",
           body: JSON.stringify({ id: item.id }),

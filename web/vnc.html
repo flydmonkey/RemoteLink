@@ -1014,7 +1014,7 @@
         };
       }
       async function removeConnection(item) {
-        if (!confirm(`删除“${item.name}”？`)) return;
+        if (!(await RemoteLinkI18n.confirm(`删除“${item.name}”？`, { confirmText: "删除" }))) return;
         await api("/api/admin/vnc/delete", {
           method: "POST",
           body: JSON.stringify({ id: item.id }),
@@ -1024,7 +1024,7 @@
         await refresh();
       }
       async function clearCredentials(item) {
-        if (!confirm(`清除“${item.name}”保存的 VNC 凭据？`)) return;
+        if (!(await RemoteLinkI18n.confirm(`清除“${item.name}”保存的 VNC 凭据？`, { confirmText: "清除凭据" }))) return;
         await api("/api/admin/vnc/credentials/clear", {
           method: "POST",
           body: JSON.stringify({ id: item.id }),

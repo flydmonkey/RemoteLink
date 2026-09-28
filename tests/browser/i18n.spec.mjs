@@ -135,11 +135,12 @@ test("dynamic Telnet errors, credential state, and confirmation dialogs are loca
   await expect(page.locator("#list .muted")).toContainText("Credentials configured (not displayed)");
   await page.getByRole("button", { name: "Connect" }).click();
   await expect(page.locator("#notice")).toHaveText("Unable to connect to the Telnet target");
-  const dialogMessage = new Promise((resolve) => page.once("dialog", async (dialog) => {
-    resolve(dialog.message());
-    await dialog.dismiss();
-  }));
   await page.evaluate(() => document.querySelector("#manager").showModal());
   await page.getByRole("button", { name: "Clear credentials" }).click();
-  expect(await dialogMessage).toBe("Clear the saved sign-in credentials for “openwrt”?");
+  const dialog = page.locator(".remotelink-dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("Clear the saved sign-in credentials for “openwrt”?");
+  await expect(dialog.getByRole("button", { name: "Clear credentials" })).toHaveClass(/danger/);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
 });

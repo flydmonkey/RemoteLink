@@ -1040,10 +1040,39 @@
     }
   });
   i18nObserver.observe(document.documentElement, i18nObserverOptions);
-  for (const method of ["alert", "confirm", "prompt"]) {
-    const native = window[method]?.bind(window);
-    if (!native) continue;
-    window[method] = (message, ...args) => native(translatedValue(String(message)), ...args);
+  function openDialog(message, options = {}) {
+    return new Promise((resolve) => {
+      const dialog = document.createElement("dialog");
+      dialog.className = "remotelink-dialog";
+      dialog.innerHTML = `<form method="dialog"><header></header><p></p><input hidden><footer><button value="cancel" class="secondary"></button><button value="confirm"></button></footer></form>`;
+      const style = document.createElement("style");
+      style.textContent = `.remotelink-dialog{width:min(440px,calc(100vw - 32px));padding:0;border:1px solid #4a4a4a;border-radius:8px;color:#f5f5f5;background:#242424;box-shadow:0 24px 64px #0009}.remotelink-dialog::backdrop{background:#0009}.remotelink-dialog form{padding:24px}.remotelink-dialog header{font-size:20px;font-weight:600}.remotelink-dialog p{margin:16px 0 24px;line-height:1.6;color:#ddd;white-space:pre-wrap}.remotelink-dialog input{box-sizing:border-box;width:100%;margin:-8px 0 24px;padding:10px 12px;border:1px solid #666;border-radius:4px;color:#fff;background:#181818}.remotelink-dialog footer{display:flex;justify-content:flex-end;gap:10px}.remotelink-dialog button{min-width:88px;padding:9px 16px;border:1px solid transparent;border-radius:4px;color:#101010;background:#79bcea;font:inherit;cursor:pointer}.remotelink-dialog button.secondary{border-color:#666;color:#eee;background:#333}.remotelink-dialog button.danger{color:#fff;background:#c64b55}.remotelink-dialog button:focus-visible,.remotelink-dialog input:focus-visible{outline:2px solid #8bc9f3;outline-offset:2px}`;
+      dialog.querySelector("header").textContent = translatedValue(options.title || "确认操作");
+      dialog.querySelector("p").textContent = translatedValue(String(message));
+      const input = dialog.querySelector("input");
+      if (options.input) {
+        input.hidden = false;
+        input.value = options.value || "";
+        input.placeholder = translatedValue(options.placeholder || "请输入");
+      }
+      const cancel = dialog.querySelector('[value="cancel"]');
+      cancel.textContent = translatedValue("取消");
+      const confirm = dialog.querySelector('[value="confirm"]');
+      confirm.textContent = translatedValue(options.confirmText || "确认");
+      if (options.danger) confirm.classList.add("danger");
+      const finish = (value) => { dialog.close(); dialog.remove(); style.remove(); resolve(value); };
+      dialog.addEventListener("cancel", (event) => { event.preventDefault(); finish(options.input ? null : false); });
+      dialog.addEventListener("click", (event) => {
+        if (event.target === dialog) finish(options.input ? null : false);
+      });
+      dialog.addEventListener("close", () => {
+        if (dialog.isConnected) finish(dialog.returnValue === "confirm" ? (options.input ? input.value : true) : (options.input ? null : false));
+      });
+      document.head.append(style);
+      document.body.append(dialog);
+      dialog.showModal();
+      (options.input ? input : cancel).focus();
+    });
   }
   window.RemoteLinkI18n = {
     language,
@@ -1057,6 +1086,12 @@
     },
     hasTranslation(value, locale) {
       return hasTranslatedValue(value, locale);
+    },
+    confirm(message, options = {}) {
+      return openDialog(message, { danger: true, ...options });
+    },
+    prompt(message, options = {}) {
+      return openDialog(message, { input: true, ...options });
     },
     setLanguage(value) {
       localStorage.setItem("remotelink-language", value);
