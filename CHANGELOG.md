@@ -1,5 +1,9 @@
 # RemoteLink changelog
 
+## 0.3.13
+
+- Terminate Guacamole print-PDF data streams at the gateway so printing no longer depends on browser ACK timing and repeated jobs cannot stall behind the WebSocket.
+
 ## 0.3.12
 
 - Prevent duplicate Guacamole print-stream acknowledgements that could create an empty first PDF and block later print jobs.

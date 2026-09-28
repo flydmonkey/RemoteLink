@@ -430,15 +430,20 @@ void proxy_guacamole_websocket(int client, SSL* tls, const std::string& request,
                          * otherwise corrupt layers and produce severe visual displacement. */
                         const auto instruction = read_guac_instruction(backend);
                         if (!instruction) break;
-                        const auto encoded = guac_instruction(*instruction);
-                        if (!write_websocket_frame(client, tls, 0x1,
-                                encoded.data(), encoded.size())) break;
-                        /* Guacd requires an initial ACK before sending the first print blob.
-                         * The Guacamole browser client does not ACK the file instruction, so
-                         * send that ACK here. Each subsequent blob is ACKed by the browser's
-                         * ArrayBufferReader and must not also be ACKed here: duplicate ACKs
-                         * advance guacd's print state twice, producing an empty first PDF and
-                         * leaving the following print job blocked. */
+                        const bool gateway_print_blob = instruction->size() >= 3 &&
+                            (*instruction)[0] == "blob" &&
+                            download_streams.contains((*instruction)[1]);
+                        /* Print data is consumed and acknowledged by the gateway so guacd
+                         * never depends on browser scheduling for backpressure. Forward the
+                         * file/end notifications, but not their PDF blobs: the browser only
+                         * needs to refresh the server-side print list when the stream ends. */
+                        if (!gateway_print_blob) {
+                            const auto encoded = guac_instruction(*instruction);
+                            if (!write_websocket_frame(client, tls, 0x1,
+                                    encoded.data(), encoded.size())) break;
+                        }
+                        /* Guacd also requires an initial ACK before sending the first blob.
+                         * The Guacamole browser client does not ACK the file instruction. */
                         if (instruction->size() >= 2 && (*instruction)[0] == "file") {
                             download_streams.insert((*instruction)[1]);
                             if (instruction->size() >= 4)
@@ -467,6 +472,9 @@ void proxy_guacamole_websocket(int client, SSL* tls, const std::string& request,
                                     download.data.append(decoded.data(), size);
                                 }
                             }
+                            const auto ack = guac_instruction(
+                                {"ack", (*instruction)[1], "OK", "0"});
+                            if (!write_socket(backend, ack.data(), ack.size())) break;
                         } else if (instruction->size() >= 2 && (*instruction)[0] == "end") {
                             if (auto found = downloads.find((*instruction)[1]); found != downloads.end()) {
                                 std::time_t now = std::time(nullptr);
