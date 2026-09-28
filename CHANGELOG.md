@@ -1,5 +1,11 @@
 # RemoteLink changelog
 
+## 0.3.18
+
+- Complete the visible-copy i18n coverage across administration, settings, RDP, VNC, SSH, Telnet, and user-management modules.
+- Support parameterized translations for timestamps, automatic display dimensions, and volume status.
+- Add browser audits that prevent untranslated Chinese copy and incomplete locale coverage from regressing.
+
 ## 0.3.17
 
 - Include Telnet targets and sessions in the unified administrator status and activity views.

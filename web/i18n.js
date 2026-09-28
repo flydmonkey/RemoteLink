@@ -56,6 +56,11 @@
       全屏: "全螢幕",
       状态信息: "狀態資訊",
       "暂无活动记录。": "暫無活動記錄。",
+      账户: "帳戶",
+      无法连接网关: "無法連線閘道",
+      请选择已授权连接: "請選擇已授權連線",
+      "请确认网关服务已启动。": "請確認閘道服務已啟動。",
+      连接协议: "連線協定",
     },
     en: {
       "登录 RemoteLink": "Sign in to RemoteLink",
@@ -103,6 +108,12 @@
       全屏: "Fullscreen",
       状态信息: "Statistics",
       "暂无活动记录。": "No recent activity.",
+      账户: "Account",
+      无法连接网关: "Unable to connect to the gateway",
+      请选择已授权连接: "Select an authorized connection",
+      "请选择已授权连接。": "Select an authorized connection.",
+      "请确认网关服务已启动。": "Make sure the gateway service is running.",
+      连接协议: "Connection protocols",
       清除凭据: "Clear credentials",
       在此浏览器保存这台主机的用户名和密码:
         "Save credentials for this computer in this browser",
@@ -155,6 +166,11 @@
       全屏: "全画面",
       状态信息: "統計情報",
       "暂无活动记录。": "最近のアクティビティはありません。",
+      账户: "アカウント",
+      无法连接网关: "ゲートウェイに接続できません",
+      请选择已授权连接: "許可された接続を選択してください",
+      "请确认网关服务已启动。": "ゲートウェイサービスが起動していることを確認してください。",
+      连接协议: "接続プロトコル",
     },
     ko: {
       "登录 RemoteLink": "RemoteLink 로그인",
@@ -202,6 +218,11 @@
       全屏: "전체 화면",
       状态信息: "통계",
       "暂无活动记录。": "최근 활동이 없습니다.",
+      账户: "계정",
+      无法连接网关: "게이트웨이에 연결할 수 없습니다",
+      请选择已授权连接: "허용된 연결을 선택하세요",
+      "请确认网关服务已启动。": "게이트웨이 서비스가 실행 중인지 확인하세요.",
+      连接协议: "연결 프로토콜",
     },
   };
   Object.assign(dictionaries["zh-TW"], { 选择计算机并连接: "選擇電腦並連線" });
@@ -471,7 +492,7 @@
   });
   const sharedUi = {
     "zh-TW": {
-      管理: "管理",
+      管理: "管理設定",
       管理导航: "管理導覽",
       管理页面: "管理頁面",
       连接管理: "連線管理",
@@ -890,6 +911,41 @@
     "正在读取文件…": "파일 불러오는 중…", 此目录为空: "이 폴더는 비어 있습니다",
     "正在下载…": "다운로드 중…", "正在上传…": "업로드 중…",
   });
+  Object.assign(dictionaries.en, {
+    "更新于 {time}":"Updated at {time}","自动 · 当前设备 ({width} × {height})":"Automatic · current device ({width} × {height})","音量 {percent}% · 点击静音":"Volume {percent}% · click to mute",
+    "按名称排序":"Sort by name","按地址排序":"Sort by address","按状态排序":"Sort by status","最多保留 200 条":"Keep up to 200 entries",
+    "用户将使用账号密码登录网关。":"Users sign in to the gateway with a username and password.","添加由管理员维护的 RDP 连接。":"Add an administrator-managed RDP connection.","基本信息":"Basic information","主机名或 IP":"Hostname or IP","RDP 后端":"RDP backend","FreeRDP（现代 Windows，推荐）":"FreeRDP (modern Windows, recommended)","Guacamole（旧版 Windows 兼容）":"Guacamole (legacy Windows compatibility)","保存密码":"Save password","确认操作":"Confirm action","确认":"Confirm","连接远程桌面":"Connect to remote desktop","搜索连接":"Search connections","连接排序":"Connection sorting",
+    "视觉效果预设":"Visual effects preset","同时调整背景、动画和桌面效果":"Adjust backgrounds, animations, and desktop effects together","流畅":"Performance","平衡":"Balanced","清晰":"Quality","自定义":"Custom","桌面背景":"Desktop background","显示远程桌面壁纸":"Show remote desktop wallpaper","字体平滑":"Font smoothing","改善文字边缘显示":"Improve text edge rendering","完整窗口拖动":"Full window drag","拖动窗口时显示窗口内容":"Show window contents while dragging","菜单与窗口动画":"Menu and window animations","启用远程 Windows 动画效果":"Enable remote Windows animations","桌面组合与主题":"Desktop composition and themes","启用桌面组合视觉效果":"Enable desktop composition effects","FreeRDP 专属":"FreeRDP only","最大帧率":"Maximum frame rate","限制网关向浏览器发送画面的帧率":"Limit the frame rate sent from the gateway to the browser","FreeRDP 浏览器视频固定使用经过验证的 OpenH264 软件编码器。":"FreeRDP browser video always uses the verified OpenH264 software encoder.","Guacamole 专属":"Guacamole only","图像格式偏好":"Preferred image format","选择 Guacamole 优先使用的图像格式":"Select the image format Guacamole should prefer","WebP 优先":"Prefer WebP","PNG 优先":"Prefer PNG","JPEG 优先":"Prefer JPEG","显示 DPI":"Display DPI","调整远程界面和文字缩放":"Adjust remote UI and text scaling","窗口调整方式":"Window resize mode","浏览器尺寸改变时如何处理远程桌面":"How to handle the remote desktop when the browser size changes","动态调整远程分辨率":"Dynamically resize remote resolution","重新连接并调整":"Reconnect and resize","固定分辨率，仅缩放":"Fixed resolution, scale only","将 Gateway Files 映射到远程 Windows":"Map Gateway Files to remote Windows","允许本机与远程 Windows 交换文本":"Allow text exchange with remote Windows",
+    "主题：系统":"Theme: system","信令断开，正在恢复…":"Signaling disconnected. Reconnecting…","选择远程主机":"Select a remote host","选择一台可用的 Windows 主机开始远程会话。":"Select an available Windows host to start a remote session.","粘贴文本":"Paste text","下载打印文件":"Download print file","远程 Ctrl+Alt+Delete":"Remote Ctrl+Alt+Delete","远程桌面：H.264 / WebRTC。点击画面后可使用键盘、鼠标和滚轮。":"Remote desktop: H.264 / WebRTC. Click the display to use the keyboard, mouse, and wheel.","等待视频轨道…":"Waiting for video track…","连接状态":"Connection status","浏览器接收端与网关实时指标":"Live browser receiver and gateway metrics","解码帧率":"Decode frame rate","接收码率":"Receive bitrate","网络往返":"Network round trip","视频":"Video","等待轨道":"Waiting for track","分辨率":"Resolution","编解码器":"Codec","已解码帧":"Decoded frames","浏览器丢帧":"Browser dropped frames","网络":"Network","等待连接":"Waiting for connection","接收包":"Packets received","丢包":"Packet loss","抖动":"Jitter","传输协议":"Transport protocol","音频轨道":"Audio track","未提供":"Not available","播放状态":"Playback status","无声音":"No audio","网关":"Gateway","服务":"Service","等待会话":"Waiting for session","捕获帧":"Captured frames","编码帧":"Encoded frames","管线丢帧":"Pipeline dropped frames","累计发送":"Total sent","RDPGFX Progressive · H.264 视频 · Opus 音频 · RDPDR 打印机":"RDPGFX Progressive · H.264 video · Opus audio · RDPDR printer","打印任务":"Print jobs","文件保留 24 小时，最多保留 100 个":"Files are retained for 24 hours, up to 100 files","全部删除":"Delete all","暂无打印文件":"No print files","删除所选":"Delete selected","上级":"Up","新建文件夹":"New folder","上传文件":"Upload file","暂无文件":"No files","打印完成":"Print complete","PDF 已生成，可在打印任务中下载。":"The PDF is ready and can be downloaded from Print jobs.","粘贴到远程 Windows":"Paste into remote Windows","文本（最多 4096 个字符）":"Text (up to 4096 characters)","请输入":"Enter text","确定":"OK","文件已存在":"File already exists","保留两者":"Keep both","覆盖":"Overwrite","当前系统主题，点击切换":"Current system theme; click to switch","进入全屏":"Enter full screen","静音":"Mute","打开远程安全界面":"Open remote security screen","关闭状态信息":"Close status information","关闭打印任务":"Close print jobs","关闭文件管理":"Close file manager",
+    "尚未分配 VNC 设备":"No VNC devices assigned","添加 VNC 连接":"Add VNC connection","CA 证书":"CA certificate","只读":"View only","返回 VNC 连接":"Back to VNC connections","请选择 SSH 设备":"Select an SSH device","添加 SSH 连接":"Add SSH connection","SSH 私钥":"SSH private key","返回 SSH 连接":"Back to SSH connections","已断开":"Disconnected","连接已断开":"Connection closed","密码（可选）":"Password (optional)","返回 Telnet 连接":"Back to Telnet connections","管理账号并统一配置 RDP、VNC、SSH 和 Telnet 连接授权。":"Manage accounts and centrally configure access to RDP, VNC, SSH, and Telnet connections.","尚无用户。":"No users yet.","暂无 SSH 连接":"No SSH connections","暂无 Telnet 连接":"No Telnet connections"
+  });
+  // Locales retain their native translations where available and fall back to
+  // English for newly introduced copy, so no interface ever leaks source Chinese.
+  for (const locale of ["zh-TW", "ja", "ko"])
+    for (const [source, fallback] of Object.entries(dictionaries.en))
+      if (!Object.prototype.hasOwnProperty.call(dictionaries[locale], source))
+        dictionaries[locale][source] = fallback;
+  const templates = [
+    [/^更新于 (.+)$/, "更新于 {time}", ["time"]],
+    [/^自动 · 当前设备 \((\d+) × (\d+)\)$/, "自动 · 当前设备 ({width} × {height})", ["width", "height"]],
+    [/^音量 (\d+)% · 点击静音$/, "音量 {percent}% · 点击静音", ["percent"]],
+  ];
+  function translatedValue(value, locale = language) {
+    const dict = dictionaries[locale] || {};
+    if (dict[value]) return dict[value];
+    for (const [pattern, key, names] of templates) {
+      const match = value.match(pattern);
+      if (!match || !dict[key]) continue;
+      return names.reduce((result, name, index) =>
+        result.replace(`{${name}}`, match[index + 1]), dict[key]);
+    }
+    return value;
+  }
+  function hasTranslatedValue(value, locale) {
+    if (Object.prototype.hasOwnProperty.call(dictionaries[locale] || {}, value)) return true;
+    return templates.some(([pattern, key]) => pattern.test(value) &&
+      Object.prototype.hasOwnProperty.call(dictionaries[locale] || {}, key));
+  }
   function systemLanguage() {
     const raw = navigator.languages?.[0] || navigator.language || "zh-CN";
     if (
@@ -941,7 +997,7 @@
       if (node.parentElement?.closest("script,style")) continue;
       const raw = node.nodeValue,
         trimmed = raw.trim(),
-        translated = dict[trimmed];
+        translated = translatedValue(trimmed);
       if (translated) node.nodeValue = raw.replace(trimmed, translated);
     }
     for (const element of target.querySelectorAll?.(
@@ -949,7 +1005,7 @@
     ) || []) {
       for (const attribute of ["title", "aria-label", "placeholder"]) {
         const value = element.getAttribute(attribute);
-        if (value && dict[value]) element.setAttribute(attribute, dict[value]);
+        if (value) element.setAttribute(attribute, translatedValue(value));
       }
     }
   }
@@ -979,7 +1035,13 @@
     preference,
     supported,
     t(value) {
-      return dictionaries[language]?.[value] || value;
+      return translatedValue(value);
+    },
+    translation(value, locale) {
+      return translatedValue(value, locale);
+    },
+    hasTranslation(value, locale) {
+      return hasTranslatedValue(value, locale);
     },
     setLanguage(value) {
       localStorage.setItem("remotelink-language", value);
