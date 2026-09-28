@@ -1601,13 +1601,13 @@
           );
           const type = document.createElement("div");
           type.className = `event-type ${item.type}`;
-          type.textContent = labels[item.type] || item.type;
+          type.textContent = RemoteLinkI18n.t(labels[item.type] || item.type);
           const peer = document.createElement("div");
           peer.className = "event-peer";
           peer.textContent = `${item.protocol || "RDP"} · ${item.targetName || item.targetId || "—"}${item.username ? ` · ${item.username}` : ""}`;
           const message = document.createElement("div");
           message.className = "event-message";
-          message.textContent = `${item.host || item.targetId || "—"} · ${stateLabels[item.message] || item.message}${item.reason ? ` · ${item.reason}` : ""}`;
+          message.textContent = `${item.host || item.targetId || "—"} · ${RemoteLinkI18n.t(stateLabels[item.message] || item.message)}${item.reason ? ` · ${RemoteLinkI18n.t(item.reason)}` : ""}`;
           row.append(time, type, peer, message);
           eventList.append(row);
         }

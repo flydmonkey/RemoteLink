@@ -1,5 +1,12 @@
 # RemoteLink changelog
 
+## 0.3.21
+
+- Eliminate mixed Chinese and English in RDP, VNC, and SSH editing and destructive-action flows.
+- Localize persisted activity messages and disconnect reasons as complete phrases.
+- Replace native localized validation bubbles with RemoteLink inline validation feedback.
+- Isolate shared dialog layout from page-specific dialog CSS.
+
 ## 0.3.20
 
 - Replace native browser confirmation and prompt dialogs with localized RemoteLink-styled dialogs.

@@ -912,6 +912,9 @@
     "正在下载…": "다운로드 중…", "正在上传…": "업로드 중…",
   });
   Object.assign(dictionaries.en, {
+    "编辑连接":"Edit connection","保存修改":"Save changes","删除连接":"Delete connection","清除凭据":"Clear credentials","凭据已配置（不回显）。密码留空将保留当前密码。":"Credentials configured (not displayed). Leave the password blank to keep the current password.","凭据已配置（不回显）；留空将保留当前凭据。":"Credentials configured (not displayed). Leave blank to keep the current credentials.","已配置密码；留空将保留现有密码。":"Password configured. Leave blank to keep the current password.","已托管 CA 证书；不选择新文件将保留现有证书。":"CA certificate configured. Leave the file empty to keep the current certificate.","请先填写有效的主机和端口。":"Enter a valid host and port first.","连接和身份验证成功。":"Connection and authentication succeeded.","请检查密码或 TLS 配置。":"Check the password or TLS configuration.","保存失败：":"Save failed:","无法读取连接：":"Unable to load connections:",
+    "会话创建":"Session created","状态变化":"Status changed","连接拒绝":"Connection rejected","管理操作":"Administrative action","远程会话已创建":"Remote session created","远程会话已结束":"Remote session ended","客户端断开或网络中断":"Client disconnected or network interrupted","已连接":"Connected","空闲":"Idle","未配置用户名":"Username not configured","未配置密码":"Password not configured","用户：":"User:",
+    "确定清除“{name}”保存的 RDP 密码？清除后需要重新配置才能连接。":"Clear the saved RDP password for “{name}”? You must configure it again before connecting.","确定删除“{name}”吗？该操作会同时撤销所有用户对此连接的授权。":"Delete “{name}”? This also revokes every user's access to this connection.","清除“{name}”保存的 VNC 凭据？":"Clear the saved VNC credentials for “{name}”?","重置“{name}”的主机指纹信任？":"Reset trusted host fingerprint for “{name}”?","请填写此字段。":"Please fill out this field.",
     "正在重试":"Retrying","已停止":"Stopped","占用":"In use","帧":"frames","断开会话":"Disconnect session","会话结束":"Session ended","请先断开当前会话":"Disconnect the current session first","已授权：":"Authorized:","无":"None","访问令牌已失效，请重新输入":"The access token has expired. Enter it again.","重试":"Retry","不可用":"Unavailable","断开远程会话":"Disconnect remote session","正在断开":"Disconnecting","断开失败：":"Disconnect failed:","测试":"Test","测试中…":"Testing…","会话已结束":"Session ended",
     "可控制":"Controllable","控制":"Control","正在验证 VNC 协议和身份信息…":"Validating VNC protocol and credentials…","验证失败：":"Validation failed:","测试失败：":"Test failed:","开":"On","关":"Off","VNC 身份验证失败":"VNC authentication failed","重置信任":"Reset trust","断开":"Disconnect","会话已失效":"Session expired","授权":"Authorization","打印说明":"Printing information","远程打印":"Remote printing","远程桌面":"Remote desktop","重连":"Reconnect","打开":"Open","文件夹 · 点击进入":"Folder · click to open","不支持的打印格式":"Unsupported print format","打印失败：guacd 未生成 PDF 数据":"Printing failed: guacd produced no PDF data","预览":"Preview","正在等待远程画面…":"Waiting for remote display…","播放中":"Playing","页面错误：":"Page error:",
     "无法连接 Telnet 目标":"Unable to connect to the Telnet target","无法连接 SSH 目标":"Unable to connect to the SSH target",
@@ -935,6 +938,10 @@
     [/^音量 (\d+)% · 点击静音$/, "音量 {percent}% · 点击静音", ["percent"]],
     [/^清除“(.+)”保存的登录凭据？$/, "清除“{name}”保存的登录凭据？", ["name"]],
     [/^删除“(.+)”？$/, "删除“{name}”？", ["name"]],
+    [/^确定清除“(.+)”保存的 RDP 密码？清除后需要重新配置才能连接。$/, "确定清除“{name}”保存的 RDP 密码？清除后需要重新配置才能连接。", ["name"]],
+    [/^确定删除“(.+)”吗？该操作会同时撤销所有用户对此连接的授权。$/, "确定删除“{name}”吗？该操作会同时撤销所有用户对此连接的授权。", ["name"]],
+    [/^清除“(.+)”保存的 VNC 凭据？$/, "清除“{name}”保存的 VNC 凭据？", ["name"]],
+    [/^重置“(.+)”的主机指纹信任？$/, "重置“{name}”的主机指纹信任？", ["name"]],
   ];
   function translatedValue(value, locale = language) {
     const dict = dictionaries[locale] || {};
@@ -1040,13 +1047,35 @@
     }
   });
   i18nObserver.observe(document.documentElement, i18nObserverOptions);
+  document.addEventListener("invalid", (event) => {
+    const field = event.target;
+    if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) return;
+    event.preventDefault();
+    field.setAttribute("aria-invalid", "true");
+    field.focus();
+    let error = field.parentElement?.querySelector(":scope > .remotelink-field-error");
+    if (!error) {
+      error = document.createElement("div");
+      error.className = "remotelink-field-error";
+      error.setAttribute("role", "alert");
+      error.style.cssText = "margin-top:6px;color:#f0a0a8;font-size:13px";
+      field.insertAdjacentElement("afterend", error);
+    }
+    error.textContent = translatedValue("请填写此字段。");
+  }, true);
+  document.addEventListener("input", (event) => {
+    const field = event.target;
+    if (!(field instanceof Element)) return;
+    field.removeAttribute("aria-invalid");
+    field.parentElement?.querySelector(":scope > .remotelink-field-error")?.remove();
+  }, true);
   function openDialog(message, options = {}) {
     return new Promise((resolve) => {
       const dialog = document.createElement("dialog");
       dialog.className = "remotelink-dialog";
       dialog.innerHTML = `<form method="dialog"><header></header><p></p><input hidden><footer><button value="cancel" class="secondary"></button><button value="confirm"></button></footer></form>`;
       const style = document.createElement("style");
-      style.textContent = `.remotelink-dialog{width:min(440px,calc(100vw - 32px));padding:0;border:1px solid #4a4a4a;border-radius:8px;color:#f5f5f5;background:#242424;box-shadow:0 24px 64px #0009}.remotelink-dialog::backdrop{background:#0009}.remotelink-dialog form{padding:24px}.remotelink-dialog header{font-size:20px;font-weight:600}.remotelink-dialog p{margin:16px 0 24px;line-height:1.6;color:#ddd;white-space:pre-wrap}.remotelink-dialog input{box-sizing:border-box;width:100%;margin:-8px 0 24px;padding:10px 12px;border:1px solid #666;border-radius:4px;color:#fff;background:#181818}.remotelink-dialog footer{display:flex;justify-content:flex-end;gap:10px}.remotelink-dialog button{min-width:88px;padding:9px 16px;border:1px solid transparent;border-radius:4px;color:#101010;background:#79bcea;font:inherit;cursor:pointer}.remotelink-dialog button.secondary{border-color:#666;color:#eee;background:#333}.remotelink-dialog button.danger{color:#fff;background:#c64b55}.remotelink-dialog button:focus-visible,.remotelink-dialog input:focus-visible{outline:2px solid #8bc9f3;outline-offset:2px}`;
+      style.textContent = `.remotelink-dialog{width:min(440px,calc(100vw - 32px));padding:0;border:1px solid #4a4a4a;border-radius:8px;color:#f5f5f5;background:#242424;box-shadow:0 24px 64px #0009}.remotelink-dialog::backdrop{background:#0009}.remotelink-dialog form{display:block!important;padding:24px!important}.remotelink-dialog header{display:block!important;font-size:20px;font-weight:600}.remotelink-dialog p{display:block!important;margin:16px 0 24px!important;line-height:1.6;color:#ddd;white-space:pre-wrap}.remotelink-dialog input{box-sizing:border-box;width:100%;margin:-8px 0 24px;padding:10px 12px;border:1px solid #666;border-radius:4px;color:#fff;background:#181818}.remotelink-dialog footer{display:flex!important;justify-content:flex-end!important;gap:10px!important}.remotelink-dialog button{width:auto!important;min-width:88px;padding:9px 16px;border:1px solid transparent;border-radius:4px;color:#101010;background:#79bcea;font:inherit;cursor:pointer}.remotelink-dialog button.secondary{border-color:#666;color:#eee;background:#333}.remotelink-dialog button.danger{color:#fff;background:#c64b55}.remotelink-dialog button:focus-visible,.remotelink-dialog input:focus-visible{outline:2px solid #8bc9f3;outline-offset:2px}`;
       dialog.querySelector("header").textContent = translatedValue(options.title || "确认操作");
       dialog.querySelector("p").textContent = translatedValue(String(message));
       const input = dialog.querySelector("input");

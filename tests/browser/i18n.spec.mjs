@@ -144,3 +144,29 @@ test("dynamic Telnet errors, credential state, and confirmation dialogs are loca
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);
 });
+
+test("editing, activity, validation, and destructive messages never mix Chinese into English", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("remotelink-language", "en"));
+  await page.goto("/admin.html");
+  const sources = [
+    "编辑连接", "保存修改",
+    "凭据已配置（不回显）。密码留空将保留当前密码。",
+    "凭据已配置（不回显）；留空将保留当前凭据。",
+    "确定清除“Windows Server”保存的 RDP 密码？清除后需要重新配置才能连接。",
+    "确定删除“Windows Server”吗？该操作会同时撤销所有用户对此连接的授权。",
+    "清除“test”保存的 VNC 凭据？", "远程会话已结束", "客户端断开或网络中断",
+  ];
+  const translated = await page.evaluate((values) => values.map((value) => RemoteLinkI18n.t(value)), sources);
+  expect(translated.filter((value) => /\p{Script=Han}/u.test(value)), translated.join("\n")).toEqual([]);
+
+  const validation = await page.evaluate(() => {
+    const form = document.createElement("form");
+    const input = document.createElement("input");
+    input.required = true;
+    form.append(input);
+    document.body.append(form);
+    form.reportValidity();
+    return document.querySelector(".remotelink-field-error")?.textContent;
+  });
+  expect(validation).toBe("Please fill out this field.");
+});
