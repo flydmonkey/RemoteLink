@@ -1,5 +1,12 @@
 # RemoteLink changelog
 
+## 0.3.15
+
+- Bundle guacd 1.3.0 as the default Guacamole RDP backend for better compatibility with legacy Windows applications.
+- Keep the native RemoteLink RDP backend on the unmodified system FreeRDP 3.31.0 stack for modern Windows hosts.
+- Accept large file-upload request bodies and remove file preview actions that browsers handled as downloads.
+- Document Guacamole printing of blank PDFs as a known legacy-backend limitation.
+
 ## 0.3.14
 
 - Use Guacamole's standard `BlobReader` print flow: acknowledge stream creation once, acknowledge each PDF block once, and upload the completed PDF through RemoteLink's authenticated per-user print endpoint.

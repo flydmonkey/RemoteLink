@@ -34,7 +34,7 @@ RUN bash ./scripts/copy-novnc-core.sh \
 
 FROM builder AS guacd-builder
 
-ARG GUACAMOLE_VERSION=1.6.0
+ARG GUACAMOLE_VERSION=1.3.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       autoconf automake libtool libcairo2-dev libjpeg-turbo8-dev libpng-dev \

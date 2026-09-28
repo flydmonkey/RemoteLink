@@ -101,7 +101,7 @@ docker_workflow = docker_workflow_path.read_text(encoding="utf-8") if docker_wor
 guacd_unit = (root / "deploy" / "remotelink-guacd.service").read_text(encoding="utf-8")
 assert "REMOTELINK_GUACD_HOST: 127.0.0.1" in compose
 assert "while (expected_size == 0 || raw_request.size() < expected_size)" in http_server
-assert "ARG GUACAMOLE_VERSION=1.6.0" in dockerfile
+assert "ARG GUACAMOLE_VERSION=1.3.0" in dockerfile
 assert "apache/guacamole-server.git" in dockerfile
 assert "freerdp2-dev" in dockerfile
 assert "--with-freerdp-plugin-dir=/usr/lib/x86_64-linux-gnu/freerdp2" in dockerfile
@@ -119,7 +119,7 @@ assert "/usr/sbin/guacd -f -L" in entrypoint and "REMOTELINK_GUACD_LOG_LEVEL" in
 assert "ctest --test-dir build --output-on-failure" in dockerfile
 if docker_workflow:
     assert "remotelink-guacd" in docker_workflow and "sbom: true" in docker_workflow
-    assert "guacd -v | grep -q 'version 1.6.0'" in docker_workflow
+    assert "guacd -v | grep -q 'version 1.3.0'" in docker_workflow
 assert "@REMOTELINK_UID@:@REMOTELINK_GID@" in guacd_unit
 for page in localized_pages:
     source = page.read_text(encoding="utf-8")

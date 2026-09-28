@@ -48,7 +48,7 @@ export REMOTELINK_ADMIN_PASSWORD='replace-with-a-strong-password'
 docker compose up -d
 ```
 
-The official RemoteLink image includes guacd. Its entrypoint starts `remotelink` and `guacd` as separate supervised processes and terminates the container if either process fails, allowing the Docker restart policy to recover both. guacd listens only on `127.0.0.1:4822` inside the container and publishes no host port, so both the single-container `docker run` command and Compose support the Guacamole backend.
+The official RemoteLink image includes guacd 1.3.0. Its entrypoint starts `remotelink` and `guacd` as separate supervised processes and terminates the container if either process fails, allowing the Docker restart policy to recover both. guacd listens only on `127.0.0.1:4822` inside the container and publishes no host port, so both the single-container `docker run` command and Compose support the Guacamole backend. Printing is available, but blank PDFs are a known limitation of this legacy backend on some Windows applications.
 
 A browser on the Docker host can open the published TCP port directly. A browser
 on another machine cannot use the container bridge address. Set

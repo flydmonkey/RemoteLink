@@ -47,7 +47,7 @@ export REMOTELINK_ADMIN_PASSWORD='请替换为安全密码'
 docker compose up -d
 ```
 
-官方 RemoteLink 镜像已经包含 guacd。容器入口会分别启动 `remotelink` 和 `guacd` 两个进程，并在任一进程异常退出时结束容器，由 Docker 的重启策略统一恢复。guacd 仅监听容器内的 `127.0.0.1:4822`，不会发布宿主机端口；因此单容器 `docker run` 和 Compose 都能直接使用 Guacamole 后端。
+官方 RemoteLink 镜像已经包含 guacd 1.3.0。容器入口会分别启动 `remotelink` 和 `guacd` 两个进程，并在任一进程异常退出时结束容器，由 Docker 的重启策略统一恢复。guacd 仅监听容器内的 `127.0.0.1:4822`，不会发布宿主机端口；因此单容器 `docker run` 和 Compose 都能直接使用 Guacamole 后端。打印功能仍然保留，但旧后端在部分 Windows 应用中生成空白 PDF 是已知限制。
 
 浏览器和 Docker 在同一台机器上时，打开已发布的 TCP 端口即可。另一台机器上的浏览器
 无法访问容器网桥地址，需要把 `REMOTELINK_ICE_ADVERTISED_ADDRESS` 设成浏览器能够
