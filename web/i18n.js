@@ -912,6 +912,10 @@
     "正在下载…": "다운로드 중…", "正在上传…": "업로드 중…",
   });
   Object.assign(dictionaries.en, {
+    "正在重试":"Retrying","已停止":"Stopped","占用":"In use","帧":"frames","断开会话":"Disconnect session","会话结束":"Session ended","请先断开当前会话":"Disconnect the current session first","已授权：":"Authorized:","无":"None","访问令牌已失效，请重新输入":"The access token has expired. Enter it again.","重试":"Retry","不可用":"Unavailable","断开远程会话":"Disconnect remote session","正在断开":"Disconnecting","断开失败：":"Disconnect failed:","测试":"Test","测试中…":"Testing…","会话已结束":"Session ended",
+    "可控制":"Controllable","控制":"Control","正在验证 VNC 协议和身份信息…":"Validating VNC protocol and credentials…","验证失败：":"Validation failed:","测试失败：":"Test failed:","开":"On","关":"Off","VNC 身份验证失败":"VNC authentication failed","重置信任":"Reset trust","断开":"Disconnect","会话已失效":"Session expired","授权":"Authorization","打印说明":"Printing information","远程打印":"Remote printing","远程桌面":"Remote desktop","重连":"Reconnect","打开":"Open","文件夹 · 点击进入":"Folder · click to open","不支持的打印格式":"Unsupported print format","打印失败：guacd 未生成 PDF 数据":"Printing failed: guacd produced no PDF data","预览":"Preview","正在等待远程画面…":"Waiting for remote display…","播放中":"Playing","页面错误：":"Page error:",
+    "无法连接 Telnet 目标":"Unable to connect to the Telnet target","无法连接 SSH 目标":"Unable to connect to the SSH target",
+    "清除“{name}”保存的登录凭据？":"Clear the saved sign-in credentials for “{name}”?","删除“{name}”？":"Delete “{name}”?",
     "更新于 {time}":"Updated at {time}","自动 · 当前设备 ({width} × {height})":"Automatic · current device ({width} × {height})","音量 {percent}% · 点击静音":"Volume {percent}% · click to mute",
     "按名称排序":"Sort by name","按地址排序":"Sort by address","按状态排序":"Sort by status","最多保留 200 条":"Keep up to 200 entries",
     "用户将使用账号密码登录网关。":"Users sign in to the gateway with a username and password.","添加由管理员维护的 RDP 连接。":"Add an administrator-managed RDP connection.","基本信息":"Basic information","主机名或 IP":"Hostname or IP","RDP 后端":"RDP backend","FreeRDP（现代 Windows，推荐）":"FreeRDP (modern Windows, recommended)","Guacamole（旧版 Windows 兼容）":"Guacamole (legacy Windows compatibility)","保存密码":"Save password","确认操作":"Confirm action","确认":"Confirm","连接远程桌面":"Connect to remote desktop","搜索连接":"Search connections","连接排序":"Connection sorting",
@@ -929,6 +933,8 @@
     [/^更新于 (.+)$/, "更新于 {time}", ["time"]],
     [/^自动 · 当前设备 \((\d+) × (\d+)\)$/, "自动 · 当前设备 ({width} × {height})", ["width", "height"]],
     [/^音量 (\d+)% · 点击静音$/, "音量 {percent}% · 点击静音", ["percent"]],
+    [/^清除“(.+)”保存的登录凭据？$/, "清除“{name}”保存的登录凭据？", ["name"]],
+    [/^删除“(.+)”？$/, "删除“{name}”？", ["name"]],
   ];
   function translatedValue(value, locale = language) {
     const dict = dictionaries[locale] || {};
@@ -939,7 +945,11 @@
       return names.reduce((result, name, index) =>
         result.replace(`{${name}}`, match[index + 1]), dict[key]);
     }
-    return value;
+    let compound = value;
+    for (const source of Object.keys(dict).sort((a, b) => b.length - a.length))
+      if (/\p{Script=Han}/u.test(source) && compound.includes(source))
+        compound = compound.replaceAll(source, dict[source]);
+    return compound;
   }
   function hasTranslatedValue(value, locale) {
     if (Object.prototype.hasOwnProperty.call(dictionaries[locale] || {}, value)) return true;
@@ -1030,6 +1040,11 @@
     }
   });
   i18nObserver.observe(document.documentElement, i18nObserverOptions);
+  for (const method of ["alert", "confirm", "prompt"]) {
+    const native = window[method]?.bind(window);
+    if (!native) continue;
+    window[method] = (message, ...args) => native(translatedValue(String(message)), ...args);
+  }
   window.RemoteLinkI18n = {
     language,
     preference,

@@ -1,5 +1,11 @@
 # RemoteLink changelog
 
+## 0.3.19
+
+- Translate dynamic connection errors, credential summaries, and native browser dialogs.
+- Translate embedded status fragments used by administration, VNC, Telnet, and Guacamole interaction branches.
+- Extend i18n regression coverage to source literals and interactive Telnet failure flows.
+
 ## 0.3.18
 
 - Complete the visible-copy i18n coverage across administration, settings, RDP, VNC, SSH, Telnet, and user-management modules.
