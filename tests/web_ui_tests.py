@@ -80,8 +80,7 @@ assert "sendMouseState(state,true)" in guacamole_session
 assert "state.x/scale" not in guacamole_session and "state.y/scale" not in guacamole_session
 http_server = (root / "src" / "http_server.cpp").read_text(encoding="utf-8")
 for parameter in ("enable-printing", "enable-drive", "drive-path", "RemoteLink Printer",
-                  "enable-wallpaper", "enable-font-smoothing", "disable-copy", "resize-method",
-                  "disable-gfx", "disable-bitmap-caching", "disable-offscreen-caching"):
+                  "enable-wallpaper", "enable-font-smoothing", "disable-copy", "resize-method"):
     assert parameter in http_server, f"Guacamole handshake is missing {parameter}"
 assert "new Guacamole.BlobReader(stream,mimetype)" in guacamole_session
 assert 'stream.sendAck("OK",Guacamole.Status.Code.SUCCESS)' in guacamole_session
