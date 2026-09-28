@@ -43,31 +43,69 @@ int connect_loopback(std::uint16_t port) {
 }  // namespace
 
 int main() {
-    std::uint16_t upstream_port = 0;
-    const int listener = listen_loopback(upstream_port);
-    const std::array<unsigned char, 5> payload{'A', 255, 251, 1, 'B'};
-    std::jthread upstream([&] {
-        const int client = accept(listener, nullptr, nullptr);
-        require(client >= 0);
-        require(send(client, payload.data(), payload.size(), 0) ==
-                static_cast<ssize_t>(payload.size()));
-        close(client);
-    });
+    {
+        std::uint16_t upstream_port = 0;
+        const int listener = listen_loopback(upstream_port);
+        const std::array<unsigned char, 5> payload{'A', 255, 251, 1, 'B'};
+        std::jthread upstream([&] {
+            const int client = accept(listener, nullptr, nullptr);
+            require(client >= 0);
+            require(send(client, payload.data(), payload.size(), 0) ==
+                    static_cast<ssize_t>(payload.size()));
+            close(client);
+        });
 
-    std::string error;
-    auto bridge = remotelink::TerminalBridge::create({
-        .hostname = "127.0.0.1",
-        .port = upstream_port,
-        .protocol = remotelink::TerminalProtocol::raw_tcp,
-    }, error);
-    require(bridge && error.empty());
+        std::string error;
+        auto bridge = remotelink::TerminalBridge::create({
+            .hostname = "127.0.0.1",
+            .port = upstream_port,
+            .protocol = remotelink::TerminalProtocol::raw_tcp,
+        }, error);
+        require(bridge && error.empty());
 
-    const int browser = connect_loopback(bridge->port());
-    std::array<unsigned char, 5> received{};
-    require(recv(browser, received.data(), received.size(), MSG_WAITALL) ==
-            static_cast<ssize_t>(received.size()));
-    require(received == payload);
-    close(browser);
-    bridge->stop();
-    close(listener);
+        const int browser = connect_loopback(bridge->port());
+        std::array<unsigned char, 5> received{};
+        require(recv(browser, received.data(), received.size(), MSG_WAITALL) ==
+                static_cast<ssize_t>(received.size()));
+        require(received == payload);
+        close(browser);
+        bridge->stop();
+        close(listener);
+    }
+
+    {
+        std::uint16_t upstream_port = 0;
+        const int listener = listen_loopback(upstream_port);
+        const std::array<unsigned char, 5> negotiation{'A', 255, 251, 1, 'B'};
+        std::jthread upstream([&] {
+            const int client = accept(listener, nullptr, nullptr);
+            require(client >= 0);
+            require(send(client, negotiation.data(), negotiation.size(), 0) ==
+                    static_cast<ssize_t>(negotiation.size()));
+            std::array<unsigned char, 3> response{};
+            require(recv(client, response.data(), response.size(), MSG_WAITALL) ==
+                    static_cast<ssize_t>(response.size()));
+            const std::array<unsigned char, 3> expected{255, 253, 1};
+            require(response == expected);
+            close(client);
+        });
+
+        std::string error;
+        auto bridge = remotelink::TerminalBridge::create({
+            .hostname = "127.0.0.1",
+            .port = upstream_port,
+            .protocol = remotelink::TerminalProtocol::telnet,
+        }, error);
+        require(bridge && error.empty());
+
+        const int browser = connect_loopback(bridge->port());
+        std::array<unsigned char, 2> received{};
+        require(recv(browser, received.data(), received.size(), MSG_WAITALL) ==
+                static_cast<ssize_t>(received.size()));
+        const std::array<unsigned char, 2> expected{'A', 'B'};
+        require(received == expected);
+        close(browser);
+        bridge->stop();
+        close(listener);
+    }
 }
