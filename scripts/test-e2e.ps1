@@ -13,7 +13,7 @@ if (-not $composeStarted) {
   wsl.exe bash -lc 'podman info >/dev/null 2>&1'
   if ($LASTEXITCODE -ne 0) { throw 'Unable to start RDP/VNC/SSH test stack with Docker Compose or Podman' }
   $usePodman = $true
-  $podmanAddress = ((wsl.exe bash -lc "hostname -I | awk '{print `$1}'").Trim())
+  $podmanAddress = ((wsl.exe bash -lc "hostname -I | cut -d ' ' -f1").Trim())
   if (-not $podmanAddress) { throw 'Unable to resolve the WSL test address' }
   $containers = @(
     @{ Name = 'remotelink-rdp-test'; Args = "-p ${podmanAddress}:13389:3389 docker.io/danielguerra/ubuntu-xrdp:latest" },

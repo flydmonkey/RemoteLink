@@ -1,6 +1,6 @@
 # RemoteLink project handoff
 
-Last updated: 2026-09-26
+Last updated: 2026-09-29
 
 This document is the starting point for the next maintainer. Read it together
 with the English and Chinese README files, `CHANGELOG.md`, and
@@ -11,13 +11,13 @@ with the English and Chinese README files, `CHANGELOG.md`, and
 - Repository: `git@github.com:flydmonkey/RemoteLink.git`
 - Local checkout: `C:\Users\Administrator\Projects\apache\remote-gateway`
 - Main branch: `main`
-- Current source version: `0.3.4`
-- Published tag that must stay unchanged: `v0.3.3` at `037a055`
-- `0.3.4` packages the gzip response compression commit `d958370`, the
-  favicon and runtime asset-version commit `f636569`, and the maintainer
-  handoff commit `8068823`.
-- Do not move or overwrite `v0.3.3`. Create a new annotated tag `v0.3.4`
-  from the release-preparation commit.
+- Current source version: `0.3.23`.
+- Latest published tag before this release: `v0.3.22` at `e53996f`.
+- `0.3.23` adds Raw TCP terminal connections through the shared terminal
+  bridge, completes terminal protocol acceptance coverage, and fixes the
+  remaining terminal and user-management localization gaps.
+- Do not move or overwrite published tags. Create `v0.3.23` only after the
+  release-preparation commit is green on `main`.
 
 ## Product scope
 
@@ -31,6 +31,8 @@ depend on Guacamole/guacd or a separate "guard" product.
   one-time WSS tickets to RFB targets.
 - SSH: xterm.js plus libssh2, password/private-key authentication, explicit
   host-fingerprint trust, and SFTP file management.
+- Terminal: xterm.js plus the shared terminal bridge, with Telnet negotiation
+  or transparent Raw TCP transport selected per managed connection.
 - Product name everywhere is `RemoteLink`; do not reintroduce
   `remote-gateway`, `Remote Gateway`, or `RG_*` names.
 
@@ -40,7 +42,7 @@ avatar menus, button dimensions, labels, management navigation, and i18n.
 
 ## Implemented user experience
 
-- Top protocol navigation for RDP, VNC, and SSH.
+- Top protocol navigation for RDP, VNC, SSH, and terminal connections.
 - Protocol tabs without authorized connections are hidden for standard users.
 - Standard users can always open the avatar menu and sign out, including when
   they have no available connection.
@@ -56,7 +58,7 @@ avatar menus, button dimensions, labels, management navigation, and i18n.
 - VNC uses the local browser cursor and automatic scaling.
 - SSH supports password or private-key credentials and hides fields belonging
   to the unselected authentication mode.
-- RDP, VNC, and SSH session toolbars use the same side-toolbar style and the
+- RDP, VNC, SSH, and terminal session toolbars use the same side-toolbar style and the
   same disconnect-button treatment.
 - English `My connections` labels remain on one line in all three tabs.
 - Text responses larger than 1 KiB are gzip-compressed when the client accepts
@@ -78,9 +80,12 @@ avatar menus, button dimensions, labels, management navigation, and i18n.
 - `src/session_manager.cpp`: RDP session lifecycle and auditing.
 - `src/vnc_bridge.cpp`, `src/vnc_ticket_store.cpp`: VNC bridge and tickets.
 - `src/ssh_bridge.cpp`, `src/ssh_files.cpp`: SSH terminal and SFTP operations.
+- `include/remotelink/terminal_bridge.hpp`, `src/telnet_bridge.cpp`: shared
+  Telnet and Raw TCP terminal transport.
 - `web/connect.html`: RDP connection page and shared login behavior.
 - `web/vnc.html`, `web/vnc-session.html`: VNC management and console.
 - `web/ssh.html`, `web/ssh-session.html`: SSH management, terminal, and files.
+- `web/telnet.html`, `web/telnet-session.html`: Telnet/Raw TCP management and terminal.
 - `web/admin.html`, `web/users.html`: RDP management and user administration.
 - `web/i18n.js`: shared translations.
 - `tests/browser/navigation.spec.mjs`: UI consistency and management tests.
@@ -114,9 +119,11 @@ cmake --build build --parallel "$(nproc)"
 ctest --test-dir build --output-on-failure
 ```
 
-At handoff, all 16 Chromium tests and all 4 CTest tests passed. The build may
-print harmless clock-skew warnings because the source tree is mounted from
-Windows.
+For the `0.3.23` release preparation, all 48 Chromium/WebKit Playwright tests,
+all 6 CTest tests, and the containerized RDP/VNC/SSH integrations passed. The
+build may print harmless clock-skew warnings because the source tree is mounted
+from Windows. Firefox could not be launched locally on Windows (`spawn UNKNOWN`),
+so the Linux Browser compatibility workflow remains the Firefox release gate.
 
 For the containerized protocol regression, use `npm run test:e2e`; see the
 README for the optional test token/account environment variables. Never add
@@ -226,17 +233,12 @@ Do not reuse or force-update a published tag.
 
 ## Immediate follow-up
 
-1. `f636569` CI on `main` succeeded for both Browser compatibility and the
-   Docker image build. Re-check the `v0.3.4` tag workflows after the tag is
-   pushed.
-2. Docker Hub token rotation still has to be confirmed by the operator. The
+1. Push the `0.3.23` release-preparation commit to `main` and require the Linux
+   Browser compatibility and Docker image workflows to pass.
+2. Create and push the annotated `v0.3.23` tag only after `main` is green, then
+   confirm the Docker and Linux package workflows and the AMD64/ARM64 manifest.
+3. Docker Hub token rotation still has to be confirmed by the operator. The
    repository does not record whether the token shown during setup was
-   revoked. Do not print secret values. Tag publication logs in to Docker Hub
-   with `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`.
-3. Version files and `CHANGELOG.md` are prepared for `0.3.4`. Local CTest
-   (4/4) and Chromium Playwright (16/16) passed. Next: commit, create
-   annotated tag `v0.3.4`, push `main`, then push the tag. Confirm the Docker
-   and Linux package workflows, including an AMD64 and ARM64 manifest.
-4. Before further UI work, use the existing Playwright screenshots/tests and
-   compare RDP, VNC, and SSH together rather than adjusting one tab in
-   isolation.
+   revoked. Do not print secret values.
+4. Before further UI work, compare RDP, VNC, SSH, and terminal pages together
+   instead of adjusting one protocol in isolation.
