@@ -2715,35 +2715,6 @@
             };
             actions.append(open);
           } else {
-            const preview = document.createElement("button");
-            preview.textContent = "预览";
-            preview.onclick = async () => {
-              const r = await fileRequest(
-                "/api/admin/files/download",
-                joinFilePath(item.name),
-                "",
-              );
-              if (!r.ok) return;
-              const raw = await r.blob();
-              const ext = item.name.split(".").pop().toLowerCase();
-              const types = {
-                pdf: "application/pdf",
-                txt: "text/plain",
-                json: "application/json",
-                png: "image/png",
-                jpg: "image/jpeg",
-                jpeg: "image/jpeg",
-                gif: "image/gif",
-                mp3: "audio/mpeg",
-                mp4: "video/mp4",
-                webm: "video/webm",
-              };
-              const url = URL.createObjectURL(
-                new Blob([raw], { type: types[ext] || raw.type }),
-              );
-              window.open(url, "_blank", "noopener");
-              setTimeout(() => URL.revokeObjectURL(url), 60000);
-            };
             const download = document.createElement("button");
             download.textContent = "下载";
             download.onclick = async () => {
@@ -2759,7 +2730,7 @@
               a.click();
               setTimeout(() => URL.revokeObjectURL(a.href), 1000);
             };
-            actions.append(preview, download);
+            actions.append(download);
           }
           const rename = document.createElement("button");
           rename.textContent = "重命名";
