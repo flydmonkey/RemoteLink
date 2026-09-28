@@ -32,6 +32,25 @@ RUN bash ./scripts/copy-novnc-core.sh \
     && test -e /stage/lib/libdatachannel.so \
     && test -e /stage/lib/libvncclient.so
 
+FROM builder AS guacd-builder
+
+ARG GUACAMOLE_VERSION=1.6.0
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      autoconf automake libtool libcairo2-dev libjpeg-turbo8-dev libpng-dev \
+      libpulse-dev libwebp-dev uuid-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && git clone --branch "${GUACAMOLE_VERSION}" --depth 1 \
+      https://github.com/apache/guacamole-server.git /guacamole-server \
+    && cd /guacamole-server \
+    && autoreconf -fi \
+    && ./configure --prefix=/opt/guacamole \
+      --with-freerdp-plugin-dir=/opt/guacamole/lib/freerdp3 \
+      --disable-guacenc --disable-guaclog \
+      CPPFLAGS=-Wno-error=deprecated-declarations \
+    && make -j"$(nproc)" \
+    && make DESTDIR=/stage-guacd install
+
 FROM ubuntu:24.04 AS runtime
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -46,9 +65,9 @@ LABEL org.opencontainers.image.title="RemoteLink" \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl ghostscript openssl tini \
-      guacd libguac-client-rdp0t64 \
       freerdp3-dev libwinpr3-dev libopenh264-dev libopus-dev libyuv-dev \
-      libssl-dev libssh2-1-dev zlib1g \
+      libcairo2 libjpeg-turbo8 libpng16-16t64 libpulse0 libssl-dev \
+      libssh2-1-dev libwebp7 libossp-uuid16 zlib1g \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --user-group --home-dir /nonexistent \
       --shell /usr/sbin/nologin remotelink \
@@ -60,11 +79,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && printf '{"targets":[]}\n' > /etc/remotelink/targets.json
 
 COPY --from=builder /stage/ /opt/remotelink/
+COPY --from=guacd-builder /stage-guacd/ /
 COPY --from=builder /src/web /opt/remotelink/web
 COPY docker/entrypoint.sh /usr/local/bin/remotelink-entrypoint
 COPY docker/generate-default-certificate.sh /usr/local/bin/remotelink-generate-certificate
 
-ENV LD_LIBRARY_PATH=/opt/remotelink/lib \
+ENV LD_LIBRARY_PATH=/opt/remotelink/lib:/opt/guacamole/lib \
     HOME=/tmp \
     XDG_CONFIG_HOME=/tmp/.config \
     REMOTELINK_WEB_ROOT=/opt/remotelink/web \
@@ -83,6 +103,7 @@ VOLUME ["/var/lib/remotelink"]
 EXPOSE 18080/tcp
 EXPOSE 50000-50019/udp
 RUN chmod 0755 /usr/local/bin/remotelink-entrypoint /usr/local/bin/remotelink-generate-certificate \
+    && ln -s /opt/guacamole/sbin/guacd /usr/sbin/guacd \
     && remotelink-generate-certificate \
     && chown -R remotelink:remotelink /etc/remotelink/tls
 USER remotelink
