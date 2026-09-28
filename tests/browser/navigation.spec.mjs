@@ -712,8 +712,8 @@ test("Telnet page manages connections with semantic feedback", async ({ page }) 
   await expect(page.locator("#port")).toHaveValue("23");
   await expect(page.locator("#private-key")).toHaveCount(0);
   await page.locator("#protocol").selectOption("raw");
-  await expect(page.locator("#username")).toBeDisabled();
-  await expect(page.locator("#password")).toBeDisabled();
+  await expect(page.locator("#username")).toBeHidden();
+  await expect(page.locator("#password")).toBeHidden();
   await page.locator("#host").fill("127.0.0.1");
   await page.getByRole("button", { name: "测试连接" }).click();
   expect(testedProtocol).toBe("raw");

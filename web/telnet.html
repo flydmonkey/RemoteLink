@@ -684,7 +684,7 @@
           max="65535"
           value="23"
           required
-        /><label>用户名</label
+        /><label id="username-label">用户名</label
         ><input id="username" maxlength="256" /><label id="password-label">密码（可选）</label
         ><input id="password" type="password" />
         <div id="editor-notice" class="notice"></div>
@@ -943,10 +943,13 @@
       document.querySelector("#cancel").onclick = () => editor.close();
       function updateProtocolFields() {
         const raw = document.querySelector("#protocol").value === "raw";
+        for (const id of ["username-label", "username", "password-label", "password"]) {
+          document.querySelector(`#${id}`).hidden = raw;
+        }
         document.querySelector("#username").disabled = raw;
         document.querySelector("#password").disabled = raw;
-        document.querySelector("#password-label").textContent = raw ? "密码（Raw TCP 不使用）" : "密码（可选）";
-        if (raw && !editing) {
+        document.querySelector("#password-label").textContent = "密码（可选）";
+        if (raw) {
           document.querySelector("#username").value = "";
           document.querySelector("#password").value = "";
         }
@@ -959,8 +962,8 @@
           name: document.querySelector("#name").value.trim(),
           host: document.querySelector("#host").value.trim(),
           port: Number(document.querySelector("#port").value),
-          username: document.querySelector("#username").value.trim(),
-          password: document.querySelector("#password").value,
+          username: document.querySelector("#protocol").value === "raw" ? "" : document.querySelector("#username").value.trim(),
+          password: document.querySelector("#protocol").value === "raw" ? "" : document.querySelector("#password").value,
         };
       }
       document.querySelector("#test").onclick = async () => {

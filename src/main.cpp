@@ -1220,14 +1220,16 @@ int main() {
                 const auto supplied_id=payload.value("id","");const auto id=supplied_id.empty()?"telnet-"+generate_connection_id():supplied_id;
                 static const std::regex valid_telnet_id("^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$");
                 const auto name=payload.value("name","");const auto host=payload.value("host","");const auto port=payload.value("port",23);
-                const auto protocol=payload.value("protocol","telnet");const auto username=payload.value("username","");
+                const auto protocol=payload.value("protocol","telnet");
+                const auto username=protocol=="raw"?std::string{}:payload.value("username","");
                 if(!std::regex_match(id,valid_telnet_id)||name.empty()||host.empty()||port<1||port>65535||(protocol!="telnet"&&protocol!="raw")){response.status=400;response.body=json{{"error","终端连接配置无效"}}.dump();return response;}
                 if(name.size()>128||host.size()>255||username.size()>256||payload.value("password","").size()>4096){response.status=400;response.body=json{{"error","Telnet 连接配置过长"}}.dump();return response;}
                 std::lock_guard lock(telnet_connections_mutex);
                 auto found=std::find_if(telnet_connections.begin(),telnet_connections.end(),[&](const auto& item){return item.id==id;});
                 if(found==telnet_connections.end()&&!supplied_id.empty()){response.status=404;response.body=json{{"error","Telnet connection not found"}}.dump();return response;}
-                TelnetConnection updated{id,name,host,static_cast<std::uint16_t>(port),protocol,username,payload.value("password","")};
-                if(found!=telnet_connections.end()){if(updated.password.empty())updated.password=found->password;*found=std::move(updated);}else telnet_connections.push_back(std::move(updated));
+                TelnetConnection updated{id,name,host,static_cast<std::uint16_t>(port),protocol,username,
+                    protocol=="raw"?std::string{}:payload.value("password","")};
+                if(found!=telnet_connections.end()){if(protocol!="raw"&&updated.password.empty())updated.password=found->password;*found=std::move(updated);}else telnet_connections.push_back(std::move(updated));
                 save_telnet_connections(telnet_connections_path,telnet_connection_secrets_path,telnet_connections);
                 response.body=json{{"id",id}}.dump();return response;
             }
