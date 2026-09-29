@@ -2337,8 +2337,19 @@
       }
 
       logout.addEventListener("click", () => {
-        if (ws?.readyState === WebSocket.OPEN)
-          ws.send(JSON.stringify({ type: "stop" }));
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
+        if (ws) {
+          if (ws.readyState === WebSocket.OPEN)
+            ws.send(JSON.stringify({ type: "stop" }));
+          ws.onclose = null;
+          try {
+            ws.close();
+          } catch {}
+          ws = null;
+        }
         sessionStorage.removeItem("remotelink-session");
         location.replace("/");
       });
@@ -2424,6 +2435,17 @@
             remoteAudio.srcObject = null;
             if (location.pathname.startsWith("/session")) {
               sessionStorage.removeItem("remotelink-session");
+              if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+                reconnectTimer = null;
+              }
+              if (ws) {
+                ws.onclose = null;
+                try {
+                  ws.close();
+                } catch {}
+                ws = null;
+              }
               location.replace("/");
               return;
             }

@@ -767,7 +767,16 @@ int main() {
     webrtc.set_input_handler([&sessions](const std::string& peer, const std::string& input) { sessions.input(peer, input); });
     webrtc.set_bitrate_handler([&sessions](const std::string& peer, std::uint32_t bitrate) { return sessions.set_bitrate(peer, bitrate); });
     webrtc.set_key_frame_handler([&sessions](const std::string& peer) { sessions.request_key_frame(peer); });
-    webrtc.set_close_handler([&sessions](const std::string& peer) { sessions.stop(peer); });
+    webrtc.set_close_handler([&sessions](const std::string& peer) {
+        // FreeRDP teardown can block for seconds. Never run it on the signaling
+        // callback thread or a returning connect page cannot authenticate.
+        std::thread([&sessions, peer] {
+            try { sessions.stop(peer); }
+            catch (const std::exception& error) {
+                std::cerr << "session stop failed: " << error.what() << '\n';
+            }
+        }).detach();
+    });
     // Keep the unauthenticated liveness endpoint intentionally minimal.
     // Detailed session and performance data is available through the
     // authenticated admin API below.
@@ -925,7 +934,14 @@ int main() {
             for (const auto& target : target_catalog) {
                 if (!administrator &&
                     std::find(allowed.begin(), allowed.end(), target.id) == allowed.end()) continue;
-                targets.push_back({{"id", target.id}, {"name", target.name}});
+                targets.push_back({
+                    {"id", target.id}, {"name", target.name},
+                    {"host", target.rdp.hostname}, {"username", target.rdp.username},
+                    {"backend", target.rdp_backend},
+                    {"width", target.rdp.width}, {"height", target.rdp.height},
+                    {"bitrate", target.rdp.video_bitrate}, {"maxFps", target.rdp.max_fps},
+                    {"sound", target.allow_audio}, {"printer", target.allow_printing},
+                    {"files", target.allow_files}, {"clipboard", target.rdp.redirect_clipboard}});
             }
             response.body = json{{"targets", std::move(targets)}}.dump();
             return response;

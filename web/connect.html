@@ -953,6 +953,7 @@
       });
       let accessToken = "";
       let socket;
+      let reconnectTimer = null;
       let targets = [];
       function automaticResolution() {
         const scale = Math.max(1, window.devicePixelRatio || 1);
@@ -967,14 +968,47 @@
           ),
         };
       }
+      function applyTargets(nextTargets) {
+        targets = nextTargets || [];
+        targetList.replaceChildren();
+        targetSelect.replaceChildren();
+        for (const target of targets) {
+          const option = document.createElement("option");
+          option.value = target.id;
+          option.textContent = target.host
+            ? `${target.name} · ${target.host}`
+            : target.name;
+          targetSelect.append(option);
+        }
+        const preferred = localStorage.getItem("remotelink-last-target");
+        targetSelect.value = targets.some((item) => item.id === preferred)
+          ? preferred
+          : targets[0]?.id || "";
+        const enabled = targets.length > 0;
+        targetSelect.disabled = !enabled;
+        connectButton.disabled = !enabled;
+        status.textContent = enabled
+          ? "选择计算机并连接"
+          : "没有可用的远程主机";
+      }
       function connectGateway() {
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
+        if (socket && socket.readyState < WebSocket.CLOSING) {
+          socket.onclose = null;
+          socket.close();
+        }
+        if (!targets.length) status.textContent = "正在连接网关…";
         const scheme = location.protocol === "https:" ? "wss" : "ws";
-        socket = new WebSocket(`${scheme}://${location.host}/ws`);
-        socket.onopen = () =>
-          socket.send(
+        const next = new WebSocket(`${scheme}://${location.host}/ws`);
+        socket = next;
+        next.onopen = () =>
+          next.send(
             JSON.stringify({ type: "authenticate", token: accessToken }),
           );
-        socket.onmessage = (event) => {
+        next.onmessage = (event) => {
           const message = JSON.parse(event.data);
           if (message.type === "auth-error") {
             accessToken = "";
@@ -987,30 +1021,28 @@
           if (message.type !== "authenticated") return;
           sessionStorage.setItem("remotelink-access-token", accessToken);
           if (login.open) login.close();
-          targets = message.targets || [];
-          targetList.replaceChildren();
-          targetSelect.replaceChildren();
-          for (const target of targets) {
-            const option = document.createElement("option");
-            option.value = target.id;
-            option.textContent = `${target.name} · ${target.host}`;
-            targetSelect.append(option);
+          applyTargets(message.targets || []);
+        };
+        next.onerror = () => {
+          if (socket !== next) return;
+          if (!targets.length) {
+            status.textContent = "无法连接网关";
+            error.textContent = "请确认网关服务已启动。";
           }
-          const preferred = localStorage.getItem("remotelink-last-target");
-          targetSelect.value = targets.some((item) => item.id === preferred)
-            ? preferred
-            : targets[0]?.id || "";
-          const enabled = targets.length > 0;
-          targetSelect.disabled = !enabled;
-          connectButton.disabled = !enabled;
-          status.textContent = enabled
-            ? "选择计算机并连接"
-            : "没有可用的远程主机";
         };
-        socket.onerror = () => {
-          status.textContent = "无法连接网关";
-          error.textContent = "请确认网关服务已启动。";
+        next.onclose = () => {
+          if (socket !== next || !accessToken) return;
+          if (!targets.length) status.textContent = "信令断开，正在恢复…";
+          reconnectTimer = setTimeout(connectGateway, 1000);
         };
+      }
+      async function loadTargets() {
+        const response = await fetch("/api/rdp/targets", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("targets");
+        applyTargets((await response.json()).targets || []);
       }
       loginForm.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -1035,6 +1067,11 @@
           loginPassword.value = "";
           statusNav.hidden = !account.admin;
           showAccount(account);
+          try {
+            await loadTargets();
+          } catch {
+            /* Signaling still tries to populate the list. */
+          }
           connectGateway();
         } catch (error) {
           authError.textContent = "无法连接登录服务";
@@ -1134,6 +1171,11 @@
           const account = await response.json();
           statusNav.hidden = !account.admin;
           showAccount(account);
+          try {
+            await loadTargets();
+          } catch {
+            /* Fall through to signaling; loadTargets failure must not block reconnect. */
+          }
           connectGateway();
         } catch {
           accessToken = "";
@@ -1142,6 +1184,10 @@
         }
       }
       logoutAccount.addEventListener("click", () => {
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
         if (socket && socket.readyState < WebSocket.CLOSING) {
           socket.onclose = null;
           socket.close();
@@ -1149,6 +1195,13 @@
         sessionStorage.removeItem("remotelink-access-token");
         sessionStorage.removeItem("remotelink-session");
         location.reload();
+      });
+      window.addEventListener("pageshow", (event) => {
+        if (!event.persisted) return;
+        if (!accessToken) {
+          accessToken = sessionStorage.getItem("remotelink-access-token") || "";
+        }
+        resumeAccount();
       });
       resumeAccount();
     </script>

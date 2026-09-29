@@ -7,6 +7,8 @@ admin = (web / "admin.html").read_text(encoding="utf-8")
 assert "#connection-backend" in admin and "width: 100%" in admin
 connect = (web / "connect.html").read_text(encoding="utf-8")
 session = (web / "index.html").read_text(encoding="utf-8")
+assert "loadTargets" in connect and "/api/rdp/targets" in connect
+assert "ws.onclose = null" in session
 settings = (web / "settings.html").read_text(encoding="utf-8")
 i18n = (web / "i18n.js").read_text(encoding="utf-8")
 vnc_session = (web / "vnc-session.html").read_text(encoding="utf-8")
