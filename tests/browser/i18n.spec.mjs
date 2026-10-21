@@ -43,26 +43,37 @@ test("every web module translates visible Chinese copy to English", async ({ pag
       : { targets: [] };
     await route.fulfill({ json: payload });
   });
+  const collectChinese = () => page.evaluate(() => {
+    const found = new Set();
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      if (["SCRIPT", "STYLE"].includes(walker.currentNode.parentElement?.tagName)) continue;
+      if (walker.currentNode.parentElement?.closest("#account-language")) continue;
+      const value = walker.currentNode.nodeValue.trim();
+      if (/\p{Script=Han}/u.test(value)) found.add(value);
+    }
+    for (const element of document.querySelectorAll("[title],[aria-label],[placeholder]"))
+      for (const name of ["title", "aria-label", "placeholder"]) {
+        const value = element.getAttribute(name)?.trim();
+        if (value && /\p{Script=Han}/u.test(value)) found.add(value);
+      }
+    return [...found];
+  });
   const missing = [];
   for (const path of pages) {
     await page.goto(path);
     await page.waitForTimeout(100);
-    const values = await page.evaluate(() => {
-      const found = new Set();
-      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-      while (walker.nextNode()) {
-        if (["SCRIPT", "STYLE"].includes(walker.currentNode.parentElement?.tagName)) continue;
-        if (walker.currentNode.parentElement?.closest("#account-language")) continue;
-        const value = walker.currentNode.nodeValue.trim();
-        if (/\p{Script=Han}/u.test(value)) found.add(value);
+    // Session pages without a usable session redirect immediately after load.
+    let values;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        values = await collectChinese();
+        break;
+      } catch (error) {
+        if (attempt >= 3 || !/Execution context was destroyed/.test(error.message)) throw error;
+        await page.waitForLoadState("load");
       }
-      for (const element of document.querySelectorAll("[title],[aria-label],[placeholder]"))
-        for (const name of ["title", "aria-label", "placeholder"]) {
-          const value = element.getAttribute(name)?.trim();
-          if (value && /\p{Script=Han}/u.test(value)) found.add(value);
-        }
-      return [...found];
-    });
+    }
     missing.push(...values.map((value) => `${path}: ${value}`));
   }
   expect(missing, missing.join("\n")).toEqual([]);
