@@ -1,6 +1,6 @@
 # RemoteLink project handoff
 
-Last updated: 2026-09-29
+Last updated: 2026-10-21
 
 This document is the starting point for the next maintainer. Read it together
 with the English and Chinese README files, `CHANGELOG.md`, and
@@ -11,12 +11,12 @@ with the English and Chinese README files, `CHANGELOG.md`, and
 - Repository: `git@github.com:flydmonkey/RemoteLink.git`
 - Local checkout: `C:\Users\Administrator\Projects\apache\remote-gateway`
 - Main branch: `main`
-- Current source version: `0.3.23`.
-- Latest published tag before this release: `v0.3.22` at `e53996f`.
-- `0.3.23` adds Raw TCP terminal connections through the shared terminal
-  bridge, completes terminal protocol acceptance coverage, and fixes the
-  remaining terminal and user-management localization gaps.
-- Do not move or overwrite published tags. Create `v0.3.23` only after the
+- Current source version: `0.3.24`.
+- Latest published tag before this release: `v0.3.23` at `d9c0904`.
+- `0.3.24` fixes an occasional gateway crash when several RDP sessions connect
+  concurrently: FreeRDP's process-wide addin provider is now registered under
+  a lock and the gateway provider can no longer capture itself as fallback.
+- Do not move or overwrite published tags. Create `v0.3.24` only after the
   release-preparation commit is green on `main`.
 
 ## Product scope
@@ -233,9 +233,9 @@ Do not reuse or force-update a published tag.
 
 ## Immediate follow-up
 
-1. Push the `0.3.23` release-preparation commit to `main` and require the Linux
+1. Push the `0.3.24` release-preparation commit to `main` and require the Linux
    Browser compatibility and Docker image workflows to pass.
-2. Create and push the annotated `v0.3.23` tag only after `main` is green, then
+2. Create and push the annotated `v0.3.24` tag only after `main` is green, then
    confirm the Docker and Linux package workflows and the AMD64/ARM64 manifest.
 3. Docker Hub token rotation still has to be confirmed by the operator. The
    repository does not record whether the token shown during setup was

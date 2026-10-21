@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.3.24
+
+- Fix an occasional gateway crash when several RDP sessions connect at the same time; the shared FreeRDP channel provider could point back at itself and recurse until the stack overflowed.
+
 ## 0.3.23
 
 - Translate user-management roles, suspended state, edit actions, and connection-access titles as complete phrases.
