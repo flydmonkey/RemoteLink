@@ -31,6 +31,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <mutex>
 #include <new>
 #include <stdexcept>
 #include <sstream>
@@ -95,7 +96,8 @@ struct GatewayAudioDevice {
     std::uint16_t channels = 2;
 };
 
-FREERDP_LOAD_CHANNEL_ADDIN_ENTRY_FN fallback_addin_provider = nullptr;
+std::mutex addin_provider_mutex;
+std::atomic<FREERDP_LOAD_CHANNEL_ADDIN_ENTRY_FN> fallback_addin_provider { nullptr };
 std::mutex gateway_printer_directories_mutex;
 std::unordered_map<std::string, std::string> gateway_printer_directories;
 std::atomic_uint64_t gateway_printer_sequence { 1 };
@@ -325,8 +327,22 @@ PVIRTUALCHANNELENTRY gateway_addin_provider(LPCSTR name, LPCSTR subsystem,
         std::strcmp(subsystem, "gateway") == 0) {
         return reinterpret_cast<PVIRTUALCHANNELENTRY>(gateway_printer_entry);
     }
-    return fallback_addin_provider
-        ? fallback_addin_provider(name, subsystem, type, flags) : nullptr;
+    const auto fallback = fallback_addin_provider.load();
+    return fallback != nullptr && fallback != gateway_addin_provider
+        ? fallback(name, subsystem, type, flags) : nullptr;
+}
+
+/* FreeRDP keeps one process-wide addin provider and every
+ * freerdp_client_context_new() resets it. Sessions connect on separate
+ * threads, so the fallback must never capture gateway_addin_provider itself,
+ * otherwise channel lookup recurses until the stack overflows. */
+rdpContext* new_gateway_client_context(const RDP_CLIENT_ENTRY_POINTS* entry_points) {
+    std::lock_guard lock(addin_provider_mutex);
+    rdpContext* context = freerdp_client_context_new(entry_points);
+    const auto current = freerdp_get_current_addin_provider();
+    if (current != gateway_addin_provider) fallback_addin_provider.store(current);
+    freerdp_register_addin_provider(gateway_addin_provider, 0);
+    return context;
 }
 
 GatewayRdpContext* gateway_context(rdpContext* context) {
@@ -726,14 +742,12 @@ void RdpFrameSource::run(std::stop_token stop_token, FrameHandler on_frame) {
     entry_points.ClientNew = client_new;
     entry_points.ClientFree = client_free;
 
-    rdpContext* context = freerdp_client_context_new(&entry_points);
+    rdpContext* context = new_gateway_client_context(&entry_points);
     if (context == nullptr) {
         throw std::runtime_error("unable to allocate FreeRDP context");
     }
     freerdp* instance = context->instance;
     gateway_context(context)->owner = this;
-    fallback_addin_provider = freerdp_get_current_addin_provider();
-    freerdp_register_addin_provider(gateway_addin_provider, 0);
 
     rdpSettings* settings = instance->context->settings;
     // The service has no home directory. FreeRDP's printer channel needs a
